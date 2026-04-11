@@ -31,7 +31,14 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
+.env.*
 .env*.local
+
+# local editor/generated files
+.vscode/.react/
+.eslintcache
+*.log
 
 # typescript
 *.tsbuildinfo
