@@ -4,12 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AppBottomTabs } from "../components/app-bottom-tabs";
-import { getIsLoggedIn } from "../components/auth";
+import { ensureAuthReady, useAuthSession } from "../components/auth";
+import { refreshCourseCatalog } from "../components/course-management";
 import { theme } from "../components/theme";
 
 export default function RootLayout() {
   const router = useRouter();
   const pathname = usePathname();
+  const auth = useAuthSession();
   const [isReady, setIsReady] = useState(false);
   const routerRef = useRef(router);
   const systemBackground = theme.system.getBackground(pathname);
@@ -21,53 +23,43 @@ export default function RootLayout() {
   }, [systemBackground]);
 
   useEffect(() => {
-    let active = true;
+    void ensureAuthReady();
+    void refreshCourseCatalog();
+  }, []);
 
-    const applyRouteGuard = (isLoggedIn: boolean) => {
-      if (!active) {
-        return;
+  useEffect(() => {
+    if (!auth.initialized) {
+      return;
+    }
+
+    const isPublicAuthRoute =
+      pathname === "/splash" ||
+      pathname === "/login" ||
+      pathname === "/forgot-password" ||
+      pathname === "/" ||
+      pathname === "/launch";
+
+    if (!auth.isAuthenticated) {
+      if (!isPublicAuthRoute) {
+        routerRef.current.replace("/splash");
       }
-
-      const isPublicAuthRoute =
-        pathname === "/splash" ||
-        pathname === "/login" ||
-        pathname === "/forgot-password" ||
-        pathname === "/" ||
-        pathname === "/launch";
-
-      if (!isLoggedIn) {
-        if (!isPublicAuthRoute) {
-          routerRef.current.replace("/splash");
-        }
-        setIsReady(true);
-        return;
-      }
-
-      if (
-        pathname === "/splash" ||
-        pathname === "/login" ||
-        pathname === "/forgot-password" ||
-        pathname === "/"
-      ) {
-        routerRef.current.replace("/home");
-      }
-
       setIsReady(true);
-    };
+      return;
+    }
 
-    const guardRoute = async () => {
-      const isLoggedIn = await getIsLoggedIn();
-      applyRouteGuard(isLoggedIn);
-    };
+    if (
+      pathname === "/splash" ||
+      pathname === "/login" ||
+      pathname === "/forgot-password" ||
+      pathname === "/"
+    ) {
+      routerRef.current.replace("/home");
+    }
 
-    guardRoute();
+    setIsReady(true);
+  }, [auth.initialized, auth.isAuthenticated, pathname]);
 
-    return () => {
-      active = false;
-    };
-  }, [pathname]);
-
-  if (!isReady) {
+  if (!isReady || !auth.initialized) {
     return <View style={[styles.fallback, { backgroundColor: systemBackground }]} />;
   }
 

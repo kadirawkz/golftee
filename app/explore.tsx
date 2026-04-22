@@ -9,21 +9,15 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { CourseCard } from "../components/course-card";
 import {
-  allCourses,
-  calculateDistanceKm,
-  CourseStyle,
-  DEFAULT_USER_LOCATION,
-  SRI_LANKA_MAP_REGION,
-  STYLE_OPTIONS,
+    calculateDistanceKm,
+    CourseStyle,
+    DEFAULT_USER_LOCATION,
+    SRI_LANKA_MAP_REGION,
+    STYLE_OPTIONS,
 } from "../components/course-data";
+import { useCourseCatalog } from "../components/course-management";
 import { openInGoogleMaps } from "../components/map-links";
 import { theme } from "../components/theme";
-
-const COURSES_WITH_METRICS = allCourses.map((course) => ({
-  ...course,
-  priceNum: Number.parseInt(course.price.replace(/[^0-9]/g, ""), 10),
-  ratingNum: Number.parseFloat(course.rating),
-}));
 
 const PRICE_RANGES = [
   { label: "All Prices", min: 0, max: 999 },
@@ -47,8 +41,16 @@ const USER_FOCUS_REGION_DELTA = {
 
 type LocationState = "idle" | "loading" | "ready" | "fallback";
 type LocationNoticeKind = "none" | "permissionDenied" | "permissionBlocked" | "servicesDisabled" | "error";
-type CourseWithMetrics = (typeof COURSES_WITH_METRICS)[number];
+type CourseWithMetrics = ReturnType<typeof buildCoursesWithMetrics>[number];
 type DisplayedCourse = CourseWithMetrics & { distanceKm: number };
+
+function buildCoursesWithMetrics(courses: ReturnType<typeof useCourseCatalog>["courses"]) {
+  return courses.map((course) => ({
+    ...course,
+    priceNum: Number.parseInt(course.price.replace(/[^0-9]/g, ""), 10),
+    ratingNum: Number.parseFloat(course.rating),
+  }));
+}
 
 const DEFAULT_LOCATION_LABEL = "Showing courses near Colombo. Tap Use My Location for nearby results.";
 const LOCATION_ERROR_LABEL = "Could not get your current location, so courses are shown near Colombo.";
@@ -60,6 +62,7 @@ const LOCATION_ERROR_NOTICE = {
 
 export default function ExploreScreen() {
   const router = useRouter();
+  const courseCatalog = useCourseCatalog();
   const { section, scrollOffset } = useLocalSearchParams<{ section?: string; scrollOffset?: string }>();
   const scrollRef = useRef<FlatList<DisplayedCourse>>(null);
   const mapRef = useRef<MapView>(null);
@@ -93,6 +96,7 @@ export default function ExploreScreen() {
   const resolvedScrollOffset = Number.isFinite(parsedScrollOffset) && parsedScrollOffset > 0
     ? parsedScrollOffset
     : DEFAULT_VIEW_ALL_SCROLL_OFFSET;
+  const coursesWithMetrics = useMemo(() => buildCoursesWithMetrics(courseCatalog.courses), [courseCatalog.courses]);
   const openCourseDetails = useCallback(
     (courseId: string) => {
       router.push({ pathname: "/course-details", params: { id: courseId } });
@@ -339,7 +343,7 @@ export default function ExploreScreen() {
   const activePriceRange = PRICE_RANGES[selectedPriceRange];
 
   const displayedCourses = useMemo(() => {
-    return COURSES_WITH_METRICS.filter((course) => {
+    return coursesWithMetrics.filter((course) => {
       const styleMatch = activeStyle === "ALL" || course.style === activeStyle;
       const priceMatch = course.priceNum >= activePriceRange.min && course.priceNum <= activePriceRange.max;
       const ratingMatch = course.ratingNum >= selectedRating;
@@ -350,7 +354,7 @@ export default function ExploreScreen() {
 
       return styleMatch && priceMatch && ratingMatch && searchMatch;
     });
-  }, [activePriceRange.max, activePriceRange.min, activeStyle, normalizedSearchQuery, selectedRating]);
+  }, [activePriceRange.max, activePriceRange.min, activeStyle, coursesWithMetrics, normalizedSearchQuery, selectedRating]);
 
   const displayedCoursesWithDistance = useMemo<DisplayedCourse[]>(() => {
     return displayedCourses
@@ -668,6 +672,7 @@ export default function ExploreScreen() {
               <CourseCard
                 key={course.id}
                 variant="compact"
+                size="small"
                 title={course.title}
                 location={`${course.location} - ${course.distanceKm.toFixed(0)} km`}
                 image={course.image}
@@ -892,7 +897,7 @@ const styles = StyleSheet.create({
     maxWidth: 280,
   },
   trendingCard: {
-    width: 292,
+    width: 316,
   },
   sectionSeparator: {
     marginHorizontal: 16,

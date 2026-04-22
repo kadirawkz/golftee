@@ -6,7 +6,7 @@ import { InteractionManager, ScrollView, StyleSheet, Text, View, useWindowDimens
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
-import { getCourseById } from "../components/course-data";
+import { getManagedCourseById } from "../components/course-management";
 import { toggleFavoriteCourse, useIsFavoriteCourse } from "../components/favorites";
 import { openInGoogleMaps } from "../components/map-links";
 import { theme } from "../components/theme";
@@ -102,7 +102,8 @@ export default function CourseDetailsScreen() {
   const [weatherState, setWeatherState] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [weatherError, setWeatherError] = useState<string | null>(null);
   const [showAllReviews, setShowAllReviews] = useState(false);
-  const course = getCourseById(courseId);
+  const [favoriteNotice, setFavoriteNotice] = useState<string | null>(null);
+  const course = getManagedCourseById(courseId);
   const isFavorite = useIsFavoriteCourse(course.id);
   const isCompact = width < 360;
   const isTabletLike = width >= 768;
@@ -154,6 +155,15 @@ export default function CourseDetailsScreen() {
     };
   }, [course.coordinates, course.id]);
 
+  const handleFavoriteToggle = async () => {
+    try {
+      setFavoriteNotice(null);
+      await toggleFavoriteCourse(course.id);
+    } catch (error) {
+      setFavoriteNotice(error instanceof Error ? error.message : "Unable to update favourites right now.");
+    }
+  };
+
   return (
     <SafeAreaView style={styles.screen} edges={["top"]}>
       <StatusBar style="dark" />
@@ -169,7 +179,7 @@ export default function CourseDetailsScreen() {
           <View style={styles.heroOverlay} />
           <Pressable
             style={[styles.favoriteButton, isFavorite && styles.favoriteButtonActive]}
-            onPress={() => void toggleFavoriteCourse(course.id)}
+            onPress={() => void handleFavoriteToggle()}
             variant="icon"
           >
             <Ionicons
@@ -208,6 +218,7 @@ export default function CourseDetailsScreen() {
                 <Text style={styles.metaMapButtonText}>Open in Map</Text>
               </Pressable>
             </View>
+            {favoriteNotice ? <Text style={styles.favoriteNotice}>{favoriteNotice}</Text> : null}
           </View>
         </View>
 
@@ -485,6 +496,13 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
     color: theme.colors.surface,
+    fontWeight: "600",
+  },
+  favoriteNotice: {
+    marginTop: 8,
+    fontSize: theme.typography.bodySm.fontSize,
+    lineHeight: theme.typography.bodySm.lineHeight,
+    color: theme.colors.textOnPrimaryStrong,
     fontWeight: "600",
   },
   metaDot: {

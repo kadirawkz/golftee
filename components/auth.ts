@@ -1,105 +1,325 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as SecureStore from "expo-secure-store";
+import type { Session } from "@supabase/supabase-js";
+import { useSyncExternalStore } from "react";
+import type { ProfileInsert, ProfileRow, ProfileUpdate } from "../lib/database.types";
+import { supabase, supabaseConfigurationError } from "../lib/supabase";
 
-const AUTH_STATE_KEY = "golftee:auth:logged-in";
-let authState: boolean | null = null;
-let pendingAuthStateRead: Promise<boolean> | null = null;
+type AuthSnapshot = {
+  initialized: boolean;
+  isAuthenticated: boolean;
+  session: Session | null;
+  profile: ProfileRow | null;
+  profileLoading: boolean;
+  profileError: string | null;
+};
 
-async function readPersistedAuthState(): Promise<string | null> {
-  try {
-    return await SecureStore.getItemAsync(AUTH_STATE_KEY);
-  } catch {
-    return await AsyncStorage.getItem(AUTH_STATE_KEY);
+type AuthListener = () => void;
+
+const DEFAULT_SNAPSHOT: AuthSnapshot = {
+  initialized: false,
+  isAuthenticated: false,
+  session: null,
+  profile: null,
+  profileLoading: false,
+  profileError: null,
+};
+
+let snapshot = DEFAULT_SNAPSHOT;
+let initPromise: Promise<void> | null = null;
+let authListenerAttached = false;
+const listeners = new Set<AuthListener>();
+
+function emitChange() {
+  for (const listener of listeners) {
+    listener();
   }
 }
 
-async function persistAuthState(value: boolean): Promise<void> {
-  if (value) {
-    try {
-      await SecureStore.setItemAsync(AUTH_STATE_KEY, "true");
-      await AsyncStorage.removeItem(AUTH_STATE_KEY);
-      return;
-    } catch {
-      await AsyncStorage.setItem(AUTH_STATE_KEY, "true");
-      return;
-    }
-  }
-
-  try {
-    await SecureStore.deleteItemAsync(AUTH_STATE_KEY);
-  } catch {
-    // Best effort delete. Fall through to AsyncStorage cleanup.
-  }
-  await AsyncStorage.removeItem(AUTH_STATE_KEY);
+function updateSnapshot(patch: Partial<AuthSnapshot>) {
+  snapshot = {
+    ...snapshot,
+    ...patch,
+  };
+  emitChange();
 }
 
-async function migrateLegacyAuthStateIfNeeded() {
-  let migratedToSecureStore = false;
-
-  try {
-    const legacyValue = await AsyncStorage.getItem(AUTH_STATE_KEY);
-    if (legacyValue === "true") {
-      await SecureStore.setItemAsync(AUTH_STATE_KEY, "true");
-      migratedToSecureStore = true;
-    }
-  } catch {
-    // Ignore migration failures and keep current storage as source of truth.
+function formatAuthErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
   }
 
-  if (migratedToSecureStore) {
-    try {
-      await AsyncStorage.removeItem(AUTH_STATE_KEY);
-    } catch {
-      // Ignore legacy cleanup failures.
-    }
+  return fallback;
+}
+
+async function loadProfile(userId: string) {
+  updateSnapshot({ profileLoading: true, profileError: null });
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) {
+    updateSnapshot({
+      profile: null,
+      profileLoading: false,
+      profileError: formatAuthErrorMessage(error, "Unable to load your profile."),
+    });
+    return;
   }
+
+  updateSnapshot({
+    profile: data,
+    profileLoading: false,
+    profileError: null,
+  });
+}
+
+async function applySession(session: Session | null) {
+  updateSnapshot({
+    initialized: true,
+    isAuthenticated: Boolean(session),
+    session,
+    profile: session ? snapshot.profile : null,
+    profileError: null,
+  });
+
+  if (!session?.user?.id) {
+    updateSnapshot({
+      profile: null,
+      profileLoading: false,
+    });
+    return;
+  }
+
+  await loadProfile(session.user.id);
+}
+
+async function bootstrapAuth() {
+  if (snapshot.initialized) {
+    return;
+  }
+
+  if (supabaseConfigurationError) {
+    updateSnapshot({
+      initialized: true,
+      isAuthenticated: false,
+      session: null,
+      profile: null,
+      profileLoading: false,
+      profileError: supabaseConfigurationError,
+    });
+    return;
+  }
+
+  const { data, error } = await supabase.auth.getSession();
+
+  if (error) {
+    updateSnapshot({
+      initialized: true,
+      isAuthenticated: false,
+      session: null,
+      profile: null,
+      profileLoading: false,
+      profileError: formatAuthErrorMessage(error, "Unable to restore your session."),
+    });
+  } else {
+    await applySession(data.session);
+  }
+
+  if (!authListenerAttached) {
+    supabase.auth.onAuthStateChange((_event, nextSession) => {
+      void applySession(nextSession);
+    });
+
+    authListenerAttached = true;
+  }
+}
+
+export async function ensureAuthReady() {
+  if (!initPromise) {
+    initPromise = bootstrapAuth().finally(() => {
+      initPromise = null;
+    });
+  }
+
+  await initPromise;
 }
 
 export async function getIsLoggedIn(): Promise<boolean> {
-  if (authState !== null) {
-    return authState;
-  }
-
-  if (pendingAuthStateRead) {
-    return pendingAuthStateRead;
-  }
-
-  pendingAuthStateRead = (async () => {
-    try {
-      const value = await readPersistedAuthState();
-      authState = value === "true";
-      if (authState) {
-        await migrateLegacyAuthStateIfNeeded();
-      }
-      return authState;
-    } catch {
-      authState = false;
-      return false;
-    } finally {
-      pendingAuthStateRead = null;
-    }
-  })();
-
-  return pendingAuthStateRead;
+  await ensureAuthReady();
+  return snapshot.isAuthenticated;
 }
 
-export async function setIsLoggedIn(value: boolean, rememberMe = false): Promise<void> {
-  try {
-    if (!value) {
-      await persistAuthState(false);
-      authState = false;
-      return;
-    }
+export async function signInWithEmail({
+  email,
+  password,
+}: {
+  email: string;
+  password: string;
+}) {
+  if (supabaseConfigurationError) {
+    throw new Error(supabaseConfigurationError);
+  }
 
-    if (rememberMe) {
-      await persistAuthState(true);
-      authState = true;
-      return;
-    }
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: email.trim().toLowerCase(),
+    password,
+  });
 
-    await persistAuthState(false);
-    authState = true;
-  } catch {
-    authState = value;
+  if (error) {
+    throw error;
+  }
+
+  await applySession(data.session);
+  return data;
+}
+
+export async function signUpWithEmail({
+  email,
+  password,
+  username,
+  handicap,
+}: {
+  email: string;
+  password: string;
+  username: string;
+  handicap?: number | null;
+}) {
+  if (supabaseConfigurationError) {
+    throw new Error(supabaseConfigurationError);
+  }
+
+  const normalizedUsername = username.trim().toLowerCase();
+  const { data, error } = await supabase.auth.signUp({
+    email: email.trim().toLowerCase(),
+    password,
+    options: {
+      data: {
+        username: normalizedUsername,
+        full_name: username.trim(),
+        handicap: handicap == null ? null : handicap.toFixed(1),
+      },
+    },
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  await applySession(data.session);
+  return {
+    ...data,
+    requiresEmailVerification: !data.session,
+  };
+}
+
+export async function sendPasswordResetEmail(email: string) {
+  if (supabaseConfigurationError) {
+    throw new Error(supabaseConfigurationError);
+  }
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase());
+
+  if (error) {
+    throw error;
   }
 }
+
+export async function signOut() {
+  if (supabaseConfigurationError) {
+    await clearAuthState();
+    return;
+  }
+
+  const { error } = await supabase.auth.signOut();
+  if (error) {
+    throw error;
+  }
+
+  await clearAuthState();
+}
+
+export async function refreshProfile() {
+  await ensureAuthReady();
+
+  const userId = snapshot.session?.user?.id;
+  if (!userId) {
+    updateSnapshot({
+      profile: null,
+      profileLoading: false,
+      profileError: null,
+    });
+    return null;
+  }
+
+  await loadProfile(userId);
+  return snapshot.profile;
+}
+
+export async function updateProfile(profileUpdate: ProfileUpdate) {
+  if (supabaseConfigurationError) {
+    throw new Error(supabaseConfigurationError);
+  }
+
+  await ensureAuthReady();
+
+  const userId = snapshot.session?.user?.id;
+  if (!userId) {
+    throw new Error("You need to be signed in to update your profile.");
+  }
+
+  const payload: ProfileInsert = {
+    ...profileUpdate,
+    id: userId,
+  };
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .upsert(payload, { onConflict: "id" })
+    .select("*")
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  updateSnapshot({
+    profile: data,
+    profileError: null,
+    profileLoading: false,
+  });
+
+  return data;
+}
+
+export function getAuthConfigurationError() {
+  return supabaseConfigurationError;
+}
+
+export function useAuthSession() {
+  return useSyncExternalStore(
+    (listener) => {
+      listeners.add(listener);
+      void ensureAuthReady();
+
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    () => snapshot,
+    () => snapshot,
+  );
+}
+
+let clearAuthState = async () => {
+  snapshot = {
+    initialized: true,
+    isAuthenticated: false,
+    session: null,
+    profile: null,
+    profileLoading: false,
+    profileError: null,
+  };
+  emitChange();
+};

@@ -5,20 +5,20 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
-import { getCourseById } from "../components/course-data";
+import { formatBookingDate, isHistoricalBooking, useBookingState } from "../components/bookings";
+import { getManagedCourseById } from "../components/course-management";
 import { useResponsiveLayout } from "../components/responsive-layout";
 import { theme } from "../components/theme";
-
-const HISTORY_ITEMS = [
-  { id: "4", date: "September 28, 2023", score: "84", result: "Completed", spend: "240", highlight: "Sunny morning round" },
-  { id: "5", date: "September 15, 2023", score: "79", result: "Completed", spend: "195", highlight: "Best back-nine finish" },
-  { id: "6", date: "August 30, 2023", score: "82", result: "Completed", spend: "210", highlight: "Windy coastal conditions" },
-  { id: "3", date: "August 12, 2023", score: "70", result: "Top Round", spend: "260", highlight: "Personal season best" },
-] as const;
 
 export default function BookingHistoryScreen() {
   const router = useRouter();
   const { horizontalPadding, screenBottomPadding } = useResponsiveLayout();
+  const bookingState = useBookingState();
+  const historyBookings = bookingState.bookings.filter(isHistoricalBooking).reverse();
+  const completedBookings = historyBookings.filter((booking) => booking.status === "completed");
+  const averageSpend = historyBookings.length
+    ? historyBookings.reduce((total, booking) => total + booking.total, 0) / historyBookings.length
+    : 0;
 
   return (
     <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
@@ -37,30 +37,42 @@ export default function BookingHistoryScreen() {
         <View style={styles.summaryCard}>
           <View>
             <Text style={styles.summaryLabel}>PAST ROUNDS</Text>
-            <Text style={styles.summaryValue}>{HISTORY_ITEMS.length} bookings completed</Text>
+            <Text style={styles.summaryValue}>{historyBookings.length} bookings in history</Text>
           </View>
           <View style={styles.summaryMetric}>
-            <Text style={styles.summaryMetricLabel}>AVG SCORE</Text>
-            <Text style={styles.summaryMetricValue}>78.8</Text>
+            <Text style={styles.summaryMetricLabel}>AVG SPEND</Text>
+            <Text style={styles.summaryMetricValue}>${averageSpend.toFixed(0)}</Text>
           </View>
         </View>
 
+        {!bookingState.initialized || bookingState.loading ? (
+          <Text style={styles.statusText}>Loading booking history...</Text>
+        ) : null}
+        {bookingState.error ? <Text style={styles.statusText}>{bookingState.error}</Text> : null}
+        {!bookingState.loading && bookingState.initialized && !historyBookings.length ? (
+          <Text style={styles.statusText}>
+            No history yet. Cancelled or past bookings will appear here once you have them.
+          </Text>
+        ) : null}
+
         <View style={styles.list}>
-          {HISTORY_ITEMS.map((item) => {
-            const course = getCourseById(item.id);
+          {historyBookings.map((booking) => {
+            const course = getManagedCourseById(booking.course_id);
+            const badgeText =
+              booking.status === "cancelled" ? "CANCELLED" : booking.status === "completed" ? "COMPLETED" : "PAST";
 
             return (
               <Pressable
-                key={`${item.id}-${item.date}`}
+                key={booking.id}
                 style={styles.historyCard}
-                onPress={() => router.push({ pathname: "/course-details", params: { id: course.id } })}
+                onPress={() => router.push({ pathname: "/manage-booking", params: { bookingId: booking.id } })}
                 variant="card"
               >
                 <View style={styles.historyImageWrap}>
                   <AppImage source={{ uri: course.image }} style={styles.historyImage} />
                   <View style={styles.historyOverlay} />
                   <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{item.result.toUpperCase()}</Text>
+                    <Text style={styles.badgeText}>{badgeText}</Text>
                   </View>
                 </View>
 
@@ -79,19 +91,25 @@ export default function BookingHistoryScreen() {
                   <View style={styles.metaPanel}>
                     <View>
                       <Text style={styles.metaLabel}>DATE</Text>
-                      <Text style={styles.metaValue}>{item.date}</Text>
+                      <Text style={styles.metaValue}>{formatBookingDate(booking.tee_date)}</Text>
                     </View>
                     <View>
-                      <Text style={styles.metaLabel}>SCORE</Text>
-                      <Text style={styles.metaValue}>{item.score}</Text>
+                      <Text style={styles.metaLabel}>PLAYERS</Text>
+                      <Text style={styles.metaValue}>{booking.players}</Text>
                     </View>
                     <View>
                       <Text style={styles.metaLabel}>SPEND</Text>
-                      <Text style={styles.metaValue}>${item.spend}</Text>
+                      <Text style={styles.metaValue}>${booking.total.toFixed(2)}</Text>
                     </View>
                   </View>
 
-                  <Text style={styles.highlightText}>{item.highlight}</Text>
+                  <Text style={styles.highlightText}>
+                    {booking.status === "cancelled"
+                      ? "This reservation was cancelled and the tee slot was released."
+                      : completedBookings.includes(booking)
+                        ? "Completed round stored in your booking history."
+                        : "Past booking retained for your account records."}
+                  </Text>
                 </View>
               </Pressable>
             );
@@ -252,5 +270,11 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
     color: theme.colors.textSoft,
+  },
+  statusText: {
+    fontSize: theme.typography.bodySm.fontSize,
+    lineHeight: theme.typography.bodySm.lineHeight,
+    color: theme.colors.textSoft,
+    fontWeight: "600",
   },
 });

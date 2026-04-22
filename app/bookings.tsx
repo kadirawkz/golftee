@@ -6,50 +6,46 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
-import { getCourseById } from "../components/course-data";
+import {
+  formatBookingDate,
+  formatBookingDateTime,
+  isHistoricalBooking,
+  isUpcomingBooking,
+  useBookingState,
+} from "../components/bookings";
+import { getManagedCourseById } from "../components/course-management";
 import { useResponsiveLayout } from "../components/responsive-layout";
 import { theme } from "../components/theme";
 
-const UPCOMING_BOOKINGS = [
-  { courseId: "1", dateTime: "Oct 14, 08:30 AM", players: "4 People" },
-  { courseId: "2", dateTime: "Oct 21, 10:15 AM", players: "2 People" },
-] as const;
-
-const HISTORY_ITEMS = [
-  { id: "4", icon: "golf" as const, date: "September 28, 2023" },
-  { id: "5", icon: "water" as const, date: "September 15, 2023" },
-  { id: "6", icon: "flag" as const, date: "August 30, 2023" },
-];
-
 function BookingCard({
+  bookingId,
   courseId,
-  image,
-  title,
-  location,
   dateTime,
   players,
+  status,
   onPressManage,
 }: {
+  bookingId: string;
   courseId: string;
-  image: string;
-  title: string;
-  location: string;
   dateTime: string;
-  players: string;
-  onPressManage: (courseId: string, dateTime: string, players: string) => void;
+  players: number;
+  status: string;
+  onPressManage: (bookingId: string) => void;
 }) {
+  const course = getManagedCourseById(courseId);
+
   return (
     <View style={styles.bookingCard}>
       <View style={styles.bookingImageWrap}>
-        <AppImage source={{ uri: image }} style={styles.bookingImage} />
-        <Text style={styles.confirmedBadge}>CONFIRMED</Text>
+        <AppImage source={{ uri: course.image }} style={styles.bookingImage} />
+        <Text style={styles.confirmedBadge}>{status.toUpperCase()}</Text>
       </View>
 
       <View style={styles.bookingBody}>
-        <Text style={styles.bookingTitle}>{title}</Text>
+        <Text style={styles.bookingTitle}>{course.title}</Text>
         <View style={styles.bookingLocationRow}>
           <Ionicons name="location" size={12} color={theme.colors.textSoft} />
-          <Text style={styles.bookingLocation}>{location}</Text>
+          <Text style={styles.bookingLocation}>{course.location}</Text>
         </View>
 
         <View style={styles.bookingMetaPanel}>
@@ -59,11 +55,11 @@ function BookingCard({
           </View>
           <View style={styles.metaRight}>
             <Text style={styles.metaLabel}>PLAYERS</Text>
-            <Text style={styles.metaValue}>{players}</Text>
+            <Text style={styles.metaValue}>{players} People</Text>
           </View>
         </View>
 
-        <Pressable style={[styles.manageButton]} onPress={() => onPressManage(courseId, dateTime, players)} variant="cta">
+        <Pressable style={styles.manageButton} onPress={() => onPressManage(bookingId)} variant="cta">
           <Text style={styles.manageButtonText}>Manage Booking</Text>
         </Pressable>
       </View>
@@ -74,14 +70,15 @@ function BookingCard({
 export default function BookingsScreen() {
   const router = useRouter();
   const { horizontalPadding, screenBottomPadding } = useResponsiveLayout();
+  const bookingState = useBookingState();
+  const upcomingBookings = bookingState.bookings.filter(isUpcomingBooking);
+  const historyBookings = bookingState.bookings.filter(isHistoricalBooking).slice(-3).reverse();
 
-  const handleManageBooking = useCallback((courseId: string, dateTime: string, players: string) => {
+  const handleManageBooking = useCallback((bookingId: string) => {
     router.push({
       pathname: "/manage-booking",
       params: {
-        id: courseId,
-        dateTime,
-        players,
+        bookingId,
       },
     });
   }, [router]);
@@ -102,48 +99,52 @@ export default function BookingsScreen() {
         <View style={styles.sectionWrap}>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Upcoming Bookings</Text>
-            <Text style={styles.sectionRightText}>{UPCOMING_BOOKINGS.length} Rounds Scheduled</Text>
+            <Text style={styles.sectionRightText}>{upcomingBookings.length} Rounds Scheduled</Text>
           </View>
 
-          {UPCOMING_BOOKINGS.map((booking) => {
-            const course = getCourseById(booking.courseId);
+          {!bookingState.initialized || bookingState.loading ? (
+            <Text style={styles.emptyText}>Loading your bookings...</Text>
+          ) : null}
+          {bookingState.error ? <Text style={styles.emptyText}>{bookingState.error}</Text> : null}
 
-            return (
-              <BookingCard
-                key={booking.courseId}
-                courseId={booking.courseId}
-                image={course.image}
-                title={course.title}
-                location={course.location}
-                dateTime={booking.dateTime}
-                players={booking.players}
-                onPressManage={handleManageBooking}
-              />
-            );
-          })}
+          {upcomingBookings.map((booking) => (
+            <BookingCard
+              key={booking.id}
+              bookingId={booking.id}
+              courseId={booking.course_id}
+              dateTime={formatBookingDateTime(booking)}
+              players={booking.players}
+              status={booking.status}
+              onPressManage={handleManageBooking}
+            />
+          ))}
+
+          {bookingState.initialized && !bookingState.loading && !upcomingBookings.length ? (
+            <Text style={styles.emptyText}>No upcoming bookings yet. Book a tee time to get started.</Text>
+          ) : null}
         </View>
 
         <View style={styles.activityPanel}>
-          <Text style={styles.activityKicker}>RECENT ACTIVITY</Text>
-          <Text style={styles.activityTitle}>Masterful Round at{"\n"}{getCourseById("3").title}</Text>
+          <Text style={styles.activityKicker}>BOOKING SYSTEM</Text>
+          <Text style={styles.activityTitle}>Supabase-backed tee times with secure owner-only access.</Text>
 
           <View style={styles.activityStatsRow}>
             <View>
-              <Text style={styles.statLabel}>FINAL SCORE</Text>
-              <Text style={styles.statValue}>-2 (70)</Text>
+              <Text style={styles.statLabel}>ACTIVE</Text>
+              <Text style={styles.statValue}>{upcomingBookings.length}</Text>
             </View>
             <View style={styles.statDivider} />
             <View>
-              <Text style={styles.statLabel}>RANK</Text>
-              <Text style={styles.statValue}>#1 <Text style={styles.rankSuffix}>/ 12</Text></Text>
+              <Text style={styles.statLabel}>HISTORY</Text>
+              <Text style={styles.statValue}>{historyBookings.length}</Text>
             </View>
           </View>
 
           <View style={styles.mvpWrap}>
             <View style={styles.mvpRing}>
-              <Ionicons name="ribbon" size={36} color={theme.colors.accentSoft} />
+              <Ionicons name="shield-checkmark" size={36} color={theme.colors.accentSoft} />
             </View>
-            <Text style={styles.mvpBadge}>MVP Status</Text>
+            <Text style={styles.mvpBadge}>RLS Protected</Text>
           </View>
         </View>
 
@@ -157,24 +158,33 @@ export default function BookingsScreen() {
           </View>
 
           <View style={styles.historyList}>
-            {HISTORY_ITEMS.map((item) => {
-              const course = getCourseById(item.id);
+            {historyBookings.map((booking) => {
+              const course = getManagedCourseById(booking.course_id);
 
               return (
-                <Pressable key={item.id} style={[styles.historyItem]} onPress={() => router.push("/booking-history")} variant="card">
+                <Pressable
+                  key={booking.id}
+                  style={styles.historyItem}
+                  onPress={() => router.push({ pathname: "/manage-booking", params: { bookingId: booking.id } })}
+                  variant="card"
+                >
                   <View style={styles.historyLeft}>
                     <View style={styles.historyIconWrap}>
-                      <Ionicons name={item.icon} size={18} color={theme.colors.primary} />
+                      <Ionicons
+                        name={booking.status === "cancelled" ? "close-circle" : "golf"}
+                        size={18}
+                        color={theme.colors.primary}
+                      />
                     </View>
                     <View>
                       <Text style={styles.historyName}>{course.title}</Text>
-                      <Text style={styles.historyDate}>{item.date}</Text>
+                      <Text style={styles.historyDate}>{formatBookingDate(booking.tee_date)}</Text>
                     </View>
                   </View>
 
                   <View style={styles.historyRight}>
-                    <Text style={styles.metaLabel}>PRICE</Text>
-                    <Text style={styles.historyPrice}>{course.price}.00</Text>
+                    <Text style={styles.metaLabel}>TOTAL</Text>
+                    <Text style={styles.historyPrice}>${booking.total.toFixed(2)}</Text>
                   </View>
 
                   <Ionicons name="chevron-forward" size={16} color={theme.colors.muted} />
@@ -340,8 +350,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   activityTitle: {
-    fontSize: theme.typography.h1.fontSize,
-    lineHeight: theme.typography.h1.lineHeight,
+    fontSize: theme.typography.h2.fontSize,
+    lineHeight: theme.typography.h2.lineHeight,
     color: theme.colors.surface,
     fontWeight: "800",
   },
@@ -362,12 +372,6 @@ const styles = StyleSheet.create({
     lineHeight: theme.typography.h2.lineHeight,
     color: theme.colors.surface,
     fontWeight: "800",
-  },
-  rankSuffix: {
-    fontSize: theme.typography.body.fontSize,
-    lineHeight: theme.typography.body.lineHeight,
-    color: theme.colors.textOnPrimaryMuted,
-    fontWeight: "500",
   },
   statDivider: {
     width: 1,
@@ -445,5 +449,11 @@ const styles = StyleSheet.create({
     lineHeight: theme.typography.title.lineHeight,
     color: theme.colors.accentWarm,
     fontWeight: "800",
+  },
+  emptyText: {
+    fontSize: theme.typography.bodySm.fontSize,
+    lineHeight: theme.typography.bodySm.lineHeight,
+    color: theme.colors.textSoft,
+    fontWeight: "600",
   },
 });

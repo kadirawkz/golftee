@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
+import { sendPasswordResetEmail } from "../components/auth";
 import { useResponsiveLayout } from "../components/responsive-layout";
 import { theme } from "../components/theme";
 
@@ -52,9 +53,11 @@ export default function ForgotPasswordScreen() {
     setError(null);
 
     try {
-      await Promise.resolve();
+      await sendPasswordResetEmail(trimmedEmail);
       setEmail(trimmedEmail);
       setIsResetSent(true);
+    } catch (submissionError) {
+      setError(submissionError instanceof Error ? submissionError.message : "Unable to send reset instructions.");
     } finally {
       setIsSubmitting(false);
     }

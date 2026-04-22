@@ -15,7 +15,7 @@ import {
 } from "react-native";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { setIsLoggedIn } from "../components/auth";
+import { getAuthConfigurationError, signInWithEmail, signUpWithEmail } from "../components/auth";
 import { theme } from "../components/theme";
 
 const SEGMENTED_CONTROL_PADDING = 4;
@@ -44,6 +44,7 @@ export default function LoginScreen() {
   const segmentProgress = useRef(new Animated.Value(0)).current;
   const isCompactScreen = width < 360;
   const isTabletLike = width >= 768;
+  const supabaseConfigurationError = getAuthConfigurationError();
   const horizontalPadding = isTabletLike ? Math.max((width - 560) / 2, 28) : isCompactScreen ? 16 : 24;
   const contentMaxWidth = isTabletLike ? 560 : 999;
 
@@ -55,11 +56,6 @@ export default function LoginScreen() {
       useNativeDriver: true,
     }).start();
   }, [activeTab, segmentProgress]);
-
-  const handleAuthSuccess = async (persistLogin: boolean) => {
-    await setIsLoggedIn(true, persistLogin);
-    router.replace("/home");
-  };
 
   const clearError = (key: string) => {
     setErrors((prev) => {
@@ -119,9 +115,21 @@ export default function LoginScreen() {
         return;
       }
 
+      if (!EMAIL_REGEX.test(loginForm.usernameOrEmail.trim())) {
+        setErrors({ loginUsernameOrEmail: true });
+        setAuthNotice("Use the email address linked to your account.");
+        return;
+      }
+
       setIsSubmitting(true);
       try {
-        await handleAuthSuccess(rememberMe);
+        await signInWithEmail({
+          email: loginForm.usernameOrEmail,
+          password: loginForm.password,
+        });
+        router.replace("/home");
+      } catch (error) {
+        setAuthNotice(error instanceof Error ? error.message : "We could not sign you in right now.");
       } finally {
         setIsSubmitting(false);
       }
@@ -141,10 +149,6 @@ export default function LoginScreen() {
     if (!signUpForm.confirmPassword.trim()) {
       nextErrors.signUpConfirmPassword = true;
     }
-    if (!signUpForm.handicap.trim()) {
-      nextErrors.signUpHandicap = true;
-    }
-
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
       return;
@@ -171,22 +175,48 @@ export default function LoginScreen() {
       return;
     }
 
-    if (Number.isNaN(Number(signUpForm.handicap))) {
+    if (signUpForm.handicap.trim() && Number.isNaN(Number(signUpForm.handicap))) {
       setErrors({ signUpHandicap: true });
       setAuthNotice("Enter a valid numeric handicap.");
       return;
     }
 
-    setAuthNotice("Sign up does not log in. Use Login with an existing account.");
+    setIsSubmitting(true);
+    try {
+      const result = await signUpWithEmail({
+        email: signUpForm.email,
+        password: signUpForm.password,
+        username: signUpForm.username,
+        handicap: signUpForm.handicap.trim() ? Number(signUpForm.handicap) : null,
+      });
+
+      if (result.requiresEmailVerification) {
+        setAuthNotice("Account created. Check your email to verify the account before signing in.");
+        setActiveTab("login");
+        setLoginForm({
+          usernameOrEmail: signUpForm.email.trim(),
+          password: "",
+        });
+        return;
+      }
+
+      router.replace("/home");
+    } catch (error) {
+      setAuthNotice(error instanceof Error ? error.message : "We could not create your account right now.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const authTopTitle = activeTab === "login" ? "Login" : "Sign Up";
   const heroEyebrow = activeTab === "login" ? "WELCOME BACK" : "CREATE ACCOUNT";
   const heroSubtitle =
     activeTab === "login"
-      ? "Sign in to manage bookings, explore courses, and pick up where your next round left off."
-      : "Set up your account to book tee times faster, track plans, and explore new courses.";
-  const feedbackMessage = Object.keys(errors).length > 0 ? authNotice ?? "Please fill all required fields." : authNotice;
+      ? "Sign in with your email to manage bookings, explore courses, and pick up where your next round left off."
+      : "Create your account with secure email sign-in and a profile that syncs across devices.";
+  const feedbackMessage =
+    supabaseConfigurationError ??
+    (Object.keys(errors).length > 0 ? authNotice ?? "Please fill all required fields." : authNotice);
   const segmentIndicatorWidth = Math.max((segmentWidth - SEGMENTED_CONTROL_PADDING * 2) / 2, 0);
   const segmentIndicatorTranslateX = segmentProgress.interpolate({
     inputRange: [0, 1],
@@ -292,14 +322,15 @@ export default function LoginScreen() {
                       <Text
                         style={[styles.inputLabel, errors.loginUsernameOrEmail && styles.inputLabelError]}
                       >
-                        EMAIL OR USERNAME
+                        EMAIL ADDRESS
                       </Text>
                       <View style={styles.inputRow}>
                         <Ionicons name="mail-outline" size={18} color={theme.colors.muted} />
                         <TextInput
-                          placeholder="name@example.com or username"
+                          placeholder="name@example.com"
                           placeholderTextColor={theme.colors.muted}
                           style={[styles.inputField, errors.loginUsernameOrEmail && styles.inputFieldError]}
+                          keyboardType="email-address"
                           autoCapitalize="none"
                           value={loginForm.usernameOrEmail}
                           onChangeText={(text) => {
@@ -423,7 +454,7 @@ export default function LoginScreen() {
 
                     <View style={styles.inputShell}>
                       <Text style={[styles.inputLabel, errors.signUpHandicap && styles.inputLabelError]}>
-                        HANDICAP
+                        HANDICAP (OPTIONAL)
                       </Text>
                       <View style={styles.inputRow}>
                         <Ionicons name="golf-outline" size={18} color={theme.colors.muted} />
@@ -460,9 +491,9 @@ export default function LoginScreen() {
                   variant="chip"
                 >
                   <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
-                    {rememberMe ? <Ionicons name="checkmark" size={14} color={theme.colors.surface} /> : null}
-                  </View>
-                  <Text style={styles.rememberText}>Remember me</Text>
+                  {rememberMe ? <Ionicons name="checkmark" size={14} color={theme.colors.surface} /> : null}
+                </View>
+                  <Text style={styles.rememberText}>Keep me signed in</Text>
                 </Pressable>
 
                 <Pressable onPress={() => router.push("/forgot-password")} variant="chip">
@@ -474,12 +505,14 @@ export default function LoginScreen() {
             <Pressable
               style={[styles.loginButton]}
               onPress={() => void handleSubmit()}
-              disabled={isSubmitting}
+              disabled={isSubmitting || Boolean(supabaseConfigurationError)}
               variant="cta"
             >
               <Text style={styles.loginButtonText}>
                 {isSubmitting
-                  ? "Signing In..."
+                  ? activeTab === "login"
+                    ? "Signing In..."
+                    : "Creating Account..."
                   : activeTab === "login"
                     ? "Login to GolfTee"
                     : "Create GolfTee Account"}
@@ -497,7 +530,7 @@ export default function LoginScreen() {
               <Pressable
                 style={[styles.socialButton]}
                 onPress={() => {
-                  setAuthNotice("Google login is disabled. Use Login to access the app.");
+                  setAuthNotice("Google login is not configured yet. It can be added later from Supabase Auth providers.");
                 }}
                 variant="button"
               >
@@ -508,7 +541,7 @@ export default function LoginScreen() {
               <Pressable
                 style={[styles.socialButton]}
                 onPress={() => {
-                  setAuthNotice("Apple login is disabled. Use Login to access the app.");
+                  setAuthNotice("Apple login is not configured yet. It can be added later from Supabase Auth providers.");
                 }}
                 variant="button"
               >

@@ -1,11 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { useMemo, useState } from "react";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
-import { getCourseById } from "../components/course-data";
+import { cancelBooking, formatBookingDate, formatBookingTime, useBookingState } from "../components/bookings";
+import { getManagedCourseById } from "../components/course-management";
 import { useResponsiveLayout } from "../components/responsive-layout";
 import { theme } from "../components/theme";
 
@@ -21,20 +23,58 @@ const PARTY_BUBBLE_STYLES = [
 export default function ManageBookingScreen() {
   const router = useRouter();
   const { horizontalPadding, screenBottomPadding } = useResponsiveLayout();
-  const params = useLocalSearchParams<{ id?: string | string[]; dateTime?: string | string[]; players?: string | string[] }>();
-  const courseId = Array.isArray(params.id) ? params.id[0] : params.id;
-  const dateTimeParam = Array.isArray(params.dateTime) ? params.dateTime[0] : params.dateTime;
-  const playersParam = Array.isArray(params.players) ? params.players[0] : params.players;
-  const course = getCourseById(courseId);
-  const dateTime = dateTimeParam ?? "Oct 24, 08:45 AM";
-  const playersLabel = playersParam ?? "4 People";
-  const splitDateTime = dateTime.split(",");
-  const bookingDate = splitDateTime[0]?.trim() || "Oct 24, 2023";
-  const bookingTime = splitDateTime[1]?.trim() || "08:45 AM";
-  const parsedPlayersCount = Number.parseInt(playersLabel, 10);
-  const playersCount = Number.isInteger(parsedPlayersCount) && parsedPlayersCount > 0 ? parsedPlayersCount : 4;
-  const visiblePlayerBubbles = Math.min(playersCount, PARTY_BUBBLE_STYLES.length + 1);
-  const overflowPlayers = Math.max(playersCount - PARTY_BUBBLE_STYLES.length, 0);
+  const { bookingId } = useLocalSearchParams<{ bookingId?: string | string[] }>();
+  const resolvedBookingId = Array.isArray(bookingId) ? bookingId[0] : bookingId;
+  const bookingState = useBookingState();
+  const booking = useMemo(
+    () => bookingState.bookings.find((item) => item.id === resolvedBookingId) ?? null,
+    [bookingState.bookings, resolvedBookingId],
+  );
+  const course = getManagedCourseById(booking?.course_id);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const visiblePlayerBubbles = booking ? Math.min(booking.players, PARTY_BUBBLE_STYLES.length + 1) : 0;
+  const overflowPlayers = booking ? Math.max(booking.players - PARTY_BUBBLE_STYLES.length, 0) : 0;
+
+  const handleCancelBooking = async () => {
+    if (!booking || isCancelling || booking.status === "cancelled") {
+      return;
+    }
+
+    setIsCancelling(true);
+    setNotice(null);
+
+    try {
+      await cancelBooking(booking.id);
+      setNotice("Booking cancelled and the tee slot has been released.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Unable to cancel this booking right now.");
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
+  if (!bookingState.initialized || bookingState.loading) {
+    return (
+      <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
+        <StatusBar style="dark" />
+        <View style={styles.centerState}>
+          <Text style={styles.centerStateText}>Loading booking details...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!booking) {
+    return (
+      <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
+        <StatusBar style="dark" />
+        <View style={styles.centerState}>
+          <Text style={styles.centerStateText}>Booking not found.</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
@@ -54,10 +94,10 @@ export default function ManageBookingScreen() {
           <View style={styles.heroOverlay} />
           <View style={styles.heroContent}>
             <View style={styles.confirmedPill}>
-              <Text style={styles.confirmedPillText}>CONFIRMED</Text>
+              <Text style={styles.confirmedPillText}>{booking.status.toUpperCase()}</Text>
             </View>
             <Text style={styles.heroTitle}>{course.title}</Text>
-            <Text style={styles.heroSubtitle}>Premium 18-Hole Championship Course</Text>
+            <Text style={styles.heroSubtitle}>Booking code {booking.booking_code}</Text>
           </View>
         </View>
 
@@ -65,20 +105,20 @@ export default function ManageBookingScreen() {
           <View style={styles.metaCard}>
             <Ionicons name="calendar-outline" size={22} color={theme.colors.primary} />
             <Text style={styles.metaTitle}>DATE</Text>
-            <Text style={styles.metaMain}>{bookingDate}</Text>
+            <Text style={styles.metaMain}>{formatBookingDate(booking.tee_date)}</Text>
           </View>
 
           <View style={styles.metaCard}>
             <Ionicons name="time-outline" size={22} color={theme.colors.primary} />
             <Text style={styles.metaTitle}>TEE TIME</Text>
-            <Text style={styles.metaMain}>{bookingTime}</Text>
+            <Text style={styles.metaMain}>{formatBookingTime(booking.tee_time)}</Text>
           </View>
         </View>
 
-          <View style={styles.partyCard}>
+        <View style={styles.partyCard}>
           <View>
             <Text style={styles.metaTitle}>PARTY SIZE</Text>
-            <Text style={styles.metaMain}>{playersCount} Players</Text>
+            <Text style={styles.metaMain}>{booking.players} Players</Text>
           </View>
           <View style={styles.avatarRow}>
             {Array.from({ length: visiblePlayerBubbles }).map((_, index) => {
@@ -102,32 +142,60 @@ export default function ManageBookingScreen() {
           <View style={styles.qrImageWrap}>
             <AppImage source={{ uri: CHECKIN_QR_IMAGE }} style={styles.qrImage} />
           </View>
-          <Text style={styles.qrId}>ID: GT-{course.id.padStart(5, "0")}-0XC</Text>
+          <Text style={styles.qrId}>ID: {booking.booking_code}</Text>
         </View>
 
+        <View style={styles.priceCard}>
+          <Text style={styles.priceTitle}>Booking Costs</Text>
+          <Text style={styles.priceRow}>Green Fees: ${booking.green_fee.toFixed(2)}</Text>
+          <Text style={styles.priceRow}>Service Fee: ${booking.service_fee.toFixed(2)}</Text>
+          <Text style={styles.priceRow}>Caddy Fee: ${booking.caddy_fee.toFixed(2)}</Text>
+          <Text style={styles.priceRow}>Taxes: ${booking.taxes.toFixed(2)}</Text>
+          <Text style={styles.priceTotal}>Total: ${booking.total.toFixed(2)}</Text>
+        </View>
+
+        {notice ? <Text style={styles.noticeText}>{notice}</Text> : null}
+
         <View style={styles.actionList}>
-          <Pressable style={[styles.primaryAction]} variant="cta">
+          <Pressable style={styles.primaryAction} variant="cta">
             <Ionicons name="calendar-outline" size={22} color={theme.colors.surface} />
             <Text style={styles.primaryActionText}>Add to Calendar</Text>
           </Pressable>
 
           <Pressable
-            style={[styles.secondaryAction]}
-            onPress={() => router.push({ pathname: "/tee-time-booking", params: { id: course.id } })}
+            style={styles.secondaryAction}
+            onPress={() =>
+              router.push({
+                pathname: "/tee-time-booking",
+                params: { bookingId: booking.id, id: course.id },
+              })
+            }
+            disabled={booking.status === "cancelled"}
             variant="button"
           >
             <Ionicons name="create-outline" size={22} color={theme.colors.primary} />
             <Text style={styles.secondaryActionText}>Modify Booking</Text>
           </Pressable>
 
-          <Pressable style={[styles.dangerAction]} variant="button">
-            <Ionicons name="close-circle" size={22} color={theme.colors.danger} />
-            <Text style={styles.dangerActionText}>Cancel Reservation</Text>
+          <Pressable
+            style={styles.dangerAction}
+            onPress={() => void handleCancelBooking()}
+            disabled={isCancelling || booking.status === "cancelled"}
+            variant="button"
+          >
+            {isCancelling ? (
+              <ActivityIndicator size="small" color={theme.colors.danger} />
+            ) : (
+              <Ionicons name="close-circle" size={22} color={theme.colors.danger} />
+            )}
+            <Text style={styles.dangerActionText}>
+              {booking.status === "cancelled" ? "Reservation Cancelled" : "Cancel Reservation"}
+            </Text>
           </Pressable>
         </View>
 
         <Pressable
-          style={[styles.detailsCard]}
+          style={styles.detailsCard}
           onPress={() => router.push({ pathname: "/course-details", params: { id: course.id } })}
           variant="card"
         >
@@ -157,6 +225,19 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 160,
     gap: 12,
+  },
+  centerState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  centerStateText: {
+    fontSize: theme.typography.body.fontSize,
+    lineHeight: theme.typography.body.lineHeight,
+    color: theme.colors.textSoft,
+    fontWeight: "600",
+    textAlign: "center",
   },
   heroCard: {
     height: 204,
@@ -315,6 +396,40 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
     letterSpacing: 1,
+    fontWeight: "600",
+  },
+  priceCard: {
+    borderRadius: 14,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    padding: 14,
+    gap: 6,
+  },
+  priceTitle: {
+    fontSize: theme.typography.title.fontSize,
+    lineHeight: theme.typography.title.lineHeight,
+    color: theme.colors.primary,
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+  priceRow: {
+    fontSize: theme.typography.body.fontSize,
+    lineHeight: theme.typography.body.lineHeight,
+    color: theme.colors.textSoft,
+    fontWeight: "600",
+  },
+  priceTotal: {
+    marginTop: 4,
+    fontSize: theme.typography.subtitle.fontSize,
+    lineHeight: theme.typography.subtitle.lineHeight,
+    color: theme.colors.primary,
+    fontWeight: "800",
+  },
+  noticeText: {
+    fontSize: theme.typography.bodySm.fontSize,
+    lineHeight: theme.typography.bodySm.lineHeight,
+    color: theme.colors.textSoft,
     fontWeight: "600",
   },
   actionList: {

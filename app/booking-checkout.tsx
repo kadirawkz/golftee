@@ -2,11 +2,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
-import { Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
-import { getCourseById } from "../components/course-data";
+import { createBooking, updateBooking } from "../components/bookings";
+import { getManagedCourseById } from "../components/course-management";
 import { useResponsiveLayout } from "../components/responsive-layout";
 import { theme } from "../components/theme";
 
@@ -34,6 +35,8 @@ export default function BookingCheckoutScreen() {
     players?: string | string[];
     date?: string | string[];
     day?: string | string[];
+    dateKey?: string | string[];
+    bookingId?: string | string[];
     time?: string | string[];
     period?: string | string[];
     subtotal?: string | string[];
@@ -44,6 +47,8 @@ export default function BookingCheckoutScreen() {
   }>();
 
   const [selectedPayment, setSelectedPayment] = useState<"wallet" | "card">("wallet");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const handlePaymentChange = (method: "wallet" | "card") => {
     setSelectedPayment(method);
@@ -57,11 +62,13 @@ export default function BookingCheckoutScreen() {
   const taxesParam = getFirstParamValue(params.taxes);
   const totalParam = getFirstParamValue(params.total);
   const dateParam = getFirstParamValue(params.date);
+  const dateKeyParam = getFirstParamValue(params.dateKey);
+  const bookingIdParam = getFirstParamValue(params.bookingId);
   const timeParam = getFirstParamValue(params.time);
   const periodParam = getFirstParamValue(params.period);
   const dayParam = getFirstParamValue(params.day);
 
-  const course = getCourseById(courseId);
+  const course = getManagedCourseById(courseId);
   const players = parsePlayerCount(playersParam, 3);
   const subtotal = parsePositiveNumber(subtotalParam, 0);
   const serviceFee = parsePositiveNumber(serviceFeeParam, 12.5);
@@ -81,6 +88,46 @@ export default function BookingCheckoutScreen() {
   const isTabletLike = width >= 768;
   const horizontalPadding = isTabletLike ? Math.max((width - 620) / 2, 24) : isCompactScreen ? 12 : 16;
   const contentMaxWidth = isTabletLike ? 620 : 999;
+
+  const handlePlaceBooking = async () => {
+    if (isSubmitting || !dateKeyParam || !timeParam || !periodParam) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setNotice(null);
+
+    try {
+      const bookingInput = {
+        caddyFee,
+        courseId: course.id,
+        greenFee: subtotal,
+        paymentMethod: selectedPayment,
+        players,
+        serviceFee,
+        taxes: taxesAndFees,
+        teeDate: dateKeyParam,
+        teeTime: timeParam,
+        timePeriod: periodParam as "MORNING" | "AFTERNOON",
+        total: totalAmount,
+      };
+
+      const savedBooking = bookingIdParam
+        ? await updateBooking(bookingIdParam, bookingInput)
+        : await createBooking(bookingInput);
+
+      router.replace({
+        pathname: "/manage-booking",
+        params: {
+          bookingId: savedBooking.id,
+        },
+      });
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Unable to place your booking right now.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
@@ -226,14 +273,21 @@ export default function BookingCheckoutScreen() {
             </Text>
           </View>
         </View>
+        {notice ? <Text style={styles.noticeText}>{notice}</Text> : null}
         </View>
       </ScrollView>
 
       <View style={[styles.footerCtaWrap, { paddingHorizontal: horizontalPadding, paddingBottom: insets.bottom + 12 }]}>
         <View style={[styles.footerCtaInner, { maxWidth: contentMaxWidth }]}>
-          <Pressable style={[styles.placeButton]} onPress={() => router.replace("/bookings")} variant="cta">
-            <Text style={styles.placeButtonText}>Place Booking</Text>
-            <Ionicons name="arrow-forward" size={20} color={theme.colors.surface} />
+          <Pressable style={[styles.placeButton]} onPress={() => void handlePlaceBooking()} disabled={isSubmitting} variant="cta">
+            {isSubmitting ? (
+              <ActivityIndicator size="small" color={theme.colors.surface} />
+            ) : (
+              <>
+                <Text style={styles.placeButtonText}>{bookingIdParam ? "Save Booking Changes" : "Place Booking"}</Text>
+                <Ionicons name="arrow-forward" size={20} color={theme.colors.surface} />
+              </>
+            )}
           </Pressable>
           <Text style={styles.footerPolicy}>
             BY CLICKING PLACE BOOKING, YOU AGREE TO THE CLUB&apos;S CANCELLATION POLICY.
@@ -478,6 +532,12 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.h1.fontSize,
     lineHeight: theme.typography.h1.lineHeight,
     fontWeight: "900",
+  },
+  noticeText: {
+    fontSize: theme.typography.bodySm.fontSize,
+    lineHeight: theme.typography.bodySm.lineHeight,
+    color: theme.colors.textSoft,
+    fontWeight: "600",
   },
   footerCtaWrap: {
     position: "absolute",

@@ -34,6 +34,26 @@ yarn-error.*
 .env
 .env.*
 .env*.local
+.envrc
+!.env.example
+
+# Supabase local state
+.supabase/
+supabase/.temp/
+supabase/.branches/
+supabase/.env
+
+# local auth/config files
+.npmrc
+
+# local databases / data dumps
+*.db
+*.sqlite
+*.sqlite3
+
+# common editor/OS artifacts
+.idea/
+Thumbs.db
 
 # local editor/generated files
 .vscode/.react/

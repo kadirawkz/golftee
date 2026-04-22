@@ -4,23 +4,21 @@ import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import Animated, {
-  interpolate,
-  interpolateColor,
-  SharedValue,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
+    interpolate,
+    interpolateColor,
+    SharedValue,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
 } from "react-native-reanimated";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
 import { CourseCard } from "../components/course-card";
 import {
-  allCourses,
-  calculateDistanceKm,
-  DEFAULT_USER_LOCATION,
-  featuredHomeCourses,
-  getawayHomeCourses,
+    calculateDistanceKm,
+    DEFAULT_USER_LOCATION,
 } from "../components/course-data";
+import { useCourseCatalog } from "../components/course-management";
 import { FavoriteCoursesSection } from "../components/favorite-courses-section";
 import { useFavoriteCourseIds } from "../components/favorites";
 import { useResponsiveLayout } from "../components/responsive-layout";
@@ -62,14 +60,6 @@ const HERO_SLIDES = [
   },
 ] as const;
 const HERO_LOOP_SLIDES = [HERO_SLIDES[HERO_SLIDES.length - 1], ...HERO_SLIDES, HERO_SLIDES[0]] as const;
-const HOME_NEAREST_COURSES = allCourses
-  .map((course) => ({
-    ...course,
-    distanceKm: calculateDistanceKm(DEFAULT_USER_LOCATION, course.coordinates),
-  }))
-  .filter((course) => course.distanceKm <= 100)
-  .sort((a, b) => a.distanceKm - b.distanceKm)
-  .slice(0, 5);
 
 const EXPLORE_SCROLL_OFFSET = 20;
 const HERO_AUTOPLAY_MS = 4500;
@@ -105,6 +95,7 @@ function HeroIndicatorDot({
 
 export default function HomeScreen() {
   const router = useRouter();
+  const courseCatalog = useCourseCatalog();
   const { width } = useWindowDimensions();
   const { horizontalPadding, screenBottomPadding, scaleFont, scaleLineHeight } = useResponsiveLayout();
   const heroScrollRef = useRef<ScrollView>(null);
@@ -113,11 +104,29 @@ export default function HomeScreen() {
   const activeHeroIndexRef = useRef(0);
   const activeHeroLoopIndexRef = useRef(1);
   const heroIndicatorIndex = useSharedValue(0);
+  const allCourses = courseCatalog.courses;
   const favoriteCourseIds = useFavoriteCourseIds();
   const favoriteCourseIdSet = useMemo(() => new Set(favoriteCourseIds), [favoriteCourseIds]);
+  const featuredHomeCourses = useMemo(() => allCourses.slice(0, 3), [allCourses]);
+  const getawayHomeCourses = useMemo(
+    () => allCourses.slice(4, 8).map((course) => ({ id: course.id, title: course.title, place: course.location, image: course.image })),
+    [allCourses]
+  );
+  const homeNearestCourses = useMemo(
+    () =>
+      allCourses
+        .map((course) => ({
+          ...course,
+          distanceKm: calculateDistanceKm(DEFAULT_USER_LOCATION, course.coordinates),
+        }))
+        .filter((course) => course.distanceKm <= 100)
+        .sort((a, b) => a.distanceKm - b.distanceKm)
+        .slice(0, 5),
+    [allCourses]
+  );
   const favoriteCourses = useMemo(
     () => allCourses.filter((course) => favoriteCourseIdSet.has(course.id)).slice(0, 3),
-    [favoriteCourseIdSet]
+    [allCourses, favoriteCourseIdSet]
   );
   const isTabletLike = width >= 768;
   const isCompactScreen = width < 390;
@@ -374,7 +383,7 @@ export default function HomeScreen() {
             bounces={false}
             overScrollMode="never"
           >
-            {HOME_NEAREST_COURSES.map((course) => (
+            {homeNearestCourses.map((course) => (
               <CourseCard
                 key={course.id}
                 variant="compact"
@@ -606,7 +615,7 @@ const styles = StyleSheet.create({
     paddingRight: 10,
   },
   trendingCard: {
-    width: 272,
+    width: 316,
   },
   trendingCardTablet: {
     width: 316,

@@ -8,13 +8,12 @@ import { InteractionManager, Platform, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
-import { getCourseById } from "../components/course-data";
+import { formatBookingTime, useBookingState } from "../components/bookings";
+import { getAvailableTeeSlots, getManagedCourseById, type TeeSlot } from "../components/course-management";
 import { useResponsiveLayout } from "../components/responsive-layout";
 import { theme } from "../components/theme";
 import { DailyWeatherForecast, getFourteenDayForecast, getWeatherCodeIconName } from "../components/weather";
 
-const MORNING_TIMES = ["07:20", "07:45", "08:00", "08:15", "08:30", "09:00", "10:15", "11:30"];
-const AFTERNOON_TIMES = ["12:15", "12:45", "01:30", "02:00", "02:30", "03:15", "04:00", "04:30"];
 const SERVICE_FEE = 12.5;
 const CADDY_FEE_PER_PLAYER = 7.5;
 
@@ -33,14 +32,26 @@ function dateKey(value: Date): string {
   return `${value.getFullYear()}-${month}-${day}`;
 }
 
+function parseTimeToMinutes(value: string) {
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
 export default function TeeTimeBookingScreen() {
   const router = useRouter();
   const { horizontalPadding, screenBottomPadding } = useResponsiveLayout();
-  const { id } = useLocalSearchParams<{ id?: string | string[] }>();
+  const { id, bookingId } = useLocalSearchParams<{ id?: string | string[]; bookingId?: string | string[] }>();
   const courseId = Array.isArray(id) ? id[0] : id;
-  const course = getCourseById(courseId);
+  const resolvedBookingId = Array.isArray(bookingId) ? bookingId[0] : bookingId;
+  const course = getManagedCourseById(courseId);
+  const bookingState = useBookingState();
+  const existingBooking = bookingState.bookings.find((item) => item.id === resolvedBookingId) ?? null;
   const [weather, setWeather] = useState<DailyWeatherForecast[]>([]);
   const [weatherState, setWeatherState] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [slotState, setSlotState] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [slotError, setSlotError] = useState<string | null>(null);
+  const [availableSlots, setAvailableSlots] = useState<TeeSlot[]>([]);
+  const [now, setNow] = useState(() => new Date());
 
   const [calendarDate, setCalendarDate] = useState<Date>(() => toDayStart(new Date()));
   const [selectedDateKey, setSelectedDateKey] = useState<string>(() => dateKey(toDayStart(new Date())));
@@ -63,7 +74,6 @@ export default function TeeTimeBookingScreen() {
     });
   }, [calendarDate]);
 
-  const availableTimes = timePeriod === "MORNING" ? MORNING_TIMES : AFTERNOON_TIMES;
   const selectedDateObj = bookingDates.find((item) => item.key === selectedDateKey) ?? bookingDates[0];
   const basePrice = Number(course.price.replace(/[^0-9.]/g, "")) || 0;
   const greenFees = basePrice * selectedPlayers;
@@ -86,8 +96,105 @@ export default function TeeTimeBookingScreen() {
   });
 
   const formattedDateTime = useMemo(() => {
+    if (!selectedTime) {
+      return `${selectedDateObj.day}, ${formattedBookingDate} - Time not selected`;
+    }
+
     return `${selectedDateObj.day}, ${formattedBookingDate} - ${selectedTime} ${timePeriod === "MORNING" ? "AM" : "PM"}`;
   }, [formattedBookingDate, selectedDateObj.day, selectedTime, timePeriod]);
+  const isToday = selectedDateObj.key === dateKey(toDayStart(now));
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const periodSlots = useMemo(() => {
+    return availableSlots
+      .filter((slot) => slot.timePeriod === timePeriod)
+      .map((slot) => {
+        const isPastToday = isToday && parseTimeToMinutes(slot.teeTime) <= currentMinutes;
+        const isExistingBookingSlot =
+          existingBooking?.tee_date === selectedDateObj.key &&
+          existingBooking?.tee_time.slice(0, 5) === slot.teeTime &&
+          existingBooking?.time_period === slot.timePeriod;
+        const isAvailable = (slot.isAvailable || isExistingBookingSlot) && !isPastToday;
+
+        return {
+          ...slot,
+          isAvailable,
+          isPastToday,
+          isUnavailableByBooking: !slot.isAvailable && !isExistingBookingSlot,
+        };
+      });
+  }, [availableSlots, currentMinutes, existingBooking, isToday, selectedDateObj.key, timePeriod]);
+  const availableTimes = periodSlots.filter((slot) => slot.isAvailable).map((slot) => slot.teeTime);
+
+  useEffect(() => {
+    if (!existingBooking) {
+      return;
+    }
+
+    const bookingDate = toDayStart(new Date(`${existingBooking.tee_date}T00:00:00`));
+    const parsedTime = formatBookingTime(existingBooking.tee_time);
+    const normalizedTime = parsedTime.replace(/\s?(AM|PM)$/i, "");
+
+    setCalendarDate(bookingDate);
+    setSelectedDateKey(dateKey(bookingDate));
+    setVisibleDateIndex(0);
+    setSelectedPlayers(existingBooking.players);
+    setTimePeriod(existingBooking.time_period as TimePeriod);
+    setSelectedTime(normalizedTime);
+  }, [existingBooking]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(new Date());
+    }, 60000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadSlots = async () => {
+      setSlotState("loading");
+      setSlotError(null);
+
+      try {
+        const slots = await getAvailableTeeSlots(course.id, selectedDateObj.key);
+        if (!active) {
+          return;
+        }
+
+        setAvailableSlots(slots);
+        setSlotState("success");
+      } catch (error) {
+        if (!active) {
+          return;
+        }
+
+        setAvailableSlots([]);
+        setSlotState("error");
+        setSlotError(error instanceof Error ? error.message : "Unable to load tee slots right now.");
+      }
+    };
+
+    void loadSlots();
+
+    return () => {
+      active = false;
+    };
+  }, [course.id, selectedDateObj.key]);
+
+  useEffect(() => {
+    if (!availableTimes.length) {
+      setSelectedTime("");
+      return;
+    }
+
+    if (!availableTimes.includes(selectedTime)) {
+      setSelectedTime(availableTimes[0]);
+    }
+  }, [availableTimes, selectedTime]);
 
   useEffect(() => {
     let active = true;
@@ -147,6 +254,10 @@ export default function TeeTimeBookingScreen() {
   };
 
   const handleConfirmBooking = () => {
+    if (!selectedTime) {
+      return;
+    }
+
     router.push({
       pathname: "/booking-checkout",
       params: {
@@ -156,6 +267,8 @@ export default function TeeTimeBookingScreen() {
         day: selectedDateObj.day,
         time: selectedTime,
         period: timePeriod,
+        dateKey: selectedDateObj.key,
+        bookingId: resolvedBookingId,
         subtotal: greenFees.toFixed(2),
         serviceFee: serviceFee.toFixed(2),
         caddyFee: caddyFee.toFixed(2),
@@ -329,7 +442,7 @@ export default function TeeTimeBookingScreen() {
                 style={[styles.periodPill, timePeriod === "MORNING" && styles.periodPillActive]}
                 onPress={() => {
                   setTimePeriod("MORNING");
-                  setSelectedTime(MORNING_TIMES[2]);
+                  setSelectedTime("");
                 }}
                 variant="chip"
               >
@@ -339,7 +452,7 @@ export default function TeeTimeBookingScreen() {
                 style={[styles.periodPill, timePeriod === "AFTERNOON" && styles.periodPillActive]}
                 onPress={() => {
                   setTimePeriod("AFTERNOON");
-                  setSelectedTime(AFTERNOON_TIMES[1]);
+                  setSelectedTime("");
                 }}
                 variant="chip"
               >
@@ -351,18 +464,42 @@ export default function TeeTimeBookingScreen() {
           </View>
 
           <View style={styles.timeGrid}>
-            {availableTimes.map((time) => {
-              const active = selectedTime === time;
+            {slotState === "loading" ? <Text style={styles.weatherStateText}>Loading available tee slots...</Text> : null}
+            {slotState === "error" ? <Text style={styles.weatherStateText}>{slotError}</Text> : null}
+            {slotState === "success" && !periodSlots.length ? (
+              <Text style={styles.weatherStateText}>No tee slots configured for this period on the selected date.</Text>
+            ) : null}
+            {slotState === "success" && periodSlots.map((slot) => {
+              const active = selectedTime === slot.teeTime;
+              const disabled = !slot.isAvailable;
               return (
                 <Pressable
-                  key={time}
-                  style={[styles.timeChip, active && styles.timeChipActive]}
+                  key={slot.teeTime}
+                  style={[
+                    styles.timeChip,
+                    active && styles.timeChipActive,
+                    slot.isPastToday && styles.timeChipPast,
+                    slot.isUnavailableByBooking && styles.timeChipBooked,
+                  ]}
                   onPress={() => {
-                    setSelectedTime(time);
+                    if (!disabled) {
+                      setSelectedTime(slot.teeTime);
+                    }
                   }}
+                  disabled={disabled}
                   variant="chip"
                 >
-                  <Text style={[styles.timeChipText, active && styles.timeChipTextActive]}>{time}</Text>
+                  <Text
+                    style={[
+                      styles.timeChipText,
+                      active && styles.timeChipTextActive,
+                      disabled && styles.timeChipTextDisabled,
+                      slot.isUnavailableByBooking && styles.timeChipTextBooked,
+                    ]}
+                  >
+                    {slot.teeTime}
+                  </Text>
+                  {slot.isUnavailableByBooking ? <View style={styles.timeChipStrike} /> : null}
                 </Pressable>
               );
             })}
@@ -415,7 +552,7 @@ export default function TeeTimeBookingScreen() {
             </View>
           </View>
 
-          <Pressable style={[styles.confirmButton]} onPress={handleConfirmBooking} variant="cta">
+          <Pressable style={[styles.confirmButton, !selectedTime && styles.confirmButtonDisabled]} onPress={handleConfirmBooking} disabled={!selectedTime} variant="cta">
             <Text style={styles.confirmButtonText}>Confirm Booking</Text>
           </Pressable>
 
@@ -717,6 +854,14 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 4,
   },
+  timeChipPast: {
+    opacity: 0.4,
+  },
+  timeChipBooked: {
+    backgroundColor: theme.colors.surfaceSoft,
+    borderColor: theme.colors.borderStrong,
+    opacity: 1,
+  },
   timeChipText: {
     color: theme.colors.text,
     fontSize: theme.typography.subtitle.fontSize,
@@ -725,6 +870,20 @@ const styles = StyleSheet.create({
   },
   timeChipTextActive: {
     color: theme.colors.surface,
+  },
+  timeChipTextDisabled: {
+    color: theme.colors.textSoft,
+  },
+  timeChipTextBooked: {
+    color: theme.colors.muted,
+  },
+  timeChipStrike: {
+    position: "absolute",
+    left: 10,
+    right: 10,
+    height: 2,
+    backgroundColor: theme.colors.muted,
+    transform: [{ rotate: "-8deg" }],
   },
   summaryCard: {
     marginTop: 2,
@@ -824,6 +983,9 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
     elevation: 3,
+  },
+  confirmButtonDisabled: {
+    opacity: 0.5,
   },
   confirmButtonText: {
     color: theme.colors.surface,

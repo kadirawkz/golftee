@@ -1,51 +1,132 @@
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
+import { refreshProfile, updateProfile, useAuthSession } from "../components/auth";
 import { useResponsiveLayout } from "../components/responsive-layout";
 import { theme } from "../components/theme";
 
 const PROFILE_IMAGE =
   "https://lh3.googleusercontent.com/aida-public/AB6AXuAtvP2yhWDyZzMmfqZm-64GbAQU1leygJR4XvWNEjNG-Y8v081n1CW6IT037D9o6EKGbW_KzlgUSeCaCsuls8kaOf3CWCfDCpuRg8mTqgE-TvlTlJ199VKcyl-HIuK5JNRGgRMDI0MCL7rrfrId46EMJzwDzPgyJ6MBXm5NL-UpL9rSHD-IMzKPu2uHWDcsyttzykYhj97m06K2Ih3V4L9cOmmEglnPOpkQSsXlM-Q66XRa4f4pJiywM7snw8CbQmvG5e7G8ASXoJA";
 
-function SectionHeader({ title, caption }: { title: string; caption?: string }) {
+function Field({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  keyboardType,
+  editable = true,
+}: {
+  label: string;
+  value: string;
+  onChangeText?: (value: string) => void;
+  placeholder: string;
+  keyboardType?: "default" | "email-address" | "phone-pad" | "decimal-pad";
+  editable?: boolean;
+}) {
   return (
-    <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {caption ? <Text style={styles.sectionCaption}>{caption}</Text> : null}
+    <View style={[styles.inputShell, !editable && styles.inputShellDisabled]}>
+      <Text style={styles.inputLabel}>{label}</Text>
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={theme.colors.muted}
+        style={styles.inputField}
+        keyboardType={keyboardType}
+        autoCapitalize="words"
+        autoCorrect={false}
+        editable={editable}
+      />
     </View>
   );
 }
 
-function DetailRow({
-  icon,
-  label,
-  value,
-  accent,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  value: string;
-  accent?: string;
-}) {
-  return (
-    <Pressable style={styles.detailRow} variant="card">
-      <View style={styles.detailIcon}>
-        <Ionicons name={icon} size={18} color={theme.colors.primary} />
-      </View>
-      <View style={styles.detailCopy}>
-        <Text style={styles.detailLabel}>{label}</Text>
-        <Text style={[styles.detailValue, accent ? { color: accent } : null]}>{value}</Text>
-      </View>
-      <Ionicons name="chevron-forward" size={18} color={theme.colors.muted} />
-    </Pressable>
-  );
-}
-
 export default function AccountScreen() {
+  const auth = useAuthSession();
   const { horizontalPadding, screenBottomPadding } = useResponsiveLayout();
+  const [fullName, setFullName] = useState("");
+  const [username, setUsername] = useState("");
+  const [phone, setPhone] = useState("");
+  const [homeClub, setHomeClub] = useState("");
+  const [handicap, setHandicap] = useState("");
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  useEffect(() => {
+    setFullName(auth.profile?.full_name ?? "");
+    setUsername(auth.profile?.username ?? "");
+    setPhone(auth.profile?.phone ?? "");
+    setHomeClub(auth.profile?.home_club ?? "");
+    setHandicap(auth.profile?.handicap != null ? auth.profile.handicap.toFixed(1) : "");
+  }, [auth.profile]);
+
+  const avatarSource = auth.profile?.avatar_url || PROFILE_IMAGE;
+  const membershipTier = auth.profile?.membership_tier ?? "Free";
+  const memberId = auth.session?.user.id.slice(0, 8).toUpperCase() ?? "PENDING";
+  const memberSince = auth.profile?.member_since
+    ? new Date(auth.profile.member_since).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })
+    : "Pending";
+
+  const handleRefresh = async () => {
+    if (isRefreshing) {
+      return;
+    }
+
+    setIsRefreshing(true);
+    setStatusMessage(null);
+
+    try {
+      await refreshProfile();
+      setStatusMessage("Profile synced from Supabase.");
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : "Unable to refresh your profile.");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (isSaving) {
+      return;
+    }
+
+    if (!username.trim()) {
+      setStatusMessage("Username is required.");
+      return;
+    }
+
+    if (handicap.trim() && Number.isNaN(Number(handicap))) {
+      setStatusMessage("Handicap must be a valid number.");
+      return;
+    }
+
+    setIsSaving(true);
+    setStatusMessage(null);
+
+    try {
+      await updateProfile({
+        full_name: fullName.trim() || null,
+        username: username.trim().toLowerCase(),
+        phone: phone.trim() || null,
+        home_club: homeClub.trim() || null,
+        handicap: handicap.trim() ? Number(handicap) : null,
+      });
+      setStatusMessage("Account changes saved securely.");
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : "Unable to save your profile.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
@@ -64,21 +145,25 @@ export default function AccountScreen() {
         <View style={styles.profileCard}>
           <View style={styles.photoRow}>
             <View style={styles.avatarWrap}>
-              <AppImage source={{ uri: PROFILE_IMAGE }} style={styles.avatarImage} />
+              <AppImage source={{ uri: avatarSource }} style={styles.avatarImage} />
             </View>
             <View style={styles.photoCopy}>
-              <Text style={styles.photoTitle}>Profile Photo</Text>
+              <Text style={styles.photoTitle}>Account Profile</Text>
               <Text style={styles.photoSubtitle}>
-                Visible across bookings, reviews, and your GolfTee profile.
+                Auth and profile data are now backed by Supabase with row-level security.
               </Text>
               <View style={styles.photoButtons}>
-                <Pressable style={styles.primaryAction} variant="cta">
-                  <Ionicons name="image-outline" size={16} color={theme.colors.surface} />
-                  <Text style={styles.primaryActionText}>Upload New</Text>
+                <Pressable style={styles.primaryAction} onPress={() => void handleRefresh()} variant="cta">
+                  {isRefreshing ? (
+                    <ActivityIndicator size="small" color={theme.colors.surface} />
+                  ) : (
+                    <Ionicons name="refresh-outline" size={16} color={theme.colors.surface} />
+                  )}
+                  <Text style={styles.primaryActionText}>{isRefreshing ? "Syncing..." : "Sync Profile"}</Text>
                 </Pressable>
-                <Pressable style={styles.secondaryAction} variant="button">
-                  <Text style={styles.secondaryActionText}>Remove</Text>
-                </Pressable>
+                <View style={styles.secondaryAction}>
+                  <Text style={styles.secondaryActionText}>Avatar upload next phase</Text>
+                </View>
               </View>
             </View>
           </View>
@@ -86,52 +171,111 @@ export default function AccountScreen() {
           <View style={styles.profileMetaRow}>
             <View style={styles.metaPill}>
               <Text style={styles.metaPillLabel}>PLAN</Text>
-              <Text style={styles.metaPillValue}>Gold Member</Text>
+              <Text style={styles.metaPillValue}>{membershipTier}</Text>
             </View>
             <View style={styles.metaPill}>
               <Text style={styles.metaPillLabel}>MEMBER ID</Text>
-              <Text style={styles.metaPillValue}>GT-20481</Text>
+              <Text style={styles.metaPillValue}>GT-{memberId}</Text>
             </View>
           </View>
         </View>
 
         <View style={styles.section}>
-          <SectionHeader title="Personal Details" caption="Update how your profile appears." />
+          <Text style={styles.sectionTitle}>Personal Details</Text>
+          <Text style={styles.sectionCaption}>These values come from your Supabase-backed profile.</Text>
           <View style={styles.card}>
-            <DetailRow icon="person-outline" label="Full name" value="Julian Sterling" />
-            <DetailRow icon="mail-outline" label="Email" value="julian.sterling@golftee.com" />
-            <DetailRow icon="call-outline" label="Phone" value="+1 (408) 555-0138" />
-            <DetailRow icon="location-outline" label="Home club" value="Pebble Dunes Golf Club" />
-            <DetailRow icon="golf-outline" label="Handicap" value="12.4" />
+            <Field
+              label="FULL NAME"
+              value={fullName}
+              onChangeText={setFullName}
+              placeholder="Enter your full name"
+            />
+            <Field
+              label="USERNAME"
+              value={username}
+              onChangeText={setUsername}
+              placeholder="Choose a username"
+            />
+            <Field
+              label="EMAIL"
+              value={auth.session?.user.email ?? ""}
+              placeholder="Email address"
+              keyboardType="email-address"
+              editable={false}
+            />
+            <Field
+              label="PHONE"
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="+1 555 555 5555"
+              keyboardType="phone-pad"
+            />
+            <Field
+              label="HOME CLUB"
+              value={homeClub}
+              onChangeText={setHomeClub}
+              placeholder="Your regular course"
+            />
+            <Field
+              label="HANDICAP"
+              value={handicap}
+              onChangeText={setHandicap}
+              placeholder="e.g. 12.4"
+              keyboardType="decimal-pad"
+            />
           </View>
         </View>
 
         <View style={styles.section}>
-          <SectionHeader title="Membership & Security" caption="Manage plan, sign-in, and account access." />
+          <Text style={styles.sectionTitle}>Security & Membership</Text>
+          <Text style={styles.sectionCaption}>The free plan is enough for email auth and this profile model.</Text>
           <View style={styles.card}>
-            <DetailRow icon="sparkles-outline" label="Membership tier" value="Gold" />
-            <DetailRow icon="calendar-outline" label="Renewal date" value="May 12, 2026" />
-            <DetailRow icon="shield-checkmark-outline" label="2-step verification" value="Enabled" accent={theme.colors.successText} />
-            <DetailRow icon="key-outline" label="Password" value="Last changed 43 days ago" />
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>EMAIL VERIFICATION</Text>
+              <Text style={styles.detailValue}>
+                {auth.session?.user.email_confirmed_at ? "Verified" : "Verification pending"}
+              </Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>MEMBER SINCE</Text>
+              <Text style={styles.detailValue}>{memberSince}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>CURRENT TIER</Text>
+              <Text style={styles.detailValue}>{membershipTier}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>PROFILE LOAD STATUS</Text>
+              <Text style={styles.detailValue}>
+                {auth.profileLoading ? "Loading..." : auth.profile ? "Healthy" : "Profile pending"}
+              </Text>
+            </View>
           </View>
         </View>
 
-        <View style={styles.section}>
-          <SectionHeader title="Billing" caption="Cards, invoices, and active subscription details." />
-          <View style={styles.card}>
-            <DetailRow icon="card-outline" label="Primary card" value="Visa ending in 2048" />
-            <DetailRow icon="receipt-outline" label="Billing cycle" value="Renews on May 12" />
-            <DetailRow icon="document-text-outline" label="Latest invoice" value="Paid on Apr 01, 2026" />
+        {statusMessage ? (
+          <View style={styles.noticeCard}>
+            <Ionicons name="information-circle-outline" size={18} color={theme.colors.primary} />
+            <Text style={styles.noticeText}>{statusMessage}</Text>
           </View>
-        </View>
+        ) : null}
 
         <View style={styles.footerActions}>
-          <Pressable style={styles.primaryButton} variant="cta">
-            <Text style={styles.primaryButtonText}>Save Account Changes</Text>
+          <Pressable
+            style={styles.primaryButton}
+            onPress={() => void handleSave()}
+            disabled={isSaving || auth.profileLoading}
+            variant="cta"
+          >
+            {isSaving ? (
+              <ActivityIndicator size="small" color={theme.colors.surface} />
+            ) : (
+              <Text style={styles.primaryButtonText}>Save Account Changes</Text>
+            )}
           </Pressable>
-          <Pressable style={styles.secondaryButton} variant="button">
-            <Text style={styles.secondaryButtonText}>Download Statement</Text>
-          </Pressable>
+          <View style={styles.secondaryButton}>
+            <Text style={styles.secondaryButtonText}>Billing is intentionally deferred until paid features are needed.</Text>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -209,7 +353,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   secondaryAction: {
-    height: 38,
+    minHeight: 38,
     paddingHorizontal: 14,
     borderRadius: theme.radius.pill,
     borderWidth: 1,
@@ -252,9 +396,6 @@ const styles = StyleSheet.create({
   section: {
     gap: 10,
   },
-  sectionHeader: {
-    gap: 3,
-  },
   sectionTitle: {
     fontSize: theme.typography.h3.fontSize,
     lineHeight: theme.typography.h3.lineHeight,
@@ -271,27 +412,40 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    overflow: "hidden",
+    padding: 14,
+    gap: 12,
+  },
+  inputShell: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 12,
+  },
+  inputShellDisabled: {
+    backgroundColor: theme.colors.surfaceSoft,
+  },
+  inputLabel: {
+    fontSize: theme.typography.label.fontSize,
+    lineHeight: theme.typography.label.lineHeight,
+    fontWeight: "700",
+    letterSpacing: 1.4,
+    color: theme.colors.textSoft,
+    marginBottom: 8,
+  },
+  inputField: {
+    fontSize: theme.typography.body.fontSize,
+    lineHeight: theme.typography.body.lineHeight,
+    color: theme.colors.text,
+    paddingVertical: 0,
   },
   detailRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.borderSoft,
-  },
-  detailIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: theme.colors.primarySoft,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  detailCopy: {
-    flex: 1,
+    borderRadius: 16,
+    backgroundColor: theme.colors.surfaceSoft,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 4,
   },
   detailLabel: {
     fontSize: theme.typography.caption.fontSize,
@@ -299,13 +453,32 @@ const styles = StyleSheet.create({
     color: theme.colors.textSoft,
     letterSpacing: 1.1,
     fontWeight: "700",
-    marginBottom: 2,
   },
   detailValue: {
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
+    color: theme.colors.primary,
+    fontWeight: "700",
+  },
+  noticeCard: {
+    borderRadius: 18,
+    backgroundColor: theme.colors.surfaceSoft,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  noticeText: {
+    flex: 1,
+    fontSize: theme.typography.bodySm.fontSize,
+    lineHeight: theme.typography.bodySm.lineHeight,
     color: theme.colors.text,
     fontWeight: "600",
+  },
+  footerActions: {
+    gap: 10,
   },
   primaryButton: {
     height: 56,
@@ -320,22 +493,22 @@ const styles = StyleSheet.create({
     color: theme.colors.surface,
     fontWeight: "700",
   },
-  footerActions: {
-    gap: 10,
-  },
   secondaryButton: {
-    height: 52,
+    minHeight: 52,
     borderRadius: theme.radius.pill,
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surfaceSoft,
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: 18,
+    paddingVertical: 12,
   },
   secondaryButtonText: {
-    fontSize: theme.typography.subtitle.fontSize,
-    lineHeight: theme.typography.subtitle.lineHeight,
+    fontSize: theme.typography.bodySm.fontSize,
+    lineHeight: theme.typography.bodySm.lineHeight,
     color: theme.colors.primary,
     fontWeight: "700",
+    textAlign: "center",
   },
 });

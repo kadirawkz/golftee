@@ -6,8 +6,15 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
-import { setIsLoggedIn } from "../components/auth";
-import { allCourses, getCourseById } from "../components/course-data";
+import { signOut, useAuthSession } from "../components/auth";
+import {
+  formatBookingDate,
+  formatBookingTime,
+  isHistoricalBooking,
+  isUpcomingBooking,
+  useBookingState,
+} from "../components/bookings";
+import { getManagedCourseById } from "../components/course-management";
 import { useResponsiveLayout } from "../components/responsive-layout";
 import { theme } from "../components/theme";
 
@@ -24,6 +31,7 @@ function BookingPreviewCard({
   players,
   cart,
   code,
+  bookingId,
   onPress,
 }: {
   courseId: string;
@@ -35,10 +43,11 @@ function BookingPreviewCard({
   players: string;
   cart: string;
   code: string;
-  onPress: (courseId: string, date: string, teeTime: string, players: string) => void;
+  bookingId: string;
+  onPress: (bookingId: string) => void;
 }) {
   return (
-    <Pressable style={styles.previewCard} onPress={() => onPress(courseId, date, teeTime, players)} variant="card">
+    <Pressable style={styles.previewCard} onPress={() => onPress(bookingId)} variant="card">
       <View style={styles.previewImageWrap}>
         <AppImage source={{ uri: image }} style={styles.previewImage} />
         <View style={styles.previewOverlay} />
@@ -88,11 +97,34 @@ function BookingPreviewCard({
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const auth = useAuthSession();
+  const bookingState = useBookingState();
   const { screenBottomPadding, scaleFont, scaleLineHeight } = useResponsiveLayout();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const bookingA = getCourseById("1");
-  const bookingB = getCourseById("2");
-  const historyItems = useMemo(() => [allCourses[2], allCourses[3], allCourses[4]], []);
+  const upcomingBookings = bookingState.bookings.filter(isUpcomingBooking).slice(0, 2);
+  const historyItems = useMemo(
+    () =>
+      bookingState.bookings
+        .filter(isHistoricalBooking)
+        .slice(-3)
+        .reverse()
+        .map((booking) => ({
+          booking,
+          course: getManagedCourseById(booking.course_id),
+        })),
+    [bookingState.bookings]
+  );
+  const memberName =
+    auth.profile?.full_name ||
+    auth.profile?.username ||
+    auth.session?.user.email?.split("@")[0] ||
+    "GolfTee Member";
+  const memberSince = auth.profile?.member_since
+    ? new Date(auth.profile.member_since).getFullYear()
+    : new Date().getFullYear();
+  const handicapValue = auth.profile?.handicap != null ? auth.profile.handicap.toFixed(1) : "--";
+  const membershipTier = auth.profile?.membership_tier?.toUpperCase() || "FREE";
+  const avatarSource = auth.profile?.avatar_url || PROFILE_IMAGE;
 
   const handleLogout = useCallback(async () => {
     if (isLoggingOut) {
@@ -100,17 +132,19 @@ export default function ProfileScreen() {
     }
 
     setIsLoggingOut(true);
-    await setIsLoggedIn(false);
-    router.replace("/splash");
+    try {
+      await signOut();
+      router.replace("/splash");
+    } finally {
+      setIsLoggingOut(false);
+    }
   }, [isLoggingOut, router]);
 
-  const handleManageBooking = useCallback((courseId: string, date: string, teeTime: string, players: string) => {
+  const handleManageBooking = useCallback((bookingId: string) => {
     router.push({
       pathname: "/manage-booking",
       params: {
-        id: courseId,
-        dateTime: `${date}, ${teeTime}`,
-        players,
+        bookingId,
       },
     });
   }, [router]);
@@ -127,13 +161,13 @@ export default function ProfileScreen() {
       >
         <View style={styles.profileSection}>
           <Pressable style={styles.avatarWrap} onPress={() => router.push("/account")} variant="card">
-            <AppImage source={{ uri: PROFILE_IMAGE }} style={styles.avatarImage} />
+            <AppImage source={{ uri: avatarSource }} style={styles.avatarImage} />
             <Pressable style={[styles.editButton]} onPress={() => router.push("/account")} variant="icon">
               <Ionicons name="create" size={13} color={theme.colors.surface} />
             </Pressable>
           </Pressable>
 
-          <Text style={styles.memberSince}>MEMBER SINCE 2022</Text>
+          <Text style={styles.memberSince}>MEMBER SINCE {memberSince}</Text>
           <Text
             style={[
               styles.memberName,
@@ -143,13 +177,13 @@ export default function ProfileScreen() {
               },
             ]}
           >
-            Julian Sterling
+            {memberName}
           </Text>
 
           <View style={styles.statsPill}>
             <View style={styles.statCol}>
               <Text style={styles.statLabel}>HANDICAP</Text>
-              <Text style={styles.statValue}>12.4</Text>
+              <Text style={styles.statValue}>{handicapValue}</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statCol}>
@@ -161,7 +195,7 @@ export default function ProfileScreen() {
               <Text style={styles.statLabel}>STATUS</Text>
               <View style={styles.statusRow}>
                 <Ionicons name="sparkles" size={12} color={theme.colors.accentWarm} />
-                <Text style={styles.statusText}>GOLD</Text>
+                <Text style={styles.statusText}>{membershipTier}</Text>
               </View>
             </View>
           </View>
@@ -195,31 +229,29 @@ export default function ProfileScreen() {
           bounces={false}
           overScrollMode="never"
         >
-          <BookingPreviewCard
-            courseId={bookingA.id}
-            title={bookingA.title}
-            location={bookingA.location}
-            image={bookingA.image}
-            date="Oct 24, 2023"
-            teeTime="08:15 AM"
-            players="4 Balls"
-            cart="Included"
-            code="#GT-99281"
-            onPress={handleManageBooking}
-          />
-          <BookingPreviewCard
-            courseId={bookingB.id}
-            title={bookingB.title}
-            location={bookingB.location}
-            image={bookingB.image}
-            date="Nov 02, 2023"
-            teeTime="10:30 AM"
-            players="2 Balls"
-            cart="Walk Only"
-            code="#GT-88412"
-            onPress={handleManageBooking}
-          />
+          {upcomingBookings.map((booking) => {
+            const course = getManagedCourseById(booking.course_id);
+            return (
+              <BookingPreviewCard
+                key={booking.id}
+                bookingId={booking.id}
+                courseId={course.id}
+                title={course.title}
+                location={course.location}
+                image={course.image}
+                date={formatBookingDate(booking.tee_date)}
+                teeTime={formatBookingTime(booking.tee_time)}
+                players={`${booking.players} Players`}
+                cart={booking.payment_method === "wallet" ? "Digital Wallet" : "Card"}
+                code={`#${booking.booking_code}`}
+                onPress={handleManageBooking}
+              />
+            );
+          })}
         </ScrollView>
+        {!bookingState.loading && bookingState.initialized && !upcomingBookings.length ? (
+          <Text style={styles.emptyStateText}>No upcoming bookings yet. Your next round will show up here.</Text>
+        ) : null}
 
         <View style={styles.actionsSection}>
           <Pressable style={[styles.actionCard]} onPress={() => router.push("/favourites")} variant="card">
@@ -281,25 +313,35 @@ export default function ProfileScreen() {
           </Text>
 
           <View style={styles.historyList}>
-            {historyItems.map((item, index) => (
-              <Pressable key={item.id} style={[styles.historyItem]} onPress={() => router.push("/booking-history")} variant="card">
+            {historyItems.map((item) => (
+              <Pressable
+                key={item.booking.id}
+                style={[styles.historyItem]}
+                onPress={() => router.push({ pathname: "/manage-booking", params: { bookingId: item.booking.id } })}
+                variant="card"
+              >
                 <View style={styles.historyLeft}>
                   <View style={styles.historyThumb}>
-                    <AppImage source={{ uri: item.image }} style={styles.historyThumbImage} />
+                    <AppImage source={{ uri: item.course.image }} style={styles.historyThumbImage} />
                   </View>
                   <View>
-                    <Text style={styles.historyName}>{item.title}</Text>
-                    <Text style={styles.historyMeta}>Sep {12 - index * 7}, 2023 • Score: {84 - index * 5}</Text>
+                    <Text style={styles.historyName}>{item.course.title}</Text>
+                    <Text style={styles.historyMeta}>
+                      {formatBookingDate(item.booking.tee_date)} • {item.booking.status.toUpperCase()}
+                    </Text>
                   </View>
                 </View>
 
                 <View style={styles.historyRight}>
-                  <Text style={styles.historyPrice}>{item.price}.00</Text>
-                  <Text style={styles.historyStatus}>COMPLETED</Text>
+                  <Text style={styles.historyPrice}>${item.booking.total.toFixed(2)}</Text>
+                  <Text style={styles.historyStatus}>{item.booking.status.toUpperCase()}</Text>
                 </View>
               </Pressable>
             ))}
           </View>
+          {!bookingState.loading && bookingState.initialized && !historyItems.length ? (
+            <Text style={styles.emptyStateText}>Past and cancelled bookings will appear here.</Text>
+          ) : null}
 
           <Pressable style={[styles.loadButton]} onPress={() => router.push("/booking-history")} variant="button">
             <Text style={styles.loadButtonText}>Load Full History</Text>
@@ -690,5 +732,12 @@ const styles = StyleSheet.create({
     lineHeight: theme.typography.subtitle.lineHeight,
     color: theme.colors.primary,
     fontWeight: "700",
+  },
+  emptyStateText: {
+    paddingHorizontal: 16,
+    fontSize: theme.typography.bodySm.fontSize,
+    lineHeight: theme.typography.bodySm.lineHeight,
+    color: theme.colors.textSoft,
+    fontWeight: "600",
   },
 });

@@ -1,50 +1,88 @@
-# Welcome to your Expo app 👋
+# GolfTee
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+GolfTee is an Expo Router mobile app for discovering golf courses and booking tee times.
+It uses Supabase for authentication, profiles, favorites, course catalog data, tee-slot availability, and bookings.
 
-## Get started
+## Current backend scope
 
-1. Install dependencies
+- Email/password auth (sign up, sign in, sign out)
+- Password reset email trigger
+- Secure session persistence (`expo-secure-store` with AsyncStorage fallback)
+- User profile read/update flow
+- Per-user favorites with RLS
+- Tee-time booking create/update/cancel flows with slot conflict protection
+- Supabase-backed course catalog and tee-slot templates (read-only from client)
 
-   ```bash
-   npm install
-   ```
+## Tech stack
 
-2. Start the app
+- React Native + Expo + Expo Router
+- TypeScript
+- Supabase JS client (`@supabase/supabase-js`)
 
-   ```bash
-   npx expo start
-   ```
+## Project scripts
 
-In the output, you'll find options to open the app in a
+- Install deps: `npm install`
+- Start dev server: `npm run start`
+- Run Android: `npm run android`
+- Run iOS: `npm run ios`
+- Run web: `npm run web`
+- Lint: `npm run lint`
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+Note: There is currently no test runner configured in this repository.
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## Local setup
 
-## Get a fresh project
+1. Create a Supabase project.
+2. In Supabase SQL editor, run [supabase/schema.sql](supabase/schema.sql).
+3. Then run [supabase/seed_courses.sql](supabase/seed_courses.sql).
+4. Copy [.env.example](.env.example) to `.env`.
+5. Set values in `.env`:
 
-When you're ready, run:
-
-```bash
-npm run reset-project
+```env
+EXPO_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+6. In Supabase Auth settings:
+   - Keep Email provider enabled
+   - Configure confirmation policy based on your release needs
+   - Configure redirect URLs if you add in-app reset confirmation flow
+7. Start the app with `npm run start`.
 
-## Learn more
+## Security model
 
-To learn more about developing your project with Expo, look at the following resources:
+- Client only uses public anon key (never service role key).
+- Row Level Security is enabled for user-owned tables.
+- Profile, favorites, and bookings are scoped to `auth.uid()`.
+- Booking slot availability is exposed via RPC instead of broad booking table reads.
+- RPC execution is restricted to `authenticated` in [supabase/schema.sql](supabase/schema.sql).
+- Session tokens are persisted in secure storage where available.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Pre-push checklist
 
-## Join the community
+Run from project root:
 
-Join our community of developers creating universal apps.
+```bash
+npm run lint
+npx tsc --noEmit
+npm audit --omit=dev
+git status --short
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Before pushing, confirm:
+
+- `.env` is not tracked
+- only `.env.example` is committed
+- no local credential files (for example `.npmrc`) are staged
+
+## Deferred features
+
+The following are intentionally out of scope for this phase:
+
+- Payments
+- Notifications
+- Media/file uploads
+- Analytics and advanced monitoring
+- Admin workflows requiring server-side secrets
+
+For admin actions or secret-bearing operations, use Supabase Edge Functions or a private backend.
