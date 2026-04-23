@@ -12,6 +12,7 @@ It uses Supabase for authentication, profiles, favorites, course catalog data, t
 - Per-user favorites with RLS
 - Tee-time booking create/update/cancel flows with slot conflict protection
 - Supabase-backed course catalog and tee-slot templates (read-only from client)
+- Supabase-backed course detail content, amenities, and reviews
 
 ## Tech stack
 

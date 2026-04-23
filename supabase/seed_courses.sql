@@ -50,3 +50,113 @@ set
   max_players = excluded.max_players,
   sort_order = excluded.sort_order,
   is_active = true;
+
+insert into public.course_content (
+  course_id,
+  hero_badge,
+  review_count,
+  experience_description
+)
+values
+  ('1', 'SIGNATURE COURSE', 128, 'Designed for precision and rhythm, Royal Colombo delivers a city-club round with mature trees, fast greens, and strategic lines that reward thoughtful shot shaping from the first tee through the closing stretch.'),
+  ('2', 'HIGHLANDS ESCAPE', 96, 'Set above the reservoir in Digana, Victoria blends elevation changes, sweeping lake views, and demanding approach angles into a resort round that feels scenic on every hole and exacting on the scorecard.'),
+  ('3', 'HERITAGE CLASSIC', 114, 'Nuwara Eliya offers a cool-climate test with old-world character, tighter corridors, and disciplined green complexes that ask for controlled ball flight and smart club selection throughout the round.'),
+  ('4', 'EAST COAST CHALLENGE', 82, 'Eagles Golf Link pairs open fairways with exposed coastal winds and firm running surfaces, creating a round where trajectory control and patience matter as much as distance.'),
+  ('5', 'ANCIENT CITY FAVORITE', 74, 'Eagles Heritage combines relaxed resort play with polished conditioning, offering forgiving tee shots, balanced risk-reward holes, and a steady pace that suits both newer players and returning regulars.'),
+  ('6', 'RESORT SHOWPIECE', 143, 'Shangri La Hambantota brings bold bunkering, ocean air, and expansive landing areas together for a premium resort experience that stays playable while still rewarding aggressive scoring lines.'),
+  ('7', 'SOUTH COAST LINKS', 88, 'Koggala leans into natural movement and seaside conditions, giving players a breezy links-style test with creative recovery shots, wide visuals, and plenty of options into the greens.'),
+  ('8', 'HILL COUNTRY TEST', 69, 'Army Golf Course in Diyatalawa offers thinner mountain air, rolling terrain, and a more exacting second-shot challenge that makes every well-managed hole feel earned.')
+on conflict (course_id) do update
+set
+  hero_badge = excluded.hero_badge,
+  review_count = excluded.review_count,
+  experience_description = excluded.experience_description;
+
+delete from public.course_detail_items;
+
+insert into public.course_detail_items (
+  course_id,
+  category,
+  icon,
+  title,
+  subtitle,
+  sort_order
+)
+values
+  ('1', 'amenity', 'home', 'Clubhouse', 'Colonial lounge and terrace views', 1),
+  ('1', 'amenity', 'bag', 'Pro Shop', 'Premium gear and fitting support', 2),
+  ('1', 'amenity', 'restaurant', 'Dining', 'All-day service after the round', 3),
+  ('1', 'amenity', 'car', 'Carts', 'GPS-guided comfort on course', 4),
+  ('1', 'highlight', 'leaf', 'Pristine Turf Management', 'Fast greens and tidy landing areas daily.', 1),
+  ('1', 'highlight', 'water', 'Railway-Line Strategy', 'Signature risk-reward lines shape club selection.', 2),
+  ('2', 'amenity', 'home', 'Resort Clubhouse', 'Panoramic views over Victoria', 1),
+  ('2', 'amenity', 'bag', 'Practice Centre', 'Range, putting green, and short game zone', 2),
+  ('2', 'amenity', 'restaurant', 'Lakeside Dining', 'Resort dining between rounds', 3),
+  ('2', 'amenity', 'car', 'Carts', 'Resort fleet with course navigation', 4),
+  ('2', 'highlight', 'leaf', 'Elevation Variety', 'Every stretch asks for a different trajectory.', 1),
+  ('2', 'highlight', 'water', 'Reservoir Edge Holes', 'Water-framed approaches reward commitment.', 2),
+  ('3', 'amenity', 'home', 'Heritage Clubhouse', 'Classic hill-country atmosphere', 1),
+  ('3', 'amenity', 'bag', 'Pro Shop', 'Essentials and warm-weather layers', 2),
+  ('3', 'amenity', 'restaurant', 'Tea Lounge', 'Post-round drinks with valley views', 3),
+  ('3', 'amenity', 'car', 'Caddies', 'Walking-friendly support on course', 4),
+  ('3', 'highlight', 'leaf', 'Cool-Climate Greens', 'Firm putting surfaces reward touch.', 1),
+  ('3', 'highlight', 'water', 'Tight Approaches', 'Precision into greens matters all day.', 2),
+  ('4', 'amenity', 'home', 'Clubhouse', 'Relaxed coastal base before tee-off', 1),
+  ('4', 'amenity', 'bag', 'Rental Gear', 'Travel-friendly club rental service', 2),
+  ('4', 'amenity', 'restaurant', 'Refreshments', 'Light bites and cold drinks', 3),
+  ('4', 'amenity', 'car', 'Carts', 'Comfort rides for warm afternoons', 4),
+  ('4', 'highlight', 'leaf', 'Wind Management', 'Flighted shots beat raw power here.', 1),
+  ('4', 'highlight', 'water', 'Firm Coastal Roll', 'Ground game options stay in play.', 2),
+  ('5', 'amenity', 'home', 'Member Lounge', 'Comfortable clubhouse setting', 1),
+  ('5', 'amenity', 'bag', 'Golf Services', 'Rental sets and starter support', 2),
+  ('5', 'amenity', 'restaurant', 'Garden Dining', 'Casual meals with course outlook', 3),
+  ('5', 'amenity', 'car', 'Carts', 'Easy-moving pace across the property', 4),
+  ('5', 'highlight', 'leaf', 'Playable Routing', 'Inviting landing zones for all levels.', 1),
+  ('5', 'highlight', 'water', 'Balanced Risk-Reward', 'Scoring chances appear without over-penalty.', 2),
+  ('6', 'amenity', 'home', 'Resort Clubhouse', 'Luxury arrival and locker facilities', 1),
+  ('6', 'amenity', 'bag', 'Performance Shop', 'Premium retail and fittings', 2),
+  ('6', 'amenity', 'restaurant', 'Resort Dining', 'Signature dining after play', 3),
+  ('6', 'amenity', 'car', 'Carts', 'Fully serviced resort fleet', 4),
+  ('6', 'highlight', 'leaf', 'Championship Conditioning', 'Premium presentation from tee to green.', 1),
+  ('6', 'highlight', 'water', 'Ocean-Air Exposure', 'Wind and bunkering define scoring lines.', 2),
+  ('7', 'amenity', 'home', 'Beachside Clubhouse', 'Relaxed south-coast atmosphere', 1),
+  ('7', 'amenity', 'bag', 'Practice Corner', 'Warm-up range and putting area', 2),
+  ('7', 'amenity', 'restaurant', 'Seafood Grill', 'Fresh plates near the fairways', 3),
+  ('7', 'amenity', 'car', 'Carts', 'Quick access across exposed holes', 4),
+  ('7', 'highlight', 'leaf', 'Links Creativity', 'Low runners and recovery shots thrive.', 1),
+  ('7', 'highlight', 'water', 'Sea Breeze Control', 'Shot windows shift through the round.', 2),
+  ('8', 'amenity', 'home', 'Mountain Clubhouse', 'Warm interiors for cool mornings', 1),
+  ('8', 'amenity', 'bag', 'Starter Desk', 'Guest support and golf basics', 2),
+  ('8', 'amenity', 'restaurant', 'Mess Hall Dining', 'Hearty meals after the round', 3),
+  ('8', 'amenity', 'car', 'Carts', 'Optional transport on rolling terrain', 4),
+  ('8', 'highlight', 'leaf', 'Altitude Advantage', 'Ball flight and distance play differently.', 1),
+  ('8', 'highlight', 'water', 'Second-Shot Test', 'Approaches decide whether rounds hold together.', 2);
+
+delete from public.course_reviews;
+
+insert into public.course_reviews (
+  course_id,
+  author_name,
+  author_badge,
+  rating,
+  review_text,
+  review_date,
+  sort_order
+)
+values
+  ('1', 'Marcus Thorne', 'Handicap: 4', 5, 'The most immersive golfing experience I''ve had in years. The routing keeps asking for a smarter shape into the next fairway.', '2026-03-12', 1),
+  ('1', 'Elena Rodriguez', 'Executive Member', 5, 'Clubhouse amenities are first-class, and the finishing stretch feels polished without losing personality.', '2026-02-27', 2),
+  ('2', 'Nimal Perera', 'Handicap: 9', 5, 'Victoria has the kind of scenery that distracts you for a second and then punishes the next swing if you lose focus.', '2026-03-18', 1),
+  ('2', 'Sophie Lane', 'Resort Guest', 4, 'Great conditioning and a memorable back nine. Elevation changes make every club choice feel important.', '2026-02-08', 2),
+  ('3', 'Daniel Hooper', 'Handicap: 6', 5, 'Cool air, classic layout, and greens that absolutely demand touch. One of the most character-rich rounds in the region.', '2026-03-05', 1),
+  ('3', 'Ayesha Karim', 'Weekend Golfer', 4, 'Tighter than it first appears, but very fair if you stay patient and keep the ball below the wind.', '2026-01-29', 2),
+  ('4', 'Harith Silva', 'Handicap: 12', 4, 'The breeze changes the whole feel of the round. It rewards players who can stay creative and accept the odd bounce.', '2026-03-14', 1),
+  ('4', 'Grace Miller', 'Travel Member', 4, 'A laid-back setting with enough bite in the wind and run-out to keep things interesting.', '2026-02-11', 2),
+  ('5', 'Kavindu Senanayake', 'Club Member', 4, 'Very playable and well-paced. It''s the kind of course you''d happily book again for a relaxed morning game.', '2026-03-09', 1),
+  ('5', 'Mina Joseph', 'Handicap: 16', 4, 'Friendly routing and a nice balance between scoring chances and enough trouble to stay engaged.', '2026-01-22', 2),
+  ('6', 'Oliver Bennett', 'Handicap: 3', 5, 'A premium resort course with strong visuals and a few holes that really ask for commitment into the wind.', '2026-03-21', 1),
+  ('6', 'Chathuri Fernando', 'Member Guest', 5, 'Beautiful presentation, smooth service, and a round that feels special from arrival to the last putt.', '2026-02-16', 2),
+  ('7', 'Ruwan Dias', 'Handicap: 8', 5, 'Koggala lets you play imaginative golf. The ground game matters more than most modern resort players expect.', '2026-03-03', 1),
+  ('7', 'Isla Moore', 'Links Enthusiast', 4, 'Not overly severe, but the breeze and contours keep you thinking all the way through.', '2026-01-31', 2),
+  ('8', 'James Hewitt', 'Handicap: 7', 4, 'Cool conditions and rolling terrain make this one feel distinct. It''s a satisfying mountain test.', '2026-03-07', 1),
+  ('8', 'Pabasara Wijesinghe', 'Army Guest', 4, 'You feel the altitude and the challenge builds nicely as the round goes on. Worth the trip.', '2026-02-03', 2);

@@ -38,6 +38,45 @@ create table if not exists public.course_tee_slot_templates (
   constraint course_tee_slot_templates_course_time_unique unique (course_id, tee_time)
 );
 
+create table if not exists public.course_content (
+  course_id text primary key references public.golf_courses (id) on delete cascade,
+  hero_badge text not null default 'SIGNATURE COURSE',
+  review_count integer not null default 0,
+  experience_description text not null,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  constraint course_content_review_count_valid check (review_count >= 0)
+);
+
+create table if not exists public.course_detail_items (
+  id uuid primary key default gen_random_uuid(),
+  course_id text not null references public.golf_courses (id) on delete cascade,
+  category text not null,
+  icon text not null,
+  title text not null,
+  subtitle text not null,
+  sort_order integer not null default 0,
+  is_active boolean not null default true,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  constraint course_detail_items_category_valid check (category in ('amenity', 'highlight'))
+);
+
+create table if not exists public.course_reviews (
+  id uuid primary key default gen_random_uuid(),
+  course_id text not null references public.golf_courses (id) on delete cascade,
+  author_name text not null,
+  author_badge text not null,
+  rating integer not null,
+  review_text text not null,
+  review_date date not null,
+  sort_order integer not null default 0,
+  is_published boolean not null default true,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  constraint course_reviews_rating_valid check (rating between 1 and 5)
+);
+
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   username extensions.citext unique,
@@ -212,6 +251,9 @@ alter table public.profiles enable row level security;
 alter table public.favorite_courses enable row level security;
 alter table public.golf_courses enable row level security;
 alter table public.course_tee_slot_templates enable row level security;
+alter table public.course_content enable row level security;
+alter table public.course_detail_items enable row level security;
+alter table public.course_reviews enable row level security;
 alter table public.tee_time_bookings enable row level security;
 
 drop policy if exists "Profiles are viewable by the owner" on public.profiles;
@@ -260,6 +302,42 @@ using (auth.role() = 'authenticated');
 drop policy if exists "Course slot templates are readable by authenticated users" on public.course_tee_slot_templates;
 create policy "Course slot templates are readable by authenticated users"
 on public.course_tee_slot_templates
+for select
+using (auth.role() = 'authenticated');
+
+drop trigger if exists course_content_set_updated_at on public.course_content;
+create trigger course_content_set_updated_at
+before update on public.course_content
+for each row
+execute function public.set_current_timestamp_updated_at();
+
+drop trigger if exists course_detail_items_set_updated_at on public.course_detail_items;
+create trigger course_detail_items_set_updated_at
+before update on public.course_detail_items
+for each row
+execute function public.set_current_timestamp_updated_at();
+
+drop trigger if exists course_reviews_set_updated_at on public.course_reviews;
+create trigger course_reviews_set_updated_at
+before update on public.course_reviews
+for each row
+execute function public.set_current_timestamp_updated_at();
+
+drop policy if exists "Course content is readable by authenticated users" on public.course_content;
+create policy "Course content is readable by authenticated users"
+on public.course_content
+for select
+using (auth.role() = 'authenticated');
+
+drop policy if exists "Course detail items are readable by authenticated users" on public.course_detail_items;
+create policy "Course detail items are readable by authenticated users"
+on public.course_detail_items
+for select
+using (auth.role() = 'authenticated');
+
+drop policy if exists "Course reviews are readable by authenticated users" on public.course_reviews;
+create policy "Course reviews are readable by authenticated users"
+on public.course_reviews
 for select
 using (auth.role() = 'authenticated');
 

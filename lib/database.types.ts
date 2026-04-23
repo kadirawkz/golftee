@@ -108,6 +108,114 @@ export type Database = {
         };
         Relationships: [];
       };
+      course_content: {
+        Row: {
+          course_id: string;
+          created_at: string;
+          experience_description: string;
+          hero_badge: string;
+          review_count: number;
+          updated_at: string;
+        };
+        Insert: {
+          course_id: string;
+          created_at?: string;
+          experience_description: string;
+          hero_badge?: string;
+          review_count?: number;
+          updated_at?: string;
+        };
+        Update: {
+          course_id?: string;
+          created_at?: string;
+          experience_description?: string;
+          hero_badge?: string;
+          review_count?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      course_detail_items: {
+        Row: {
+          category: string;
+          course_id: string;
+          created_at: string;
+          icon: string;
+          id: string;
+          is_active: boolean;
+          sort_order: number;
+          subtitle: string;
+          title: string;
+          updated_at: string;
+        };
+        Insert: {
+          category: string;
+          course_id: string;
+          created_at?: string;
+          icon: string;
+          id?: string;
+          is_active?: boolean;
+          sort_order?: number;
+          subtitle: string;
+          title: string;
+          updated_at?: string;
+        };
+        Update: {
+          category?: string;
+          course_id?: string;
+          created_at?: string;
+          icon?: string;
+          id?: string;
+          is_active?: boolean;
+          sort_order?: number;
+          subtitle?: string;
+          title?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      course_reviews: {
+        Row: {
+          author_badge: string;
+          author_name: string;
+          course_id: string;
+          created_at: string;
+          id: string;
+          is_published: boolean;
+          rating: number;
+          review_date: string;
+          review_text: string;
+          sort_order: number;
+          updated_at: string;
+        };
+        Insert: {
+          author_badge: string;
+          author_name: string;
+          course_id: string;
+          created_at?: string;
+          id?: string;
+          is_published?: boolean;
+          rating: number;
+          review_date: string;
+          review_text: string;
+          sort_order?: number;
+          updated_at?: string;
+        };
+        Update: {
+          author_badge?: string;
+          author_name?: string;
+          course_id?: string;
+          created_at?: string;
+          id?: string;
+          is_published?: boolean;
+          rating?: number;
+          review_date?: string;
+          review_text?: string;
+          sort_order?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       tee_time_bookings: {
         Row: {
           booking_code: string;
@@ -241,6 +349,9 @@ export type FavoriteCourseRow = Database["public"]["Tables"]["favorite_courses"]
 export type FavoriteCourseInsert = Database["public"]["Tables"]["favorite_courses"]["Insert"];
 export type GolfCourseRow = Database["public"]["Tables"]["golf_courses"]["Row"];
 export type CourseTeeSlotTemplateRow = Database["public"]["Tables"]["course_tee_slot_templates"]["Row"];
+export type CourseContentRow = Database["public"]["Tables"]["course_content"]["Row"];
+export type CourseDetailItemRow = Database["public"]["Tables"]["course_detail_items"]["Row"];
+export type CourseReviewRow = Database["public"]["Tables"]["course_reviews"]["Row"];
 export type TeeTimeBookingRow = Database["public"]["Tables"]["tee_time_bookings"]["Row"];
 export type TeeTimeBookingInsert = Database["public"]["Tables"]["tee_time_bookings"]["Insert"];
 export type TeeTimeBookingUpdate = Database["public"]["Tables"]["tee_time_bookings"]["Update"];

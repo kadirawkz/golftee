@@ -6,7 +6,7 @@ import { InteractionManager, ScrollView, StyleSheet, Text, View, useWindowDimens
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
-import { getManagedCourseById } from "../components/course-management";
+import { getManagedCourseById, useCourseDetails } from "../components/course-management";
 import { toggleFavoriteCourse, useIsFavoriteCourse } from "../components/favorites";
 import { openInGoogleMaps } from "../components/map-links";
 import { theme } from "../components/theme";
@@ -52,6 +52,17 @@ const courseReviews: CourseReview[] = [
     date: "Feb 27, 2026",
   },
 ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+const fallbackExperienceDescription =
+  "Designed by master architects to harmonize with the natural contours, this course offers an 18-hole journey that challenges the professional while enchanting the amateur. The rolling bentgrass fairways blend seamlessly into pristine bunkers, framed by age-old oaks and strategic water hazards.";
+
+function formatReviewDate(value: string) {
+  return new Date(`${value}T00:00:00`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+  });
+}
 
 function AmenityCard({ icon, title, subtitle }: Amenity) {
   return (
@@ -104,6 +115,7 @@ export default function CourseDetailsScreen() {
   const [showAllReviews, setShowAllReviews] = useState(false);
   const [favoriteNotice, setFavoriteNotice] = useState<string | null>(null);
   const course = getManagedCourseById(courseId);
+  const courseDetails = useCourseDetails(course.id);
   const isFavorite = useIsFavoriteCourse(course.id);
   const isCompact = width < 360;
   const isTabletLike = width >= 768;
@@ -113,7 +125,41 @@ export default function CourseDetailsScreen() {
   const bookingBottom = tabBottom + tabHeight + (isCompact ? 10 : 12);
   const bookingMinHeight = isTabletLike ? 76 : isCompact ? 68 : 72;
   const scrollBottomPadding = bookingBottom + bookingMinHeight + 28;
-  const visibleReviews = showAllReviews ? courseReviews : courseReviews.slice(0, 1);
+  const amenityItems = (courseDetails.value?.detailItems ?? [])
+    .filter((item) => item.category === "amenity")
+    .map((item) => ({
+      icon: item.icon as keyof typeof Ionicons.glyphMap,
+      title: item.title,
+      subtitle: item.subtitle,
+    }));
+  const highlightItems = (courseDetails.value?.detailItems ?? [])
+    .filter((item) => item.category === "highlight")
+    .map((item) => ({
+      icon: item.icon as keyof typeof Ionicons.glyphMap,
+      title: item.title,
+      subtitle: item.subtitle,
+    }));
+  const resolvedAmenities = amenityItems.length ? amenityItems : amenities;
+  const resolvedHighlights = highlightItems.length
+    ? highlightItems
+    : [
+        { icon: "leaf" as const, title: "Pristine Turf Management", subtitle: "Tee-to-green perfection daily." },
+        { icon: "water" as const, title: "Strategic Water Hazards", subtitle: "Engineered for risk and reward play." },
+      ];
+  const resolvedReviews = courseDetails.value?.reviews.length
+    ? courseDetails.value.reviews.map((review) => ({
+        id: review.id,
+        author: review.author_name,
+        handicap: review.author_badge,
+        rating: review.rating,
+        text: review.review_text,
+        date: formatReviewDate(review.review_date),
+      }))
+    : courseReviews;
+  const visibleReviews = showAllReviews ? resolvedReviews : resolvedReviews.slice(0, 1);
+  const heroBadge = courseDetails.value?.content?.hero_badge ?? "SIGNATURE COURSE";
+  const reviewCount = courseDetails.value?.content?.review_count ?? 128;
+  const experienceDescription = courseDetails.value?.content?.experience_description ?? fallbackExperienceDescription;
 
   useEffect(() => {
     let active = true;
@@ -190,7 +236,7 @@ export default function CourseDetailsScreen() {
           </Pressable>
           <View style={styles.heroContent}>
             <View style={styles.badgePill}>
-              <Text style={styles.badgeText}>SIGNATURE COURSE</Text>
+              <Text style={styles.badgeText}>{heroBadge}</Text>
             </View>
             <Text style={styles.courseTitle}>{course.title}</Text>
             <View style={styles.heroLocationPill}>
@@ -200,7 +246,7 @@ export default function CourseDetailsScreen() {
             <View style={styles.courseMetaRow}>
               <View style={styles.metaItem}>
                 <Ionicons name="star" size={14} color={theme.colors.accentWarm} />
-                <Text style={styles.metaText}>{course.rating} (128 Reviews)</Text>
+                <Text style={styles.metaText}>{course.rating} ({reviewCount} Reviews)</Text>
               </View>
               <View style={styles.metaDot} />
               <Pressable
@@ -223,6 +269,8 @@ export default function CourseDetailsScreen() {
         </View>
 
         <View style={styles.contentSection}>
+          {courseDetails.error ? <Text style={styles.weatherStateText}>{courseDetails.error}</Text> : null}
+
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>14-Day Weather</Text>
@@ -266,8 +314,8 @@ export default function CourseDetailsScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>World-Class Amenities</Text>
             <View style={styles.amenitiesGrid}>
-              {amenities.map((amenity, idx) => (
-                <AmenityCard key={idx} {...amenity} />
+              {resolvedAmenities.map((amenity, idx) => (
+                <AmenityCard key={`${amenity.title}-${idx}`} {...amenity} />
               ))}
             </View>
           </View>
@@ -279,32 +327,20 @@ export default function CourseDetailsScreen() {
                 <View style={styles.underline} />
               </View>
             </View>
-            <Text style={styles.experienceText}>
-              Designed by master architects to harmonize with the natural contours, this course offers an 18-hole journey that
-              challenges the professional while enchanting the amateur. The rolling bentgrass fairways blend seamlessly into pristine
-              bunkers, framed by age-old oaks and strategic water hazards.
-            </Text>
+            <Text style={styles.experienceText}>{experienceDescription}</Text>
 
             <View style={styles.featuresWrap}>
-              <View style={styles.featureItem}>
-                <View style={styles.featureIcon}>
-                  <Ionicons name="leaf" size={18} color={theme.colors.primary} />
+              {resolvedHighlights.map((highlight, idx) => (
+                <View key={`${highlight.title}-${idx}`} style={styles.featureItem}>
+                  <View style={styles.featureIcon}>
+                    <Ionicons name={highlight.icon} size={18} color={theme.colors.primary} />
+                  </View>
+                  <View>
+                    <Text style={styles.featureTitle}>{highlight.title}</Text>
+                    <Text style={styles.featureSubtitle}>{highlight.subtitle}</Text>
+                  </View>
                 </View>
-                <View>
-                  <Text style={styles.featureTitle}>Pristine Turf Management</Text>
-                  <Text style={styles.featureSubtitle}>Tee-to-green perfection daily.</Text>
-                </View>
-              </View>
-
-              <View style={styles.featureItem}>
-                <View style={styles.featureIcon}>
-                  <Ionicons name="water" size={18} color={theme.colors.primary} />
-                </View>
-                <View>
-                  <Text style={styles.featureTitle}>Strategic Water Hazards</Text>
-                  <Text style={styles.featureSubtitle}>Engineered for risk and reward play.</Text>
-                </View>
-              </View>
+              ))}
             </View>
 
             <Pressable
@@ -338,7 +374,7 @@ export default function CourseDetailsScreen() {
               ))}
             </View>
 
-            {courseReviews.length > 1 ? (
+            {resolvedReviews.length > 1 ? (
               <Pressable style={styles.showMoreButton} onPress={() => setShowAllReviews((value) => !value)} variant="chip">
                 <Text style={styles.showMoreButtonText}>{showAllReviews ? "Show Less" : "Show More"}</Text>
                 <Ionicons
