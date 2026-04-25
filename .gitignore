@@ -57,6 +57,7 @@ Thumbs.db
 
 # local editor/generated files
 .vscode/.react/
+.vscode/*.code-workspace
 .eslintcache
 *.log
 

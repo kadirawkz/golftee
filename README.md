@@ -32,6 +32,10 @@ It uses Supabase for authentication, profiles, favorites, course catalog data, t
 
 Note: There is currently no test runner configured in this repository.
 
+## Git hygiene
+
+This repo normalizes text files with [.gitattributes](.gitattributes), so line-ending conversion warnings on Windows are expected during staging but commits are stored with LF.
+
 ## Local setup
 
 1. Create a Supabase project.
@@ -77,6 +81,7 @@ Before pushing, confirm:
 - `.env` is not tracked
 - only `.env.example` is committed
 - no local credential files (for example `.npmrc`) are staged
+- `.gitattributes` is present so Git keeps text files normalized across platforms
 
 ## Deferred features
 
