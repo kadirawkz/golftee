@@ -1,0 +1,15 @@
+# Normalize text files and store them as LF in Git
+* text=auto eol=lf
+
+# Keep common binary assets untouched
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
