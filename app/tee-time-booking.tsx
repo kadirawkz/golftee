@@ -3,7 +3,7 @@ import type { DateTimePickerEvent } from "@react-native-community/datetimepicker
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { InteractionManager, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
@@ -17,6 +17,10 @@ import { DailyWeatherForecast, getFourteenDayForecast, getWeatherCodeIconName } 
 
 const SERVICE_FEE = 12.5;
 const CADDY_FEE_PER_PLAYER = 7.5;
+const DATE_CHIP_WIDTH = 62;
+const DATE_CHIP_GAP = 10;
+const WEATHER_CARD_WIDTH = 78;
+const WEATHER_CARD_GAP = 10;
 
 type TimePeriod = "MORNING" | "AFTERNOON";
 
@@ -82,6 +86,8 @@ export default function TeeTimeBookingScreen() {
   const [selectedTime, setSelectedTime] = useState("08:00");
   const [todayHasBookableSlots, setTodayHasBookableSlots] = useState(true);
   const [autoSelectionLoading, setAutoSelectionLoading] = useState(false);
+  const weatherStripRef = useRef<ScrollView>(null);
+  const dateStripRef = useRef<ScrollView>(null);
 
   const bookingDates = useMemo(() => {
     return Array.from({ length: 64 }, (_, index) => {
@@ -157,10 +163,6 @@ export default function TeeTimeBookingScreen() {
 
     return `${selectedDateObj.day}, ${formattedBookingDate} - ${formatTeeTimeLabel(selectedTime)}`;
   }, [formattedBookingDate, selectedDateObj.day, selectedTime]);
-  const selectedDateWeather = useMemo(
-    () => weather.find((day) => day.dateKey === selectedDateObj.key) ?? null,
-    [selectedDateObj.key, weather],
-  );
   const visibleWeather = useMemo(() => {
     return weather.filter((day) => {
       if (day.dateKey !== todayDateKey) {
@@ -457,6 +459,30 @@ export default function TeeTimeBookingScreen() {
   }, [availableTimes, selectedTime]);
 
   useEffect(() => {
+    const selectedDateIndex = visibleBookingDates.findIndex((item) => item.key === selectedDateKey);
+    if (selectedDateIndex < 0) {
+      return;
+    }
+
+    dateStripRef.current?.scrollTo({
+      x: Math.max(0, selectedDateIndex * (DATE_CHIP_WIDTH + DATE_CHIP_GAP) - DATE_CHIP_WIDTH),
+      animated: true,
+    });
+  }, [selectedDateKey, visibleBookingDates]);
+
+  useEffect(() => {
+    const selectedWeatherIndex = visibleWeather.findIndex((item) => item.dateKey === selectedDateKey);
+    if (selectedWeatherIndex < 0) {
+      return;
+    }
+
+    weatherStripRef.current?.scrollTo({
+      x: Math.max(0, selectedWeatherIndex * (WEATHER_CARD_WIDTH + WEATHER_CARD_GAP) - WEATHER_CARD_WIDTH),
+      animated: true,
+    });
+  }, [selectedDateKey, visibleWeather]);
+
+  useEffect(() => {
     let active = true;
     const interactionTask = InteractionManager.runAfterInteractions(() => {
       const loadWeather = async () => {
@@ -585,6 +611,7 @@ export default function TeeTimeBookingScreen() {
 
           {weatherState === "success" ? (
             <ScrollView
+              ref={weatherStripRef}
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.weatherRow}
@@ -611,32 +638,6 @@ export default function TeeTimeBookingScreen() {
             </ScrollView>
           ) : null}
 
-          {weatherState === "success" && selectedDateWeather ? (
-            <View style={styles.closestWeatherCard}>
-              <View style={styles.closestWeatherHeader}>
-                <Text style={styles.closestWeatherTitle}>Closest Tee Time Weather</Text>
-                <Text style={styles.closestWeatherDate}>{selectedDateWeather.dateLabel}</Text>
-              </View>
-              <View style={styles.closestWeatherBody}>
-                <View style={styles.closestWeatherIconWrap}>
-                  <Ionicons
-                    name={getWeatherCodeIconName(selectedDateWeather.weatherCode)}
-                    size={18}
-                    color={theme.colors.surface}
-                  />
-                </View>
-                <View style={styles.closestWeatherMeta}>
-                  <Text style={styles.closestWeatherValue}>{formatTeeTimeLabel(selectedTime)}</Text>
-                  <Text style={styles.closestWeatherDescription}>{selectedDateWeather.description}</Text>
-                </View>
-                <Text style={styles.closestWeatherTemp}>{`${selectedDateWeather.tempMax}\u00B0 / ${selectedDateWeather.tempMin}\u00B0`}</Text>
-              </View>
-            </View>
-          ) : null}
-
-          {weatherState === "success" && !selectedDateWeather ? (
-            <Text style={styles.weatherStateText}>Weather for the selected tee date is not available yet.</Text>
-          ) : null}
         </View>
 
         <View style={styles.section}>
@@ -671,10 +672,11 @@ export default function TeeTimeBookingScreen() {
             </View>
           ) : null}
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.dateRow}
+            <ScrollView
+              ref={dateStripRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.dateRow}
             bounces={false}
             overScrollMode="never"
           >
@@ -1018,68 +1020,6 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
     fontWeight: "600",
-  },
-  closestWeatherCard: {
-    marginTop: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surfaceTint,
-    padding: 10,
-    gap: 8,
-  },
-  closestWeatherHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  closestWeatherTitle: {
-    color: theme.colors.text,
-    fontSize: theme.typography.label.fontSize,
-    lineHeight: theme.typography.label.lineHeight,
-    fontWeight: "800",
-    letterSpacing: 0.8,
-  },
-  closestWeatherDate: {
-    color: theme.colors.textSoft,
-    fontSize: theme.typography.caption.fontSize,
-    lineHeight: theme.typography.caption.lineHeight,
-    fontWeight: "700",
-  },
-  closestWeatherBody: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  closestWeatherIconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: theme.colors.primary,
-  },
-  closestWeatherMeta: {
-    flex: 1,
-  },
-  closestWeatherValue: {
-    color: theme.colors.text,
-    fontSize: theme.typography.subtitle.fontSize,
-    lineHeight: theme.typography.subtitle.lineHeight,
-    fontWeight: "800",
-  },
-  closestWeatherDescription: {
-    color: theme.colors.textSoft,
-    fontSize: theme.typography.caption.fontSize,
-    lineHeight: theme.typography.caption.lineHeight,
-    fontWeight: "600",
-    marginTop: 1,
-  },
-  closestWeatherTemp: {
-    color: theme.colors.primary,
-    fontSize: theme.typography.subtitle.fontSize,
-    lineHeight: theme.typography.subtitle.lineHeight,
-    fontWeight: "900",
   },
   calendarQuickButton: {
     height: 28,
