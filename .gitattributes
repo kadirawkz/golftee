@@ -1,6 +1,29 @@
 # Normalize text files and store them as LF in Git
 * text=auto eol=lf
 
+# Be explicit for common source and config files in this repo
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.jsx text eol=lf
+*.mjs text eol=lf
+*.cjs text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.sql text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.xml text eol=lf
+*.svg text eol=lf
+*.css text eol=lf
+*.scss text eol=lf
+*.env text eol=lf
+
+# Keep Windows-specific scripts on CRLF when present
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
 # Keep common binary assets untouched
 *.png binary
 *.jpg binary
