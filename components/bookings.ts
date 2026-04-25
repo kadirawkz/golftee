@@ -1,10 +1,10 @@
 import type { PostgrestError } from "@supabase/supabase-js";
 import { useEffect, useSyncExternalStore } from "react";
-import type { TeeTimeBookingInsert, TeeTimeBookingRow, TeeTimeBookingUpdate } from "../lib/database.types";
-import { supabase } from "../lib/supabase";
+import type { TeeTimeBookingRow } from "../lib/database.types";
+import { assertSupabaseConfigured, supabase } from "../lib/supabase";
+import { getColomboDateKey, getColomboMinutes } from "./colombo-time";
 import { ensureAuthReady, useAuthSession } from "./auth";
 
-type BookingStatus = "confirmed" | "cancelled" | "completed";
 type PaymentMethod = "wallet" | "card";
 type TimePeriod = "MORNING" | "AFTERNOON";
 
@@ -19,18 +19,12 @@ type BookingSnapshot = {
 type BookingListener = () => void;
 
 export type BookingMutationInput = {
-  caddyFee: number;
   courseId: string;
-  greenFee: number;
   paymentMethod: PaymentMethod;
   players: number;
-  serviceFee: number;
-  status?: BookingStatus;
-  taxes: number;
   teeDate: string;
   teeTime: string;
   timePeriod: TimePeriod;
-  total: number;
 };
 
 const DEFAULT_SNAPSHOT: BookingSnapshot = {
@@ -88,6 +82,7 @@ function translateLoadError(error: PostgrestError | Error) {
 }
 
 async function getCurrentUserId() {
+  assertSupabaseConfigured();
   await ensureAuthReady();
   const { data } = await supabase.auth.getSession();
   return data.session?.user?.id ?? null;
@@ -109,7 +104,21 @@ async function fetchBookingsForUser(userId: string) {
 }
 
 async function loadBookings() {
-  const userId = await getCurrentUserId();
+  let userId: string | null = null;
+
+  try {
+    userId = await getCurrentUserId();
+  } catch (error) {
+    const message = translateLoadError(error instanceof Error ? error : new Error(String(error)));
+    updateSnapshot({
+      bookings: [],
+      error: message,
+      initialized: true,
+      loading: false,
+      userId: null,
+    });
+    return [];
+  }
 
   if (!userId) {
     updateSnapshot({
@@ -158,11 +167,28 @@ export function getBookingDateTime(booking: Pick<TeeTimeBookingRow, "tee_date" |
 }
 
 export function isUpcomingBooking(booking: TeeTimeBookingRow) {
-  return booking.status === "confirmed" && getBookingDateTime(booking).getTime() >= Date.now();
+  if (booking.status !== "confirmed") {
+    return false;
+  }
+
+  const colomboDateKey = getColomboDateKey();
+  if (booking.tee_date !== colomboDateKey) {
+    return booking.tee_date > colomboDateKey;
+  }
+
+  return Number(booking.tee_time.slice(0, 2)) * 60 + Number(booking.tee_time.slice(3, 5)) >= getColomboMinutes();
 }
 
 export function isHistoricalBooking(booking: TeeTimeBookingRow) {
-  return booking.status !== "confirmed" || getBookingDateTime(booking).getTime() < Date.now();
+  return !isUpcomingBooking(booking);
+}
+
+export function isEditableBooking(booking: TeeTimeBookingRow) {
+  return isUpcomingBooking(booking);
+}
+
+export function isCancellableBooking(booking: TeeTimeBookingRow) {
+  return isUpcomingBooking(booking);
 }
 
 export function formatBookingDate(teeDate: string) {
@@ -211,27 +237,15 @@ export async function createBooking(input: BookingMutationInput) {
     throw new Error("You need to be signed in to place a booking.");
   }
 
-  const payload: TeeTimeBookingInsert = {
-    caddy_fee: input.caddyFee,
-    course_id: input.courseId,
-    green_fee: input.greenFee,
-    payment_method: input.paymentMethod,
-    players: input.players,
-    service_fee: input.serviceFee,
-    status: input.status ?? "confirmed",
-    taxes: input.taxes,
-    tee_date: input.teeDate,
-    tee_time: input.teeTime,
-    time_period: input.timePeriod,
-    total: input.total,
-    user_id: userId,
-  };
-
-  const { data, error } = await supabase
-    .from("tee_time_bookings")
-    .insert(payload)
-    .select("*")
-    .single();
+  const { data, error } = await supabase.rpc("save_tee_time_booking", {
+    target_booking_id: null,
+    target_course_id: input.courseId,
+    target_payment_method: input.paymentMethod,
+    target_players: input.players,
+    target_tee_date: input.teeDate,
+    target_tee_time: input.teeTime,
+    target_time_period: input.timePeriod,
+  });
 
   if (error) {
     throw new Error(translateBookingError(error));
@@ -255,29 +269,15 @@ export async function updateBooking(bookingId: string, input: BookingMutationInp
     throw new Error("You need to be signed in to modify a booking.");
   }
 
-  const payload: TeeTimeBookingUpdate = {
-    caddy_fee: input.caddyFee,
-    course_id: input.courseId,
-    green_fee: input.greenFee,
-    payment_method: input.paymentMethod,
-    players: input.players,
-    service_fee: input.serviceFee,
-    status: input.status ?? "confirmed",
-    taxes: input.taxes,
-    tee_date: input.teeDate,
-    tee_time: input.teeTime,
-    time_period: input.timePeriod,
-    total: input.total,
-    user_id: userId,
-  };
-
-  const { data, error } = await supabase
-    .from("tee_time_bookings")
-    .update(payload)
-    .eq("id", bookingId)
-    .eq("user_id", userId)
-    .select("*")
-    .single();
+  const { data, error } = await supabase.rpc("save_tee_time_booking", {
+    target_booking_id: bookingId,
+    target_course_id: input.courseId,
+    target_payment_method: input.paymentMethod,
+    target_players: input.players,
+    target_tee_date: input.teeDate,
+    target_tee_time: input.teeTime,
+    target_time_period: input.timePeriod,
+  });
 
   if (error) {
     throw new Error(translateBookingError(error));
@@ -301,17 +301,9 @@ export async function cancelBooking(bookingId: string) {
     throw new Error("You need to be signed in to cancel a booking.");
   }
 
-  const { data, error } = await supabase
-    .from("tee_time_bookings")
-    .update({
-      canceled_at: new Date().toISOString(),
-      status: "cancelled",
-      user_id: userId,
-    })
-    .eq("id", bookingId)
-    .eq("user_id", userId)
-    .select("*")
-    .single();
+  const { data, error } = await supabase.rpc("cancel_tee_time_booking", {
+    target_booking_id: bookingId,
+  });
 
   if (error) {
     throw new Error(translateBookingError(error));

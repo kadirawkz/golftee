@@ -209,12 +209,253 @@ begin
 end;
 $$;
 
+create or replace function public.save_tee_time_booking(
+  target_booking_id uuid default null,
+  target_course_id text default null,
+  target_tee_date date default null,
+  target_tee_time time default null,
+  target_time_period text default null,
+  target_players integer default null,
+  target_payment_method text default 'wallet'
+)
+returns public.tee_time_bookings
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  current_user_id uuid;
+  existing_booking public.tee_time_bookings%rowtype;
+  course_record public.golf_courses%rowtype;
+  slot_template public.course_tee_slot_templates%rowtype;
+  colombo_now timestamp without time zone;
+  normalized_tee_date date;
+  normalized_tee_time time;
+  normalized_time_period text;
+  normalized_players integer;
+  normalized_payment_method text;
+  computed_green_fee numeric(10, 2);
+  computed_service_fee numeric(10, 2) := 12.50;
+  computed_caddy_fee numeric(10, 2);
+  computed_taxes numeric(10, 2);
+  computed_total numeric(10, 2);
+  saved_booking public.tee_time_bookings;
+begin
+  current_user_id := auth.uid();
+
+  if current_user_id is null then
+    raise exception 'You need to be signed in to manage a booking.';
+  end if;
+
+  colombo_now := timezone('Asia/Colombo', now());
+
+  if target_booking_id is not null then
+    select *
+    into existing_booking
+    from public.tee_time_bookings
+    where id = target_booking_id
+      and user_id = current_user_id;
+
+    if not found then
+      raise exception 'Booking not found.';
+    end if;
+
+    if existing_booking.status <> 'confirmed' then
+      raise exception 'Only confirmed bookings can be modified.';
+    end if;
+  end if;
+
+  normalized_tee_date := coalesce(target_tee_date, existing_booking.tee_date);
+  normalized_tee_time := coalesce(target_tee_time, existing_booking.tee_time);
+  normalized_time_period := upper(trim(coalesce(target_time_period, existing_booking.time_period)));
+  normalized_players := coalesce(target_players, existing_booking.players);
+  normalized_payment_method := lower(trim(coalesce(target_payment_method, existing_booking.payment_method, 'wallet')));
+
+  if target_course_id is null and target_booking_id is null then
+    raise exception 'A course is required to create a booking.';
+  end if;
+
+  select *
+  into course_record
+  from public.golf_courses
+  where id = coalesce(target_course_id, existing_booking.course_id)
+    and is_active = true;
+
+  if not found then
+    raise exception 'The selected course is unavailable.';
+  end if;
+
+  if normalized_tee_date is null or normalized_tee_time is null then
+    raise exception 'A tee date and time are required.';
+  end if;
+
+  if normalized_players is null or normalized_players < 1 or normalized_players > 4 then
+    raise exception 'Bookings must be between 1 and 4 players.';
+  end if;
+
+  if normalized_time_period not in ('MORNING', 'AFTERNOON') then
+    raise exception 'Invalid tee time period.';
+  end if;
+
+  if normalized_payment_method not in ('wallet', 'card') then
+    raise exception 'Invalid payment method.';
+  end if;
+
+  if normalized_tee_date < colombo_now::date then
+    raise exception 'Past booking dates are not allowed.';
+  end if;
+
+  if normalized_tee_date = colombo_now::date and normalized_tee_time <= colombo_now::time then
+    raise exception 'This tee time has already passed.';
+  end if;
+
+  select *
+  into slot_template
+  from public.course_tee_slot_templates
+  where course_id = course_record.id
+    and tee_time = normalized_tee_time
+    and is_active = true;
+
+  if not found then
+    raise exception 'The selected tee time is not available for this course.';
+  end if;
+
+  if slot_template.time_period <> normalized_time_period then
+    raise exception 'The selected tee time period does not match the course slot.';
+  end if;
+
+  if normalized_players > slot_template.max_players then
+    raise exception 'This tee slot only supports up to % players.', slot_template.max_players;
+  end if;
+
+  computed_green_fee := round((course_record.price * normalized_players)::numeric, 2);
+  computed_caddy_fee := round((normalized_players * 7.50)::numeric, 2);
+  computed_taxes := round((computed_green_fee * 0.0845)::numeric, 2);
+  computed_total := round((computed_green_fee + computed_service_fee + computed_caddy_fee + computed_taxes)::numeric, 2);
+
+  if target_booking_id is null then
+    insert into public.tee_time_bookings (
+      user_id,
+      course_id,
+      tee_date,
+      tee_time,
+      time_period,
+      players,
+      green_fee,
+      service_fee,
+      caddy_fee,
+      taxes,
+      total,
+      payment_method,
+      status,
+      canceled_at
+    )
+    values (
+      current_user_id,
+      course_record.id,
+      normalized_tee_date,
+      normalized_tee_time,
+      normalized_time_period,
+      normalized_players,
+      computed_green_fee,
+      computed_service_fee,
+      computed_caddy_fee,
+      computed_taxes,
+      computed_total,
+      normalized_payment_method,
+      'confirmed',
+      null
+    )
+    returning *
+    into saved_booking;
+  else
+    update public.tee_time_bookings
+    set
+      course_id = course_record.id,
+      tee_date = normalized_tee_date,
+      tee_time = normalized_tee_time,
+      time_period = normalized_time_period,
+      players = normalized_players,
+      green_fee = computed_green_fee,
+      service_fee = computed_service_fee,
+      caddy_fee = computed_caddy_fee,
+      taxes = computed_taxes,
+      total = computed_total,
+      payment_method = normalized_payment_method,
+      status = 'confirmed',
+      canceled_at = null
+    where id = existing_booking.id
+      and user_id = current_user_id
+    returning *
+    into saved_booking;
+  end if;
+
+  return saved_booking;
+exception
+  when unique_violation then
+    raise exception 'That tee time has already been booked. Please choose another slot.';
+end;
+$$;
+
+create or replace function public.cancel_tee_time_booking(target_booking_id uuid)
+returns public.tee_time_bookings
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  current_user_id uuid;
+  cancelled_booking public.tee_time_bookings;
+begin
+  current_user_id := auth.uid();
+
+  if current_user_id is null then
+    raise exception 'You need to be signed in to cancel a booking.';
+  end if;
+
+  if exists (
+    select 1
+    from public.tee_time_bookings booking
+    where booking.id = target_booking_id
+      and booking.user_id = current_user_id
+      and booking.status = 'confirmed'
+      and (
+        booking.tee_date < timezone('Asia/Colombo', now())::date
+        or (
+          booking.tee_date = timezone('Asia/Colombo', now())::date
+          and booking.tee_time <= timezone('Asia/Colombo', now())::time
+        )
+      )
+  ) then
+    raise exception 'Past tee time bookings can no longer be cancelled.';
+  end if;
+
+  update public.tee_time_bookings
+  set
+    status = 'cancelled',
+    canceled_at = timezone('utc', now())
+  where id = target_booking_id
+    and user_id = current_user_id
+    and status = 'confirmed'
+  returning *
+  into cancelled_booking;
+
+  if not found then
+    raise exception 'Confirmed booking not found.';
+  end if;
+
+  return cancelled_booking;
+end;
+$$;
+
+drop function if exists public.get_available_tee_slots(text, date);
 create or replace function public.get_available_tee_slots(target_course_id text, target_tee_date date)
 returns table (
   tee_time time,
   time_period text,
   max_players integer,
-  is_available boolean
+  is_available boolean,
+  is_past boolean
 )
 language sql
 security definer
@@ -231,15 +472,90 @@ as $$
         and booking.tee_date = target_tee_date
         and booking.tee_time = template.tee_time
         and booking.status = 'confirmed'
-    ) as is_available
-  from public.course_tee_slot_templates template
-  where template.course_id = target_course_id
+    ) as is_available,
+    (
+      target_tee_date = timezone('Asia/Colombo', now())::date
+      and template.tee_time <= timezone('Asia/Colombo', now())::time
+    ) as is_past
+  from public.golf_courses course
+  join public.course_tee_slot_templates template
+    on template.course_id = course.id
+  where course.id = target_course_id
+    and course.is_active = true
     and template.is_active = true
+    and target_tee_date >= timezone('Asia/Colombo', now())::date
   order by template.sort_order asc, template.tee_time asc;
+$$;
+
+drop function if exists public.get_next_bookable_tee_slot(text, date);
+create or replace function public.get_next_bookable_tee_slot(
+  target_course_id text,
+  target_start_date date default null
+)
+returns table (
+  tee_date date,
+  tee_time time,
+  time_period text,
+  max_players integer
+)
+language sql
+security definer
+set search_path = public
+as $$
+  with current_context as (
+    select
+      timezone('Asia/Colombo', now())::date as current_date,
+      timezone('Asia/Colombo', now())::time as current_time
+  ),
+  candidate_dates as (
+    select generated_date::date as tee_date
+    from current_context context,
+    generate_series(
+      greatest(coalesce(target_start_date, context.current_date), context.current_date),
+      greatest(coalesce(target_start_date, context.current_date), context.current_date) + 63,
+      interval '1 day'
+    ) as generated_date
+  )
+  select
+    candidate_dates.tee_date,
+    template.tee_time,
+    template.time_period,
+    template.max_players
+  from candidate_dates
+  cross join current_context context
+  join public.golf_courses course
+    on course.id = target_course_id
+   and course.is_active = true
+  join public.course_tee_slot_templates template
+    on template.course_id = course.id
+   and template.is_active = true
+  where (
+      candidate_dates.tee_date > context.current_date
+      or (
+        candidate_dates.tee_date = context.current_date
+        and template.tee_time > context.current_time
+      )
+    )
+    and not exists (
+      select 1
+      from public.tee_time_bookings booking
+      where booking.course_id = target_course_id
+        and booking.tee_date = candidate_dates.tee_date
+        and booking.tee_time = template.tee_time
+        and booking.status = 'confirmed'
+    )
+  order by candidate_dates.tee_date asc, template.sort_order asc, template.tee_time asc
+  limit 1;
 $$;
 
 revoke all on function public.get_available_tee_slots(text, date) from public;
 grant execute on function public.get_available_tee_slots(text, date) to authenticated;
+revoke all on function public.get_next_bookable_tee_slot(text, date) from public;
+grant execute on function public.get_next_bookable_tee_slot(text, date) to authenticated;
+revoke all on function public.save_tee_time_booking(uuid, text, date, time, text, integer, text) from public;
+grant execute on function public.save_tee_time_booking(uuid, text, date, time, text, integer, text) to authenticated;
+revoke all on function public.cancel_tee_time_booking(uuid) from public;
+grant execute on function public.cancel_tee_time_booking(uuid) to authenticated;
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
@@ -359,3 +675,5 @@ on public.tee_time_bookings
 for update
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
+
+revoke insert, update on public.tee_time_bookings from authenticated;

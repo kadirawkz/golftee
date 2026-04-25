@@ -1,4 +1,5 @@
 export type DailyWeatherForecast = {
+  dateKey: string;
   dateLabel: string;
   tempMin: number;
   tempMax: number;
@@ -21,8 +22,15 @@ type OpenMeteoForecastResponse = {
   reason?: string;
 };
 
-const weatherCache = new Map<string, DailyWeatherForecast[]>();
 const weatherRequests = new Map<string, Promise<DailyWeatherForecast[]>>();
+const WEATHER_CACHE_TTL_MS = 30 * 60 * 1000;
+
+type CachedForecast = {
+  forecast: DailyWeatherForecast[];
+  fetchedAt: number;
+};
+
+const weatherCache = new Map<string, CachedForecast>();
 
 function createWeatherCacheKey(coordinates: { latitude: number; longitude: number }) {
   return `${coordinates.latitude.toFixed(3)}:${coordinates.longitude.toFixed(3)}`;
@@ -34,8 +42,12 @@ export async function getFourteenDayForecast(coordinates: {
 }): Promise<DailyWeatherForecast[]> {
   const cacheKey = createWeatherCacheKey(coordinates);
   const cachedForecast = weatherCache.get(cacheKey);
+  if (cachedForecast && Date.now() - cachedForecast.fetchedAt < WEATHER_CACHE_TTL_MS) {
+    return cachedForecast.forecast;
+  }
+
   if (cachedForecast) {
-    return cachedForecast;
+    weatherCache.delete(cacheKey);
   }
 
   const pendingForecast = weatherRequests.get(cacheKey);
@@ -67,6 +79,7 @@ export async function getFourteenDayForecast(coordinates: {
     }
 
     const forecast = payload.daily.time.slice(0, 14).map((dateValue, index) => ({
+      dateKey: dateValue,
       dateLabel: new Intl.DateTimeFormat("en-US", {
         month: "short",
         day: "numeric",
@@ -79,7 +92,10 @@ export async function getFourteenDayForecast(coordinates: {
       windSpeed: Math.round(payload.daily!.wind_speed_10m_max[index]),
     }));
 
-    weatherCache.set(cacheKey, forecast);
+    weatherCache.set(cacheKey, {
+      forecast,
+      fetchedAt: Date.now(),
+    });
     return forecast;
   })();
 

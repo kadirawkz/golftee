@@ -60,12 +60,13 @@ async function loadProfile(userId: string) {
     .maybeSingle();
 
   if (error) {
+    const message = formatAuthErrorMessage(error, "Unable to load your profile.");
     updateSnapshot({
-      profile: null,
+      profile: snapshot.profile,
       profileLoading: false,
-      profileError: formatAuthErrorMessage(error, "Unable to load your profile."),
+      profileError: message,
     });
-    return;
+    throw new Error(message);
   }
 
   updateSnapshot({
@@ -73,6 +74,8 @@ async function loadProfile(userId: string) {
     profileLoading: false,
     profileError: null,
   });
+
+  return data;
 }
 
 async function applySession(session: Session | null) {
@@ -92,7 +95,11 @@ async function applySession(session: Session | null) {
     return;
   }
 
-  await loadProfile(session.user.id);
+  try {
+    await loadProfile(session.user.id);
+  } catch {
+    // Keep the active session and last known profile data when profile refresh fails.
+  }
 }
 
 async function bootstrapAuth() {
@@ -253,8 +260,7 @@ export async function refreshProfile() {
     return null;
   }
 
-  await loadProfile(userId);
-  return snapshot.profile;
+  return loadProfile(userId);
 }
 
 export async function updateProfile(profileUpdate: ProfileUpdate) {

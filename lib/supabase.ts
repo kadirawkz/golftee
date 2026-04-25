@@ -12,6 +12,12 @@ const missingEnvMessage =
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 export const supabaseConfigurationError = isSupabaseConfigured ? null : missingEnvMessage;
 
+export function assertSupabaseConfigured() {
+  if (supabaseConfigurationError) {
+    throw new Error(supabaseConfigurationError);
+  }
+}
+
 export const supabase = createClient<Database>(
   supabaseUrl ?? "https://placeholder-project.supabase.co",
   supabaseAnonKey ?? "placeholder-anon-key",

@@ -260,6 +260,13 @@ export default function AccountScreen() {
           </View>
         ) : null}
 
+        {!statusMessage && auth.profileError ? (
+          <View style={styles.noticeCard}>
+            <Ionicons name="warning-outline" size={18} color={theme.colors.danger} />
+            <Text style={styles.noticeText}>{auth.profileError}</Text>
+          </View>
+        ) : null}
+
         <View style={styles.footerActions}>
           <Pressable
             style={styles.primaryButton}

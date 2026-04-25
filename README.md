@@ -11,6 +11,7 @@ It uses Supabase for authentication, profiles, favorites, course catalog data, t
 - User profile read/update flow
 - Per-user favorites with RLS
 - Tee-time booking create/update/cancel flows with slot conflict protection
+- Server-calculated booking pricing and backend-enforced slot validation
 - Supabase-backed course catalog and tee-slot templates (read-only from client)
 - Supabase-backed course detail content, amenities, and reviews
 
@@ -56,6 +57,7 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 - Row Level Security is enabled for user-owned tables.
 - Profile, favorites, and bookings are scoped to `auth.uid()`.
 - Booking slot availability is exposed via RPC instead of broad booking table reads.
+- Booking writes go through RPC so pricing and slot rules are enforced server-side.
 - RPC execution is restricted to `authenticated` in [supabase/schema.sql](supabase/schema.sql).
 - Session tokens are persisted in secure storage where available.
 

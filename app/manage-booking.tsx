@@ -6,7 +6,14 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-nat
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
-import { cancelBooking, formatBookingDate, formatBookingTime, useBookingState } from "../components/bookings";
+import {
+  cancelBooking,
+  formatBookingDate,
+  formatBookingTime,
+  isCancellableBooking,
+  isEditableBooking,
+  useBookingState,
+} from "../components/bookings";
 import { getManagedCourseById } from "../components/course-management";
 import { useResponsiveLayout } from "../components/responsive-layout";
 import { theme } from "../components/theme";
@@ -35,9 +42,11 @@ export default function ManageBookingScreen() {
   const [notice, setNotice] = useState<string | null>(null);
   const visiblePlayerBubbles = booking ? Math.min(booking.players, PARTY_BUBBLE_STYLES.length + 1) : 0;
   const overflowPlayers = booking ? Math.max(booking.players - PARTY_BUBBLE_STYLES.length, 0) : 0;
+  const canModifyBooking = booking ? isEditableBooking(booking) : false;
+  const canCancelBooking = booking ? isCancellableBooking(booking) : false;
 
   const handleCancelBooking = async () => {
-    if (!booking || isCancelling || booking.status === "cancelled") {
+    if (!booking || isCancelling || !canCancelBooking) {
       return;
     }
 
@@ -155,6 +164,9 @@ export default function ManageBookingScreen() {
         </View>
 
         {notice ? <Text style={styles.noticeText}>{notice}</Text> : null}
+        {!canModifyBooking && booking.status === "confirmed" ? (
+          <Text style={styles.noticeText}>This booking is now read-only because the tee time has passed.</Text>
+        ) : null}
 
         <View style={styles.actionList}>
           <Pressable style={styles.primaryAction} variant="cta">
@@ -170,17 +182,17 @@ export default function ManageBookingScreen() {
                 params: { bookingId: booking.id, id: course.id },
               })
             }
-            disabled={booking.status === "cancelled"}
+            disabled={!canModifyBooking}
             variant="button"
           >
             <Ionicons name="create-outline" size={22} color={theme.colors.primary} />
-            <Text style={styles.secondaryActionText}>Modify Booking</Text>
+            <Text style={styles.secondaryActionText}>{canModifyBooking ? "Modify Booking" : "Booking Locked"}</Text>
           </Pressable>
 
           <Pressable
             style={styles.dangerAction}
             onPress={() => void handleCancelBooking()}
-            disabled={isCancelling || booking.status === "cancelled"}
+            disabled={isCancelling || !canCancelBooking}
             variant="button"
           >
             {isCancelling ? (
@@ -189,7 +201,7 @@ export default function ManageBookingScreen() {
               <Ionicons name="close-circle" size={22} color={theme.colors.danger} />
             )}
             <Text style={styles.dangerActionText}>
-              {booking.status === "cancelled" ? "Reservation Cancelled" : "Cancel Reservation"}
+              {!canCancelBooking ? "Cancellation Closed" : "Cancel Reservation"}
             </Text>
           </Pressable>
         </View>

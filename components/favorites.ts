@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useSyncExternalStore } from "react";
 import type { FavoriteCourseInsert } from "../lib/database.types";
-import { supabase } from "../lib/supabase";
+import { assertSupabaseConfigured, supabase } from "../lib/supabase";
 import { ensureAuthReady, useAuthSession } from "./auth";
 
 const FAVORITE_COURSES_KEY = "golftee:courses:favorites";
@@ -110,6 +110,20 @@ async function migrateLegacyFavoritesIfNeeded(userId: string, currentFavoriteIds
 }
 
 async function loadFavoriteCourseIds() {
+  try {
+    assertSupabaseConfigured();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to load favourites.";
+    updateSnapshot({
+      initialized: true,
+      ids: [],
+      loading: false,
+      error: message,
+      userId: null,
+    });
+    return [];
+  }
+
   await ensureAuthReady();
 
   const { data: sessionData } = await supabase.auth.getSession();
@@ -132,18 +146,30 @@ async function loadFavoriteCourseIds() {
     userId,
   });
 
-  const favoriteIds = await fetchFavoriteIdsForUser(userId);
-  const resolvedIds = await migrateLegacyFavoritesIfNeeded(userId, favoriteIds);
+  try {
+    const favoriteIds = await fetchFavoriteIdsForUser(userId);
+    const resolvedIds = await migrateLegacyFavoritesIfNeeded(userId, favoriteIds);
 
-  updateSnapshot({
-    initialized: true,
-    ids: resolvedIds,
-    loading: false,
-    error: null,
-    userId,
-  });
+    updateSnapshot({
+      initialized: true,
+      ids: resolvedIds,
+      loading: false,
+      error: null,
+      userId,
+    });
 
-  return resolvedIds;
+    return resolvedIds;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to load favourites.";
+    updateSnapshot({
+      initialized: true,
+      ids: [],
+      loading: false,
+      error: message,
+      userId,
+    });
+    return [];
+  }
 }
 
 export function getCachedFavoriteCourseIds() {
@@ -166,6 +192,7 @@ export async function refreshFavoriteCourseIds() {
 }
 
 export async function toggleFavoriteCourse(courseId: string) {
+  assertSupabaseConfigured();
   await ensureAuthReady();
 
   const { data: sessionData } = await supabase.auth.getSession();

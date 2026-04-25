@@ -101,6 +101,7 @@ export default function ProfileScreen() {
   const bookingState = useBookingState();
   const { screenBottomPadding, scaleFont, scaleLineHeight } = useResponsiveLayout();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
   const upcomingBookings = bookingState.bookings.filter(isUpcomingBooking).slice(0, 2);
   const historyItems = useMemo(
     () =>
@@ -132,9 +133,12 @@ export default function ProfileScreen() {
     }
 
     setIsLoggingOut(true);
+    setLogoutError(null);
     try {
       await signOut();
       router.replace("/splash");
+    } catch (error) {
+      setLogoutError(error instanceof Error ? error.message : "Unable to log out right now.");
     } finally {
       setIsLoggingOut(false);
     }
@@ -254,6 +258,7 @@ export default function ProfileScreen() {
         ) : null}
 
         <View style={styles.actionsSection}>
+          {logoutError ? <Text style={styles.actionErrorText}>{logoutError}</Text> : null}
           <Pressable style={[styles.actionCard]} onPress={() => router.push("/favourites")} variant="card">
             <View style={[styles.actionIconWrap, styles.actionIconAccent]}>
               <Ionicons name="heart" size={20} color={theme.colors.accentWarm} />
@@ -738,6 +743,12 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
     color: theme.colors.textSoft,
+    fontWeight: "600",
+  },
+  actionErrorText: {
+    fontSize: theme.typography.bodySm.fontSize,
+    lineHeight: theme.typography.bodySm.lineHeight,
+    color: theme.colors.danger,
     fontWeight: "600",
   },
 });

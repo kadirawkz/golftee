@@ -69,7 +69,7 @@ export default function BookingCheckoutScreen() {
   const dayParam = getFirstParamValue(params.day);
 
   const course = getManagedCourseById(courseId);
-  const players = parsePlayerCount(playersParam, 3);
+  const players = parsePlayerCount(playersParam, 1);
   const subtotal = parsePositiveNumber(subtotalParam, 0);
   const serviceFee = parsePositiveNumber(serviceFeeParam, 12.5);
   const caddyFee = parsePositiveNumber(caddyFeeParam, 0);
@@ -99,17 +99,12 @@ export default function BookingCheckoutScreen() {
 
     try {
       const bookingInput = {
-        caddyFee,
         courseId: course.id,
-        greenFee: subtotal,
         paymentMethod: selectedPayment,
         players,
-        serviceFee,
-        taxes: taxesAndFees,
         teeDate: dateKeyParam,
         teeTime: timeParam,
         timePeriod: periodParam as "MORNING" | "AFTERNOON",
-        total: totalAmount,
       };
 
       const savedBooking = bookingIdParam

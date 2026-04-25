@@ -1,6 +1,6 @@
 import { useEffect, useSyncExternalStore } from "react";
 import type { CourseContentRow, CourseDetailItemRow, CourseReviewRow, GolfCourseRow } from "../lib/database.types";
-import { supabase } from "../lib/supabase";
+import { assertSupabaseConfigured, supabase } from "../lib/supabase";
 import {
     type CourseRecord,
     type CourseStyle,
@@ -15,7 +15,15 @@ type CourseCatalogSnapshot = {
 
 type TeeSlot = {
   isAvailable: boolean;
+  isPast: boolean;
   maxPlayers: number;
+  teeTime: string;
+  timePeriod: "MORNING" | "AFTERNOON";
+};
+
+type NextBookableTeeSlot = {
+  maxPlayers: number;
+  teeDate: string;
   teeTime: string;
   timePeriod: "MORNING" | "AFTERNOON";
 };
@@ -116,6 +124,18 @@ export function getManagedCourseById(id: string | undefined) {
 }
 
 async function loadCourseCatalogInternal() {
+  try {
+    assertSupabaseConfigured();
+  } catch (error) {
+    updateSnapshot({
+      courses: [],
+      error: error instanceof Error ? error.message : "Unable to load courses.",
+      initialized: true,
+      loading: false,
+    });
+    return [];
+  }
+
   updateSnapshot({
     loading: true,
     error: null,
@@ -208,6 +228,19 @@ function sortCourseReviews(reviews: CourseReviewRow[]) {
 }
 
 async function loadCourseDetailsInternal(courseId: string) {
+  try {
+    assertSupabaseConfigured();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to load course details.";
+    updateCourseDetailsSnapshot(courseId, {
+      error: message,
+      initialized: true,
+      loading: false,
+      value: null,
+    });
+    throw new Error(message);
+  }
+
   updateCourseDetailsSnapshot(courseId, {
     loading: true,
     error: null,
@@ -331,13 +364,16 @@ export function useCourseDetails(courseId: string | undefined) {
       return;
     }
 
-    void refreshCourseDetails(resolvedCourseId);
+    void refreshCourseDetails(resolvedCourseId).catch(() => {
+      // The snapshot already captures load errors for the UI.
+    });
   }, [resolvedCourseId, state.initialized, state.loading]);
 
   return state;
 }
 
 export async function getAvailableTeeSlots(courseId: string, teeDate: string) {
+  assertSupabaseConfigured();
   const { data, error } = await supabase.rpc("get_available_tee_slots", {
     target_course_id: courseId,
     target_tee_date: teeDate,
@@ -349,10 +385,35 @@ export async function getAvailableTeeSlots(courseId: string, teeDate: string) {
 
   return (data ?? []).map((item) => ({
     isAvailable: item.is_available,
+    isPast: item.is_past,
     maxPlayers: item.max_players,
     teeTime: item.tee_time.slice(0, 5),
     timePeriod: item.time_period as "MORNING" | "AFTERNOON",
   })) satisfies TeeSlot[];
 }
 
-export type { TeeSlot };
+export async function getNextBookableTeeSlot(courseId: string, startDate?: string) {
+  assertSupabaseConfigured();
+  const { data, error } = await supabase.rpc("get_next_bookable_tee_slot", {
+    target_course_id: courseId,
+    target_start_date: startDate ?? null,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  const nextSlot = data?.[0];
+  if (!nextSlot) {
+    return null;
+  }
+
+  return {
+    maxPlayers: nextSlot.max_players,
+    teeDate: nextSlot.tee_date,
+    teeTime: nextSlot.tee_time.slice(0, 5),
+    timePeriod: nextSlot.time_period as "MORNING" | "AFTERNOON",
+  } satisfies NextBookableTeeSlot;
+}
+
+export type { NextBookableTeeSlot, TeeSlot };

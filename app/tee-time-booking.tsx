@@ -8,8 +8,9 @@ import { InteractionManager, Platform, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
-import { formatBookingTime, useBookingState } from "../components/bookings";
-import { getAvailableTeeSlots, getManagedCourseById, type TeeSlot } from "../components/course-management";
+import { isEditableBooking, useBookingState } from "../components/bookings";
+import { getColomboDateKey, parseDateKeyToDate } from "../components/colombo-time";
+import { getAvailableTeeSlots, getManagedCourseById, getNextBookableTeeSlot, type TeeSlot } from "../components/course-management";
 import { useResponsiveLayout } from "../components/responsive-layout";
 import { theme } from "../components/theme";
 import { DailyWeatherForecast, getFourteenDayForecast, getWeatherCodeIconName } from "../components/weather";
@@ -18,7 +19,6 @@ const SERVICE_FEE = 12.5;
 const CADDY_FEE_PER_PLAYER = 7.5;
 
 type TimePeriod = "MORNING" | "AFTERNOON";
-const DATE_CHIP_FULL_WIDTH = 72;
 
 function toDayStart(value: Date): Date {
   const next = new Date(value);
@@ -37,6 +37,26 @@ function parseTimeToMinutes(value: string) {
   return hours * 60 + minutes;
 }
 
+function compareTeeSlots(a: TeeSlot, b: TeeSlot) {
+  return parseTimeToMinutes(a.teeTime) - parseTimeToMinutes(b.teeTime);
+}
+
+function formatTeeTimeLabel(value: string) {
+  if (!value) {
+    return "Time not selected";
+  }
+
+  const [hoursValue, minutesValue] = value.split(":").map(Number);
+  if (Number.isNaN(hoursValue) || Number.isNaN(minutesValue)) {
+    return value;
+  }
+
+  const period = hoursValue >= 12 ? "PM" : "AM";
+  const normalizedHours = hoursValue % 12 || 12;
+  const paddedMinutes = String(minutesValue).padStart(2, "0");
+  return `${normalizedHours}:${paddedMinutes} ${period}`;
+}
+
 export default function TeeTimeBookingScreen() {
   const router = useRouter();
   const { horizontalPadding, screenBottomPadding } = useResponsiveLayout();
@@ -46,6 +66,7 @@ export default function TeeTimeBookingScreen() {
   const course = getManagedCourseById(courseId);
   const bookingState = useBookingState();
   const existingBooking = bookingState.bookings.find((item) => item.id === resolvedBookingId) ?? null;
+  const canEditExistingBooking = existingBooking ? isEditableBooking(existingBooking) : true;
   const [weather, setWeather] = useState<DailyWeatherForecast[]>([]);
   const [weatherState, setWeatherState] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [slotState, setSlotState] = useState<"idle" | "loading" | "success" | "error">("idle");
@@ -53,18 +74,19 @@ export default function TeeTimeBookingScreen() {
   const [availableSlots, setAvailableSlots] = useState<TeeSlot[]>([]);
   const [now, setNow] = useState(() => new Date());
 
-  const [calendarDate, setCalendarDate] = useState<Date>(() => toDayStart(new Date()));
-  const [selectedDateKey, setSelectedDateKey] = useState<string>(() => dateKey(toDayStart(new Date())));
+  const [stripStartDate, setStripStartDate] = useState<Date>(() => parseDateKeyToDate(getColomboDateKey()));
+  const [selectedDateKey, setSelectedDateKey] = useState<string>(() => getColomboDateKey());
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [visibleDateIndex, setVisibleDateIndex] = useState(0);
-  const [selectedPlayers, setSelectedPlayers] = useState(3);
+  const [selectedPlayers, setSelectedPlayers] = useState(1);
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("MORNING");
   const [selectedTime, setSelectedTime] = useState("08:00");
+  const [todayHasBookableSlots, setTodayHasBookableSlots] = useState(true);
+  const [autoSelectionLoading, setAutoSelectionLoading] = useState(false);
 
   const bookingDates = useMemo(() => {
     return Array.from({ length: 64 }, (_, index) => {
-      const date = new Date(calendarDate);
-      date.setDate(calendarDate.getDate() + index);
+      const date = new Date(stripStartDate);
+      date.setDate(stripStartDate.getDate() + index);
       return {
         key: dateKey(date),
         day: date.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase(),
@@ -72,9 +94,44 @@ export default function TeeTimeBookingScreen() {
         fullDate: date,
       };
     });
-  }, [calendarDate]);
+  }, [stripStartDate]);
 
-  const selectedDateObj = bookingDates.find((item) => item.key === selectedDateKey) ?? bookingDates[0];
+  const selectedDateObj = useMemo(() => {
+    const selectedDate = bookingDates.find((item) => item.key === selectedDateKey);
+    if (selectedDate) {
+      return selectedDate;
+    }
+
+    const fallbackDate = parseDateKeyToDate(selectedDateKey);
+    return {
+      key: selectedDateKey,
+      day: fallbackDate.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase(),
+      date: fallbackDate.getDate(),
+      fullDate: fallbackDate,
+    };
+  }, [bookingDates, selectedDateKey]);
+  const todayDateKey = getColomboDateKey(now);
+  const visibleBookingDates = useMemo(() => {
+    return bookingDates.filter((item) => {
+      if (item.key !== todayDateKey) {
+        return true;
+      }
+
+      return todayHasBookableSlots || existingBooking?.tee_date === todayDateKey;
+    });
+  }, [bookingDates, existingBooking?.tee_date, todayDateKey, todayHasBookableSlots]);
+  const minimumBookableDateKey = useMemo(() => {
+    if (todayHasBookableSlots || existingBooking?.tee_date === todayDateKey) {
+      return todayDateKey;
+    }
+
+    const tomorrow = parseDateKeyToDate(todayDateKey);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return dateKey(tomorrow);
+  }, [existingBooking?.tee_date, todayDateKey, todayHasBookableSlots]);
+  const minimumBookableDate = useMemo(() => {
+    return parseDateKeyToDate(minimumBookableDateKey);
+  }, [minimumBookableDateKey]);
   const basePrice = Number(course.price.replace(/[^0-9.]/g, "")) || 0;
   const greenFees = basePrice * selectedPlayers;
   const serviceFee = SERVICE_FEE;
@@ -82,9 +139,7 @@ export default function TeeTimeBookingScreen() {
   const taxesAndFees = Number((greenFees * 0.0845).toFixed(2));
   const totalDue = Number((greenFees + serviceFee + caddyFee + taxesAndFees).toFixed(2));
 
-  const visibleDate = bookingDates[Math.min(visibleDateIndex, bookingDates.length - 1)] ?? selectedDateObj;
-
-  const monthYearLabel = visibleDate.fullDate.toLocaleDateString("en-US", {
+  const monthYearLabel = selectedDateObj.fullDate.toLocaleDateString("en-US", {
     month: "long",
     year: "numeric",
   }).toUpperCase();
@@ -100,30 +155,75 @@ export default function TeeTimeBookingScreen() {
       return `${selectedDateObj.day}, ${formattedBookingDate} - Time not selected`;
     }
 
-    return `${selectedDateObj.day}, ${formattedBookingDate} - ${selectedTime} ${timePeriod === "MORNING" ? "AM" : "PM"}`;
-  }, [formattedBookingDate, selectedDateObj.day, selectedTime, timePeriod]);
-  const isToday = selectedDateObj.key === dateKey(toDayStart(now));
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    return `${selectedDateObj.day}, ${formattedBookingDate} - ${formatTeeTimeLabel(selectedTime)}`;
+  }, [formattedBookingDate, selectedDateObj.day, selectedTime]);
+  const selectedDateWeather = useMemo(
+    () => weather.find((day) => day.dateKey === selectedDateObj.key) ?? null,
+    [selectedDateObj.key, weather],
+  );
+  const visibleWeather = useMemo(() => {
+    return weather.filter((day) => {
+      if (day.dateKey !== todayDateKey) {
+        return true;
+      }
+
+      return todayHasBookableSlots || existingBooking?.tee_date === todayDateKey;
+    });
+  }, [existingBooking?.tee_date, todayDateKey, todayHasBookableSlots, weather]);
   const periodSlots = useMemo(() => {
     return availableSlots
       .filter((slot) => slot.timePeriod === timePeriod)
       .map((slot) => {
-        const isPastToday = isToday && parseTimeToMinutes(slot.teeTime) <= currentMinutes;
         const isExistingBookingSlot =
+          canEditExistingBooking &&
           existingBooking?.tee_date === selectedDateObj.key &&
           existingBooking?.tee_time.slice(0, 5) === slot.teeTime &&
           existingBooking?.time_period === slot.timePeriod;
-        const isAvailable = (slot.isAvailable || isExistingBookingSlot) && !isPastToday;
+        const isAvailable = slot.isAvailable || isExistingBookingSlot;
+        const isPast = slot.isPast && !isExistingBookingSlot;
+        const isSelectable = isAvailable && !isPast;
 
         return {
           ...slot,
           isAvailable,
-          isPastToday,
+          isPast,
+          isSelectable,
           isUnavailableByBooking: !slot.isAvailable && !isExistingBookingSlot,
         };
       });
-  }, [availableSlots, currentMinutes, existingBooking, isToday, selectedDateObj.key, timePeriod]);
-  const availableTimes = periodSlots.filter((slot) => slot.isAvailable).map((slot) => slot.teeTime);
+  }, [availableSlots, canEditExistingBooking, existingBooking, selectedDateObj.key, timePeriod]);
+  const visiblePeriodSlots = useMemo(
+    () => periodSlots,
+    [periodSlots],
+  );
+  const firstSelectableSlotForPeriod = useMemo(
+    () => visiblePeriodSlots.find((slot) => slot.isSelectable) ?? null,
+    [visiblePeriodSlots],
+  );
+  const selectableSlotsForSelectedDate = useMemo(() => {
+    return availableSlots
+      .map((slot) => {
+        const isExistingBookingSlot =
+          canEditExistingBooking &&
+          existingBooking?.tee_date === selectedDateObj.key &&
+          existingBooking?.tee_time.slice(0, 5) === slot.teeTime &&
+          existingBooking?.time_period === slot.timePeriod;
+        const isAvailable = slot.isAvailable || isExistingBookingSlot;
+        const isPast = slot.isPast && !isExistingBookingSlot;
+
+        return {
+          ...slot,
+          isAvailable,
+          isSelectable: isAvailable && !isPast,
+        };
+      })
+      .filter((slot) => slot.isSelectable)
+      .sort(compareTeeSlots);
+  }, [availableSlots, canEditExistingBooking, existingBooking, selectedDateObj.key]);
+  const availableTimes = useMemo(
+    () => visiblePeriodSlots.filter((slot) => slot.isSelectable).map((slot) => slot.teeTime),
+    [visiblePeriodSlots],
+  );
 
   useEffect(() => {
     if (!existingBooking) {
@@ -131,16 +231,35 @@ export default function TeeTimeBookingScreen() {
     }
 
     const bookingDate = toDayStart(new Date(`${existingBooking.tee_date}T00:00:00`));
-    const parsedTime = formatBookingTime(existingBooking.tee_time);
-    const normalizedTime = parsedTime.replace(/\s?(AM|PM)$/i, "");
 
-    setCalendarDate(bookingDate);
+    setStripStartDate(bookingDate);
     setSelectedDateKey(dateKey(bookingDate));
-    setVisibleDateIndex(0);
     setSelectedPlayers(existingBooking.players);
     setTimePeriod(existingBooking.time_period as TimePeriod);
-    setSelectedTime(normalizedTime);
+    setSelectedTime(existingBooking.tee_time.slice(0, 5));
   }, [existingBooking]);
+
+  useEffect(() => {
+    if (existingBooking) {
+      return;
+    }
+
+    const initialDate = parseDateKeyToDate(getColomboDateKey());
+    setStripStartDate(initialDate);
+    setSelectedDateKey(dateKey(initialDate));
+    setTimePeriod("MORNING");
+    setSelectedTime("");
+  }, [course.id, existingBooking]);
+
+  useEffect(() => {
+    if (existingBooking) {
+      return;
+    }
+
+    if (dateKey(stripStartDate) < minimumBookableDateKey) {
+      setStripStartDate(minimumBookableDate);
+    }
+  }, [existingBooking, minimumBookableDate, minimumBookableDateKey, stripStartDate]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -151,6 +270,84 @@ export default function TeeTimeBookingScreen() {
       clearInterval(interval);
     };
   }, []);
+
+  useEffect(() => {
+    if (existingBooking) {
+      setTodayHasBookableSlots(existingBooking.tee_date === todayDateKey);
+      return;
+    }
+
+    let active = true;
+
+    const loadClosestBookableSlot = async () => {
+      setAutoSelectionLoading(true);
+
+      try {
+        const nextSlot = await getNextBookableTeeSlot(course.id);
+        if (!active) {
+          return;
+        }
+
+        setTodayHasBookableSlots(nextSlot?.teeDate === todayDateKey);
+
+        if (nextSlot) {
+          setSelectedDateKey(nextSlot.teeDate);
+          setTimePeriod(nextSlot.timePeriod);
+          setSelectedTime(nextSlot.teeTime);
+        } else {
+          setSelectedTime("");
+        }
+      } catch {
+        if (!active) {
+          return;
+        }
+
+        setTodayHasBookableSlots(true);
+      } finally {
+        if (active) {
+          setAutoSelectionLoading(false);
+        }
+      }
+    };
+
+    void loadClosestBookableSlot();
+
+    return () => {
+      active = false;
+    };
+  }, [course.id, existingBooking, todayDateKey]);
+
+  useEffect(() => {
+    if (existingBooking) {
+      setTodayHasBookableSlots(existingBooking.tee_date === todayDateKey);
+      return;
+    }
+
+    let active = true;
+
+    const refreshTodayAvailability = async () => {
+      try {
+        const nextSlot = await getNextBookableTeeSlot(course.id);
+        if (!active) {
+          return;
+        }
+
+        setTodayHasBookableSlots(nextSlot?.teeDate === todayDateKey);
+      } catch {
+        if (!active) {
+          return;
+        }
+
+        setTodayHasBookableSlots(true);
+      }
+    };
+
+    void refreshTodayAvailability();
+
+    return () => {
+      active = false;
+    };
+  }, [course.id, existingBooking, now, todayDateKey]);
 
   useEffect(() => {
     let active = true;
@@ -186,13 +383,76 @@ export default function TeeTimeBookingScreen() {
   }, [course.id, selectedDateObj.key]);
 
   useEffect(() => {
+    if (existingBooking || slotState !== "success" || !canEditExistingBooking) {
+      return;
+    }
+
+    if (!selectableSlotsForSelectedDate.length) {
+      let active = true;
+
+      const loadClosestSlotFromSelectedDate = async () => {
+        try {
+          const nextSlot = await getNextBookableTeeSlot(course.id, selectedDateObj.key);
+          if (!active) {
+            return;
+          }
+
+          if (!nextSlot) {
+            setSelectedTime("");
+            return;
+          }
+
+          setSelectedDateKey(nextSlot.teeDate);
+          setTimePeriod(nextSlot.timePeriod);
+          setSelectedTime(nextSlot.teeTime);
+        } catch {
+          if (!active) {
+            return;
+          }
+
+          setSelectedTime("");
+        }
+      };
+
+      void loadClosestSlotFromSelectedDate();
+
+      return () => {
+        active = false;
+      };
+    }
+
+    const selectedSlot = selectableSlotsForSelectedDate.find(
+      (slot) => slot.teeTime === selectedTime && slot.timePeriod === timePeriod,
+    );
+    if (!selectedSlot) {
+      if (firstSelectableSlotForPeriod) {
+        setSelectedTime(firstSelectableSlotForPeriod.teeTime);
+        return;
+      }
+
+      setSelectedTime("");
+      return;
+    }
+  }, [
+    course.id,
+    canEditExistingBooking,
+    existingBooking,
+    firstSelectableSlotForPeriod,
+    selectedDateObj.key,
+    selectableSlotsForSelectedDate,
+    selectedTime,
+    slotState,
+    timePeriod,
+  ]);
+
+  useEffect(() => {
     if (!availableTimes.length) {
       setSelectedTime("");
       return;
     }
 
-    if (!availableTimes.includes(selectedTime)) {
-      setSelectedTime(availableTimes[0]);
+    if (selectedTime && !availableTimes.includes(selectedTime)) {
+      setSelectedTime("");
     }
   }, [availableTimes, selectedTime]);
 
@@ -230,9 +490,13 @@ export default function TeeTimeBookingScreen() {
 
   const applySelectedDate = (pickedDate: Date) => {
     const normalized = toDayStart(pickedDate);
-    setCalendarDate(normalized);
-    setSelectedDateKey(dateKey(normalized));
-    setVisibleDateIndex(0);
+    const pickedDateKey = dateKey(normalized);
+
+    if (!bookingDates.some((item) => item.key === pickedDateKey)) {
+      setStripStartDate(normalized);
+    }
+
+    setSelectedDateKey(pickedDateKey);
   };
 
   const handleDatePickerChange = (event: DateTimePickerEvent, pickedDate?: Date) => {
@@ -254,7 +518,7 @@ export default function TeeTimeBookingScreen() {
   };
 
   const handleConfirmBooking = () => {
-    if (!selectedTime) {
+    if (!selectedTime || !canEditExistingBooking) {
       return;
     }
 
@@ -311,7 +575,7 @@ export default function TeeTimeBookingScreen() {
             <Text style={styles.sectionMeta}>Forecast</Text>
           </View>
 
-          {weatherState === "loading" ? (
+          {weatherState === "loading" || autoSelectionLoading ? (
             <Text style={styles.weatherStateText}>Loading weather forecast...</Text>
           ) : null}
 
@@ -327,8 +591,10 @@ export default function TeeTimeBookingScreen() {
               bounces={false}
               overScrollMode="never"
             >
-              {weather.map((day) => (
-                <View key={day.dateLabel} style={styles.weatherCard}>
+              {visibleWeather.map((day) => {
+                const active = day.dateKey === selectedDateObj.key;
+                return (
+                <View key={day.dateKey} style={[styles.weatherCard, active && styles.weatherCardActive]}>
                   <Text style={styles.weatherDate}>{day.dateLabel}</Text>
                   <View style={styles.weatherIconWrap}>
                     <Ionicons
@@ -340,8 +606,36 @@ export default function TeeTimeBookingScreen() {
                   <Text style={styles.weatherTemp}>{`${day.tempMax}\u00B0`}</Text>
                   <Text style={styles.weatherMinTemp}>{`${day.tempMin}\u00B0 low`}</Text>
                 </View>
-              ))}
+                );
+              })}
             </ScrollView>
+          ) : null}
+
+          {weatherState === "success" && selectedDateWeather ? (
+            <View style={styles.closestWeatherCard}>
+              <View style={styles.closestWeatherHeader}>
+                <Text style={styles.closestWeatherTitle}>Closest Tee Time Weather</Text>
+                <Text style={styles.closestWeatherDate}>{selectedDateWeather.dateLabel}</Text>
+              </View>
+              <View style={styles.closestWeatherBody}>
+                <View style={styles.closestWeatherIconWrap}>
+                  <Ionicons
+                    name={getWeatherCodeIconName(selectedDateWeather.weatherCode)}
+                    size={18}
+                    color={theme.colors.surface}
+                  />
+                </View>
+                <View style={styles.closestWeatherMeta}>
+                  <Text style={styles.closestWeatherValue}>{formatTeeTimeLabel(selectedTime)}</Text>
+                  <Text style={styles.closestWeatherDescription}>{selectedDateWeather.description}</Text>
+                </View>
+                <Text style={styles.closestWeatherTemp}>{`${selectedDateWeather.tempMax}\u00B0 / ${selectedDateWeather.tempMin}\u00B0`}</Text>
+              </View>
+            </View>
+          ) : null}
+
+          {weatherState === "success" && !selectedDateWeather ? (
+            <Text style={styles.weatherStateText}>Weather for the selected tee date is not available yet.</Text>
           ) : null}
         </View>
 
@@ -350,20 +644,25 @@ export default function TeeTimeBookingScreen() {
             <Text style={styles.sectionTitle}>Select Date</Text>
             <View style={styles.sectionHeaderRight}>
               <Text style={styles.sectionMeta}>{monthYearLabel}</Text>
-              <Pressable style={[styles.calendarQuickButton]} onPress={handleCalendarQuickPick} variant="chip">
+              <Pressable
+                style={[styles.calendarQuickButton]}
+                onPress={handleCalendarQuickPick}
+                disabled={!canEditExistingBooking}
+                variant="chip"
+              >
                 <Ionicons name="calendar-outline" size={14} color={theme.colors.primary} />
                 <Text style={styles.calendarQuickButtonText}>Calendar</Text>
               </Pressable>
             </View>
           </View>
 
-          {showDatePicker ? (
+          {showDatePicker && canEditExistingBooking ? (
             <View style={styles.inlinePickerWrap}>
               <DateTimePicker
                 value={selectedDateObj.fullDate}
                 mode="date"
                 display={Platform.OS === "ios" ? "inline" : "default"}
-                minimumDate={toDayStart(new Date())}
+                minimumDate={minimumBookableDate}
                 onChange={handleDatePickerChange}
               />
               <Pressable style={[styles.inlinePickerDoneButton]} onPress={() => setShowDatePicker(false)} variant="button">
@@ -378,24 +677,19 @@ export default function TeeTimeBookingScreen() {
             contentContainerStyle={styles.dateRow}
             bounces={false}
             overScrollMode="never"
-            scrollEventThrottle={16}
-            onScroll={(event) => {
-              const x = event.nativeEvent.contentOffset.x;
-              const nextIndex = Math.max(0, Math.floor(x / DATE_CHIP_FULL_WIDTH));
-              if (nextIndex !== visibleDateIndex) {
-                setVisibleDateIndex(nextIndex);
-              }
-            }}
           >
-            {bookingDates.map((item) => {
+            {visibleBookingDates.map((item) => {
               const active = item.key === selectedDateKey;
               return (
                 <Pressable
                   key={item.key}
                   style={[styles.dateChip, active && styles.dateChipActive]}
                   onPress={() => {
-                    setSelectedDateKey(item.key);
+                    if (canEditExistingBooking) {
+                      setSelectedDateKey(item.key);
+                    }
                   }}
+                  disabled={!canEditExistingBooking}
                   variant="chip"
                 >
                   <Text style={[styles.dateChipDay, active && styles.dateChipDayActive]}>{item.day}</Text>
@@ -418,8 +712,11 @@ export default function TeeTimeBookingScreen() {
                   key={count}
                   style={[styles.playerChip, active && styles.playerChipActive]}
                   onPress={() => {
-                    setSelectedPlayers(count);
+                    if (canEditExistingBooking) {
+                      setSelectedPlayers(count);
+                    }
                   }}
+                  disabled={!canEditExistingBooking}
                   variant="chip"
                 >
                   <Ionicons
@@ -441,9 +738,12 @@ export default function TeeTimeBookingScreen() {
               <Pressable
                 style={[styles.periodPill, timePeriod === "MORNING" && styles.periodPillActive]}
                 onPress={() => {
-                  setTimePeriod("MORNING");
-                  setSelectedTime("");
+                  if (canEditExistingBooking) {
+                    setTimePeriod("MORNING");
+                    setSelectedTime("");
+                  }
                 }}
+                disabled={!canEditExistingBooking}
                 variant="chip"
               >
                 <Text style={[styles.periodText, timePeriod === "MORNING" && styles.periodTextActive]}>MORNING</Text>
@@ -451,9 +751,12 @@ export default function TeeTimeBookingScreen() {
               <Pressable
                 style={[styles.periodPill, timePeriod === "AFTERNOON" && styles.periodPillActive]}
                 onPress={() => {
-                  setTimePeriod("AFTERNOON");
-                  setSelectedTime("");
+                  if (canEditExistingBooking) {
+                    setTimePeriod("AFTERNOON");
+                    setSelectedTime("");
+                  }
                 }}
+                disabled={!canEditExistingBooking}
                 variant="chip"
               >
                 <Text style={[styles.periodText, timePeriod === "AFTERNOON" && styles.periodTextActive]}>
@@ -466,19 +769,22 @@ export default function TeeTimeBookingScreen() {
           <View style={styles.timeGrid}>
             {slotState === "loading" ? <Text style={styles.weatherStateText}>Loading available tee slots...</Text> : null}
             {slotState === "error" ? <Text style={styles.weatherStateText}>{slotError}</Text> : null}
-            {slotState === "success" && !periodSlots.length ? (
+            {slotState === "success" && !visiblePeriodSlots.length ? (
               <Text style={styles.weatherStateText}>No tee slots configured for this period on the selected date.</Text>
             ) : null}
-            {slotState === "success" && periodSlots.map((slot) => {
+            {slotState === "success" && visiblePeriodSlots.length > 0 && !availableTimes.length ? (
+              <Text style={styles.weatherStateText}>Past and booked tee times are shown below. No bookable slots remain in this period.</Text>
+            ) : null}
+            {slotState === "success" && visiblePeriodSlots.map((slot) => {
               const active = selectedTime === slot.teeTime;
-              const disabled = !slot.isAvailable;
+              const disabled = !slot.isSelectable;
               return (
                 <Pressable
                   key={slot.teeTime}
                   style={[
                     styles.timeChip,
                     active && styles.timeChipActive,
-                    slot.isPastToday && styles.timeChipPast,
+                    slot.isPast && styles.timeChipPast,
                     slot.isUnavailableByBooking && styles.timeChipBooked,
                   ]}
                   onPress={() => {
@@ -486,7 +792,7 @@ export default function TeeTimeBookingScreen() {
                       setSelectedTime(slot.teeTime);
                     }
                   }}
-                  disabled={disabled}
+                  disabled={disabled || !canEditExistingBooking}
                   variant="chip"
                 >
                   <Text
@@ -508,6 +814,10 @@ export default function TeeTimeBookingScreen() {
 
         <View style={styles.summaryCard}>
             <Text style={styles.summaryTitle}>Booking Summary</Text>
+
+            {!canEditExistingBooking && existingBooking ? (
+              <Text style={styles.weatherStateText}>This booking is read-only because its tee time has already passed.</Text>
+            ) : null}
 
             <View style={styles.summaryMetaItem}>
               <View style={styles.summaryIconWrap}>
@@ -552,8 +862,13 @@ export default function TeeTimeBookingScreen() {
             </View>
           </View>
 
-          <Pressable style={[styles.confirmButton, !selectedTime && styles.confirmButtonDisabled]} onPress={handleConfirmBooking} disabled={!selectedTime} variant="cta">
-            <Text style={styles.confirmButtonText}>Confirm Booking</Text>
+          <Pressable
+            style={[styles.confirmButton, (!selectedTime || !canEditExistingBooking) && styles.confirmButtonDisabled]}
+            onPress={handleConfirmBooking}
+            disabled={!selectedTime || !canEditExistingBooking}
+            variant="cta"
+          >
+            <Text style={styles.confirmButtonText}>{existingBooking ? "Save Changes" : "Confirm Booking"}</Text>
           </Pressable>
 
           <Text style={styles.policyText}>
@@ -674,6 +989,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 4,
   },
+  weatherCardActive: {
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.primarySoft,
+  },
   weatherDate: {
     color: theme.colors.text,
     fontSize: theme.typography.caption.fontSize,
@@ -699,6 +1018,68 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
     fontWeight: "600",
+  },
+  closestWeatherCard: {
+    marginTop: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceTint,
+    padding: 10,
+    gap: 8,
+  },
+  closestWeatherHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  closestWeatherTitle: {
+    color: theme.colors.text,
+    fontSize: theme.typography.label.fontSize,
+    lineHeight: theme.typography.label.lineHeight,
+    fontWeight: "800",
+    letterSpacing: 0.8,
+  },
+  closestWeatherDate: {
+    color: theme.colors.textSoft,
+    fontSize: theme.typography.caption.fontSize,
+    lineHeight: theme.typography.caption.lineHeight,
+    fontWeight: "700",
+  },
+  closestWeatherBody: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  closestWeatherIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.primary,
+  },
+  closestWeatherMeta: {
+    flex: 1,
+  },
+  closestWeatherValue: {
+    color: theme.colors.text,
+    fontSize: theme.typography.subtitle.fontSize,
+    lineHeight: theme.typography.subtitle.lineHeight,
+    fontWeight: "800",
+  },
+  closestWeatherDescription: {
+    color: theme.colors.textSoft,
+    fontSize: theme.typography.caption.fontSize,
+    lineHeight: theme.typography.caption.lineHeight,
+    fontWeight: "600",
+    marginTop: 1,
+  },
+  closestWeatherTemp: {
+    color: theme.colors.primary,
+    fontSize: theme.typography.subtitle.fontSize,
+    lineHeight: theme.typography.subtitle.lineHeight,
+    fontWeight: "900",
   },
   calendarQuickButton: {
     height: 28,

@@ -324,6 +324,12 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      cancel_tee_time_booking: {
+        Args: {
+          target_booking_id: string;
+        };
+        Returns: Database["public"]["Tables"]["tee_time_bookings"]["Row"];
+      };
       get_available_tee_slots: {
         Args: {
           target_course_id: string;
@@ -331,10 +337,35 @@ export type Database = {
         };
         Returns: {
           is_available: boolean;
+          is_past: boolean;
           max_players: number;
           tee_time: string;
           time_period: string;
         }[];
+      };
+      get_next_bookable_tee_slot: {
+        Args: {
+          target_course_id: string;
+          target_start_date?: string | null;
+        };
+        Returns: {
+          max_players: number;
+          tee_date: string;
+          tee_time: string;
+          time_period: string;
+        }[];
+      };
+      save_tee_time_booking: {
+        Args: {
+          target_booking_id?: string | null;
+          target_course_id?: string | null;
+          target_payment_method?: string | null;
+          target_players?: number | null;
+          target_tee_date?: string | null;
+          target_tee_time?: string | null;
+          target_time_period?: string | null;
+        };
+        Returns: Database["public"]["Tables"]["tee_time_bookings"]["Row"];
       };
     };
     Enums: Record<string, never>;

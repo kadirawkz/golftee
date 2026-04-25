@@ -6,7 +6,8 @@ import { InteractionManager, ScrollView, StyleSheet, Text, View, useWindowDimens
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
-import { getManagedCourseById, useCourseDetails } from "../components/course-management";
+import { getColomboDateKey } from "../components/colombo-time";
+import { getManagedCourseById, getNextBookableTeeSlot, useCourseDetails } from "../components/course-management";
 import { toggleFavoriteCourse, useIsFavoriteCourse } from "../components/favorites";
 import { openInGoogleMaps } from "../components/map-links";
 import { theme } from "../components/theme";
@@ -112,11 +113,15 @@ export default function CourseDetailsScreen() {
   const [weather, setWeather] = useState<DailyWeatherForecast[]>([]);
   const [weatherState, setWeatherState] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [weatherError, setWeatherError] = useState<string | null>(null);
+  const [todayHasBookableSlots, setTodayHasBookableSlots] = useState(true);
+  const [now, setNow] = useState(() => new Date());
   const [showAllReviews, setShowAllReviews] = useState(false);
   const [favoriteNotice, setFavoriteNotice] = useState<string | null>(null);
   const course = getManagedCourseById(courseId);
   const courseDetails = useCourseDetails(course.id);
   const isFavorite = useIsFavoriteCourse(course.id);
+  const todayDateKey = getColomboDateKey(now);
+  const visibleWeather = weather.filter((day) => day.dateKey !== todayDateKey || todayHasBookableSlots);
   const isCompact = width < 360;
   const isTabletLike = width >= 768;
   const tabHeight = isTabletLike ? 74 : isCompact ? 62 : 68;
@@ -162,6 +167,16 @@ export default function CourseDetailsScreen() {
   const experienceDescription = courseDetails.value?.content?.experience_description ?? fallbackExperienceDescription;
 
   useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(new Date());
+    }, 60000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
     let active = true;
     const interactionTask = InteractionManager.runAfterInteractions(() => {
       const loadWeather = async () => {
@@ -200,6 +215,33 @@ export default function CourseDetailsScreen() {
       interactionTask.cancel();
     };
   }, [course.coordinates, course.id]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadTodayBookableState = async () => {
+      try {
+        const nextSlot = await getNextBookableTeeSlot(course.id);
+        if (!active) {
+          return;
+        }
+
+        setTodayHasBookableSlots(nextSlot?.teeDate === todayDateKey);
+      } catch {
+        if (!active) {
+          return;
+        }
+
+        setTodayHasBookableSlots(true);
+      }
+    };
+
+    void loadTodayBookableState();
+
+    return () => {
+      active = false;
+    };
+  }, [course.id, now, todayDateKey]);
 
   const handleFavoriteToggle = async () => {
     try {
@@ -293,7 +335,7 @@ export default function CourseDetailsScreen() {
                 bounces={false}
                 overScrollMode="never"
               >
-                {weather.map((day) => (
+                {visibleWeather.map((day) => (
                   <View key={day.dateLabel} style={styles.weatherCard}>
                     <Text style={styles.weatherDate}>{day.dateLabel}</Text>
                     <View style={styles.weatherIconWrap}>
