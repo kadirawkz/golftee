@@ -70,12 +70,9 @@ function translateBookingError(error: PostgrestError | Error) {
 }
 
 function translateLoadError(error: PostgrestError | Error) {
-  if ("code" in error && error.code === "PGRST205") {
-    return "Booking data is unavailable because the tee time bookings table is missing from Supabase.";
-  }
-
-  if (error.message.includes("Could not find the table 'public.tee_time_bookings'")) {
-    return "Booking data is unavailable because the tee time bookings table is missing from Supabase.";
+  const msg = error.message || "";
+  if (msg.includes("PGRST205") || msg.includes("Could not find the table") || msg.includes("tee_time_bookings")) {
+    return "Booking service is temporarily unavailable. Please try again later.";
   }
 
   return error.message || "Unable to load bookings.";
@@ -214,6 +211,10 @@ export function formatBookingTime(teeTime: string) {
 
 export function formatBookingDateTime(booking: Pick<TeeTimeBookingRow, "tee_date" | "tee_time">) {
   return `${formatBookingDate(booking.tee_date)}, ${formatBookingTime(booking.tee_time)}`;
+}
+
+export function getBookingTotal(booking: Pick<TeeTimeBookingRow, "green_fee" | "service_fee" | "caddy_fee" | "taxes">) {
+  return booking.green_fee + booking.service_fee + booking.caddy_fee + booking.taxes;
 }
 
 export function subscribeBookings(listener: BookingListener) {

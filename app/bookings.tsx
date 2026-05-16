@@ -9,6 +9,7 @@ import { AppImage } from "../components/app-image";
 import {
   formatBookingDate,
   formatBookingDateTime,
+  getBookingTotal,
   isHistoricalBooking,
   isUpcomingBooking,
   useBookingState,
@@ -16,6 +17,7 @@ import {
 import { getManagedCourseById } from "../components/course-management";
 import { useResponsiveLayout } from "../components/responsive-layout";
 import { theme } from "../components/theme";
+import { getCourseImage } from "../lib/image-mapping";
 
 function BookingCard({
   bookingId,
@@ -37,7 +39,7 @@ function BookingCard({
   return (
     <View style={styles.bookingCard}>
       <View style={styles.bookingImageWrap}>
-        <AppImage source={{ uri: course.image }} style={styles.bookingImage} />
+        <AppImage source={getCourseImage(course.image)} style={styles.bookingImage} />
         <Text style={styles.confirmedBadge}>{status.toUpperCase()}</Text>
       </View>
 
@@ -124,29 +126,6 @@ export default function BookingsScreen() {
           ) : null}
         </View>
 
-        <View style={styles.activityPanel}>
-          <Text style={styles.activityKicker}>BOOKING SYSTEM</Text>
-          <Text style={styles.activityTitle}>Supabase-backed tee times with secure owner-only access.</Text>
-
-          <View style={styles.activityStatsRow}>
-            <View>
-              <Text style={styles.statLabel}>ACTIVE</Text>
-              <Text style={styles.statValue}>{upcomingBookings.length}</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View>
-              <Text style={styles.statLabel}>HISTORY</Text>
-              <Text style={styles.statValue}>{historyBookings.length}</Text>
-            </View>
-          </View>
-
-          <View style={styles.mvpWrap}>
-            <View style={styles.mvpRing}>
-              <Ionicons name="shield-checkmark" size={36} color={theme.colors.accentSoft} />
-            </View>
-            <Text style={styles.mvpBadge}>RLS Protected</Text>
-          </View>
-        </View>
 
         <View style={styles.sectionWrap}>
           <View style={styles.sectionHeaderRow}>
@@ -184,7 +163,7 @@ export default function BookingsScreen() {
 
                   <View style={styles.historyRight}>
                     <Text style={styles.metaLabel}>TOTAL</Text>
-                    <Text style={styles.historyPrice}>${booking.total.toFixed(2)}</Text>
+                    <Text style={styles.historyPrice}>${getBookingTotal(booking).toFixed(2)}</Text>
                   </View>
 
                   <Ionicons name="chevron-forward" size={16} color={theme.colors.muted} />
@@ -334,72 +313,6 @@ const styles = StyleSheet.create({
     color: theme.colors.surface,
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
-    fontWeight: "700",
-  },
-  activityPanel: {
-    borderRadius: 18,
-    backgroundColor: theme.colors.primary,
-    padding: 18,
-    gap: 12,
-  },
-  activityKicker: {
-    fontSize: theme.typography.caption.fontSize,
-    lineHeight: theme.typography.caption.lineHeight,
-    color: theme.colors.accentSoft,
-    letterSpacing: 2,
-    fontWeight: "700",
-  },
-  activityTitle: {
-    fontSize: theme.typography.h2.fontSize,
-    lineHeight: theme.typography.h2.lineHeight,
-    color: theme.colors.surface,
-    fontWeight: "800",
-  },
-  activityStatsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-  },
-  statLabel: {
-    fontSize: theme.typography.caption.fontSize,
-    lineHeight: theme.typography.caption.lineHeight,
-    color: theme.colors.textOnPrimaryMuted,
-    letterSpacing: 1,
-    fontWeight: "600",
-  },
-  statValue: {
-    fontSize: theme.typography.h2.fontSize,
-    lineHeight: theme.typography.h2.lineHeight,
-    color: theme.colors.surface,
-    fontWeight: "800",
-  },
-  statDivider: {
-    width: 1,
-    height: 44,
-    backgroundColor: theme.colors.overlaySoft,
-  },
-  mvpWrap: {
-    alignItems: "center",
-    marginTop: 4,
-  },
-  mvpRing: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 5,
-    borderColor: theme.colors.success,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  mvpBadge: {
-    marginTop: -10,
-    backgroundColor: theme.colors.accentWarm,
-    color: theme.colors.surface,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    fontSize: theme.typography.bodySm.fontSize,
-    lineHeight: theme.typography.bodySm.lineHeight,
     fontWeight: "700",
   },
   historyList: {

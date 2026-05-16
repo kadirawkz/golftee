@@ -8,8 +8,8 @@ import { AnimatedPressable as Pressable } from "../components/animated-pressable
 import { useResponsiveLayout } from "../components/responsive-layout";
 import { theme } from "../components/theme";
 
-type NotificationType = "booking" | "promotion" | "achievement" | "system";
-type NotificationFilter = "all" | "booking" | "promotion" | "achievement" | "system";
+type NotificationType = "booking" | "promotion" | "achievement" | "updates";
+type NotificationFilter = "all" | "booking" | "promotion" | "achievement" | "updates";
 
 interface AppNotification {
   id: string;
@@ -58,13 +58,13 @@ const INITIAL_NOTIFICATIONS: AppNotification[] = [
   },
   {
     id: "4",
-    type: "system",
-    title: "Course Update",
-    message: "Pinewood Summit greens have been renovated. Check out the refreshed layout.",
+    type: "updates",
+    title: "Account Security",
+    message: "Your profile is now protected with enhanced data encryption.",
     timestampLabel: "2 days ago",
     occurredAt: "2026-04-07T09:00:00Z",
     read: true,
-    icon: "information-circle",
+    icon: "shield-checkmark",
   },
   {
     id: "5",
@@ -84,7 +84,7 @@ const FILTER_OPTIONS: { label: string; value: NotificationFilter }[] = [
   { label: "Bookings", value: "booking" },
   { label: "Offers", value: "promotion" },
   { label: "Achievements", value: "achievement" },
-  { label: "System", value: "system" },
+  { label: "App News", value: "updates" },
 ];
 
 function getIconColor(type: NotificationType) {
@@ -95,7 +95,7 @@ function getIconColor(type: NotificationType) {
       return theme.colors.accentWarm;
     case "achievement":
       return theme.colors.warning;
-    case "system":
+    case "updates":
       return theme.colors.muted;
     default:
       return theme.colors.primary;
@@ -222,7 +222,7 @@ export default function NotificationsScreen() {
       return;
     }
 
-    if (notification.type === "promotion" || notification.type === "system") {
+    if (notification.type === "promotion" || notification.type === "updates") {
       router.push("/explore");
     }
   };

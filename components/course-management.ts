@@ -79,17 +79,17 @@ function updateSnapshot(patch: Partial<CourseCatalogSnapshot>) {
   emitCourseCatalogChange();
 }
 
-function mapRowToCourse(row: GolfCourseRow): CourseRecord {
+function mapRowToCourse(row: any): CourseRecord {
   return {
     id: row.id,
     title: row.title,
     price: `$${Math.round(row.price)}`,
     rating: row.rating.toFixed(1),
-    location: row.location,
+    location: row.locations?.city_name ?? "Unknown",
     placeQuery: row.place_query,
     placeId: row.place_id ?? undefined,
     image: row.image,
-    style: row.style as CourseStyle,
+    style: (row.course_styles?.name ?? "PARKLAND") as CourseStyle,
     coordinates: {
       latitude: row.latitude,
       longitude: row.longitude,
@@ -143,7 +143,7 @@ async function loadCourseCatalogInternal() {
 
   const { data, error } = await supabase
     .from("golf_courses")
-    .select("*")
+    .select("*, locations(city_name), course_styles(name)")
     .eq("is_active", true)
     .order("sort_order", { ascending: true })
     .order("title", { ascending: true });

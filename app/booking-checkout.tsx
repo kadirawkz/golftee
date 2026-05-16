@@ -10,6 +10,7 @@ import { createBooking, updateBooking } from "../components/bookings";
 import { getManagedCourseById } from "../components/course-management";
 import { useResponsiveLayout } from "../components/responsive-layout";
 import { theme } from "../components/theme";
+import { getCourseImage } from "../lib/image-mapping";
 
 function parsePositiveNumber(value: string | undefined, fallback: number) {
   const parsed = Number(value);
@@ -157,7 +158,7 @@ export default function BookingCheckoutScreen() {
         </View>
 
         <View style={styles.courseHero}>
-          <AppImage source={{ uri: course.image }} style={styles.courseHeroImage} />
+          <AppImage source={getCourseImage(course.image)} style={styles.courseHeroImage} />
           <View style={styles.courseHeroOverlay} />
           <View style={styles.courseHeroContent}>
             <Text style={styles.courseName}>{course.title}</Text>

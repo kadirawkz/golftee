@@ -23,6 +23,7 @@ import { FavoriteCoursesSection } from "../components/favorite-courses-section";
 import { useFavoriteCourseIds } from "../components/favorites";
 import { useResponsiveLayout } from "../components/responsive-layout";
 import { theme } from "../components/theme";
+import { getCourseImage } from "../lib/image-mapping";
 
 const HERO_NEWS_IMAGE = require("../assets/images/home-hero-news.jpg");
 const HERO_OFFER_IMAGE = require("../assets/images/home-hero-offer.jpg");
@@ -425,7 +426,7 @@ export default function HomeScreen() {
                 variant="card"
               >
                 <View style={styles.getawaySquareInner}>
-                  <AppImage source={{ uri: getaway.image }} style={styles.getawaySquareImage} />
+                  <AppImage source={getCourseImage(getaway.image)} style={styles.getawaySquareImage} />
                   <View style={styles.getawaySquareOverlay} />
                   <View style={styles.getawaySquareInfo}>
                     <Text style={styles.getawaySquareName} numberOfLines={2}>

@@ -55,7 +55,7 @@ async function loadProfile(userId: string) {
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("*")
+    .select("*, membership_tiers(name)")
     .eq("id", userId)
     .maybeSingle();
 
@@ -275,14 +275,10 @@ export async function updateProfile(profileUpdate: ProfileUpdate) {
     throw new Error("You need to be signed in to update your profile.");
   }
 
-  const payload: ProfileInsert = {
-    ...profileUpdate,
-    id: userId,
-  };
-
   const { data, error } = await supabase
     .from("profiles")
-    .upsert(payload, { onConflict: "id" })
+    .update(profileUpdate)
+    .eq("id", userId)
     .select("*")
     .single();
 

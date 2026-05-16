@@ -7,7 +7,7 @@ const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim();
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim();
 
 const missingEnvMessage =
-  "Supabase is not configured. Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to your environment.";
+  "Server connection is currently unavailable. Please check your network or try again later.";
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 export const supabaseConfigurationError = isSupabaseConfigured ? null : missingEnvMessage;

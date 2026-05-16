@@ -14,6 +14,7 @@ import { getAvailableTeeSlots, getManagedCourseById, getNextBookableTeeSlot, typ
 import { useResponsiveLayout } from "../components/responsive-layout";
 import { theme } from "../components/theme";
 import { DailyWeatherForecast, getFourteenDayForecast, getWeatherCodeIconName } from "../components/weather";
+import { getCourseImage } from "../lib/image-mapping";
 
 const SERVICE_FEE = 12.5;
 const CADDY_FEE_PER_PLAYER = 7.5;
@@ -581,7 +582,7 @@ export default function TeeTimeBookingScreen() {
         overScrollMode="never"
       >
         <View style={styles.heroSection}>
-          <AppImage source={{ uri: course.image }} style={styles.heroImage} />
+          <AppImage source={getCourseImage(course.image)} style={styles.heroImage} />
           <View style={styles.heroOverlay} />
 
           <View style={styles.heroContent}>

@@ -10,6 +10,7 @@ import {
   cancelBooking,
   formatBookingDate,
   formatBookingTime,
+  getBookingTotal,
   isCancellableBooking,
   isEditableBooking,
   useBookingState,
@@ -17,6 +18,7 @@ import {
 import { getManagedCourseById } from "../components/course-management";
 import { useResponsiveLayout } from "../components/responsive-layout";
 import { theme } from "../components/theme";
+import { getCourseImage } from "../lib/image-mapping";
 
 const CHECKIN_QR_IMAGE =
   "https://lh3.googleusercontent.com/aida-public/AB6AXuC15RMxDTOjvLq2bokpb7irCZQMd_jpHwFzd-Ds2eu15F9z5E7B_Bd84nnNDonBol9FxOXwPhTmVDelDqGkvUeAw76jmEgy-jSX97QjIpwPCNTw-_fO8dSGkqJT5HN2hvSQfMlE3-nQeoco91Vfrryook_fQbxDW1r6hfQkMcpc7mQkjb-z8XSYksvhcXeGPHW30o25IYBAtRzxzuA82vYJ4sIedKfnctiXLKkuyeA2OjTaUwzQHaH2Hwrjucw3ONR9aEUfVjckcDg";
@@ -99,7 +101,7 @@ export default function ManageBookingScreen() {
         overScrollMode="never"
       >
         <View style={styles.heroCard}>
-          <AppImage source={{ uri: course.image }} style={styles.heroImage} />
+          <AppImage source={getCourseImage(course.image)} style={styles.heroImage} />
           <View style={styles.heroOverlay} />
           <View style={styles.heroContent}>
             <View style={styles.confirmedPill}>
@@ -160,7 +162,7 @@ export default function ManageBookingScreen() {
           <Text style={styles.priceRow}>Service Fee: ${booking.service_fee.toFixed(2)}</Text>
           <Text style={styles.priceRow}>Caddy Fee: ${booking.caddy_fee.toFixed(2)}</Text>
           <Text style={styles.priceRow}>Taxes: ${booking.taxes.toFixed(2)}</Text>
-          <Text style={styles.priceTotal}>Total: ${booking.total.toFixed(2)}</Text>
+          <Text style={styles.priceTotal}>Total: ${getBookingTotal(booking).toFixed(2)}</Text>
         </View>
 
         {notice ? <Text style={styles.noticeText}>{notice}</Text> : null}

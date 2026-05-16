@@ -6,6 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
 import { refreshProfile, updateProfile, useAuthSession } from "../components/auth";
+import { getManagedCourseById, useCourseCatalog } from "../components/course-management";
 import { useResponsiveLayout } from "../components/responsive-layout";
 import { theme } from "../components/theme";
 
@@ -48,10 +49,11 @@ function Field({
 export default function AccountScreen() {
   const auth = useAuthSession();
   const { horizontalPadding, screenBottomPadding } = useResponsiveLayout();
+  const catalog = useCourseCatalog();
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
   const [phone, setPhone] = useState("");
-  const [homeClub, setHomeClub] = useState("");
+  const [homeClubId, setHomeClubId] = useState("");
   const [handicap, setHandicap] = useState("");
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -61,12 +63,12 @@ export default function AccountScreen() {
     setFullName(auth.profile?.full_name ?? "");
     setUsername(auth.profile?.username ?? "");
     setPhone(auth.profile?.phone ?? "");
-    setHomeClub(auth.profile?.home_club ?? "");
+    setHomeClubId(auth.profile?.home_club_id ?? "");
     setHandicap(auth.profile?.handicap != null ? auth.profile.handicap.toFixed(1) : "");
   }, [auth.profile]);
 
   const avatarSource = auth.profile?.avatar_url || PROFILE_IMAGE;
-  const membershipTier = auth.profile?.membership_tier ?? "Free";
+  const membershipTier = (auth.profile as any)?.membership_tiers?.name || "Free";
   const memberId = auth.session?.user.id.slice(0, 8).toUpperCase() ?? "PENDING";
   const memberSince = auth.profile?.member_since
     ? new Date(auth.profile.member_since).toLocaleDateString(undefined, {
@@ -86,7 +88,7 @@ export default function AccountScreen() {
 
     try {
       await refreshProfile();
-      setStatusMessage("Profile synced from Supabase.");
+      setStatusMessage("Profile updated successfully.");
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : "Unable to refresh your profile.");
     } finally {
@@ -117,7 +119,7 @@ export default function AccountScreen() {
         full_name: fullName.trim() || null,
         username: username.trim().toLowerCase(),
         phone: phone.trim() || null,
-        home_club: homeClub.trim() || null,
+        home_club_id: homeClubId.trim() || null,
         handicap: handicap.trim() ? Number(handicap) : null,
       });
       setStatusMessage("Account changes saved securely.");
@@ -150,7 +152,7 @@ export default function AccountScreen() {
             <View style={styles.photoCopy}>
               <Text style={styles.photoTitle}>Account Profile</Text>
               <Text style={styles.photoSubtitle}>
-                Auth and profile data are now backed by Supabase with row-level security.
+                Manage your personal details and membership preferences securely.
               </Text>
               <View style={styles.photoButtons}>
                 <Pressable style={styles.primaryAction} onPress={() => void handleRefresh()} variant="cta">
@@ -159,10 +161,10 @@ export default function AccountScreen() {
                   ) : (
                     <Ionicons name="refresh-outline" size={16} color={theme.colors.surface} />
                   )}
-                  <Text style={styles.primaryActionText}>{isRefreshing ? "Syncing..." : "Sync Profile"}</Text>
+                  <Text style={styles.primaryActionText}>{isRefreshing ? "Syncing..." : "Refresh Profile"}</Text>
                 </Pressable>
                 <View style={styles.secondaryAction}>
-                  <Text style={styles.secondaryActionText}>Avatar upload next phase</Text>
+                  <Text style={styles.secondaryActionText}>Update Photo</Text>
                 </View>
               </View>
             </View>
@@ -182,7 +184,7 @@ export default function AccountScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Personal Details</Text>
-          <Text style={styles.sectionCaption}>These values come from your Supabase-backed profile.</Text>
+          <Text style={styles.sectionCaption}>Keep your profile information up to date.</Text>
           <View style={styles.card}>
             <Field
               label="FULL NAME"
@@ -210,12 +212,32 @@ export default function AccountScreen() {
               placeholder="+1 555 555 5555"
               keyboardType="phone-pad"
             />
-            <Field
-              label="HOME CLUB"
-              value={homeClub}
-              onChangeText={setHomeClub}
-              placeholder="Your regular course"
-            />
+            <View style={styles.inputShell}>
+              <Text style={styles.inputLabel}>HOME CLUB</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.clubSelector}
+                bounces={false}
+              >
+                {catalog.courses.map((course) => {
+                  const isSelected = homeClubId === course.id;
+                  return (
+                    <Pressable
+                      key={course.id}
+                      style={[styles.clubChip, isSelected && styles.clubChipActive]}
+                      onPress={() => setHomeClubId(course.id)}
+                      variant="chip"
+                    >
+                      <Text style={[styles.clubChipText, isSelected && styles.clubChipTextActive]}>
+                        {course.title}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+              {!catalog.courses.length && <Text style={styles.loadingText}>Loading courses...</Text>}
+            </View>
             <Field
               label="HANDICAP"
               value={handicap}
@@ -228,12 +250,12 @@ export default function AccountScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Security & Membership</Text>
-          <Text style={styles.sectionCaption}>The free plan is enough for email auth and this profile model.</Text>
+          <Text style={styles.sectionCaption}>Review your account security and current membership status.</Text>
           <View style={styles.card}>
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>EMAIL VERIFICATION</Text>
+              <Text style={styles.detailLabel}>EMAIL STATUS</Text>
               <Text style={styles.detailValue}>
-                {auth.session?.user.email_confirmed_at ? "Verified" : "Verification pending"}
+                {auth.session?.user.email_confirmed_at ? "Verified" : "Pending Verification"}
               </Text>
             </View>
             <View style={styles.detailRow}>
@@ -245,9 +267,9 @@ export default function AccountScreen() {
               <Text style={styles.detailValue}>{membershipTier}</Text>
             </View>
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>PROFILE LOAD STATUS</Text>
+              <Text style={styles.detailLabel}>ACCOUNT STATUS</Text>
               <Text style={styles.detailValue}>
-                {auth.profileLoading ? "Loading..." : auth.profile ? "Healthy" : "Profile pending"}
+                {auth.profileLoading ? "Updating..." : auth.profile ? "Verified" : "Syncing"}
               </Text>
             </View>
           </View>
@@ -281,7 +303,7 @@ export default function AccountScreen() {
             )}
           </Pressable>
           <View style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonText}>Billing is intentionally deferred until paid features are needed.</Text>
+            <Text style={styles.secondaryButtonText}>Billing and payment history details.</Text>
           </View>
         </View>
       </ScrollView>
@@ -446,6 +468,37 @@ const styles = StyleSheet.create({
     lineHeight: theme.typography.body.lineHeight,
     color: theme.colors.text,
     paddingVertical: 0,
+  },
+  clubSelector: {
+    gap: 8,
+    paddingVertical: 4,
+  },
+  clubChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: theme.colors.surfaceSoft,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  clubChipActive: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  clubChipText: {
+    fontSize: theme.typography.bodySm.fontSize,
+    color: theme.colors.textSoft,
+    fontWeight: "600",
+  },
+  clubChipTextActive: {
+    color: theme.colors.surface,
+    fontWeight: "700",
+  },
+  loadingText: {
+    marginTop: 8,
+    fontSize: theme.typography.caption.fontSize,
+    color: theme.colors.textSoft,
+    fontStyle: "italic",
   },
   detailRow: {
     borderRadius: 16,

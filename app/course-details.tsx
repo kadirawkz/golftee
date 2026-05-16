@@ -11,6 +11,7 @@ import { getManagedCourseById, getNextBookableTeeSlot, useCourseDetails } from "
 import { toggleFavoriteCourse, useIsFavoriteCourse } from "../components/favorites";
 import { openInGoogleMaps } from "../components/map-links";
 import { theme } from "../components/theme";
+import { getCourseImage } from "../lib/image-mapping";
 import { DailyWeatherForecast, getFourteenDayForecast, getWeatherCodeIconName } from "../components/weather";
 
 interface CourseReview {
@@ -263,7 +264,7 @@ export default function CourseDetailsScreen() {
         overScrollMode="never"
       >
         <View style={styles.heroSection}>
-          <AppImage source={{ uri: course.image }} style={styles.heroImage} />
+          <AppImage source={getCourseImage(course.image)} style={styles.heroImage} />
           <View style={styles.heroOverlay} />
           <Pressable
             style={[styles.favoriteButton, isFavorite && styles.favoriteButtonActive]}
@@ -401,7 +402,7 @@ export default function CourseDetailsScreen() {
             </Pressable>
 
             <View style={styles.courseImageWrap}>
-              <AppImage source={{ uri: course.image }} style={styles.courseImage} />
+              <AppImage source={getCourseImage(course.image)} style={styles.courseImage} />
             </View>
           </View>
 

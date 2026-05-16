@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { AnimatedPressable as Pressable } from "./animated-pressable";
 import { AppImage } from "./app-image";
+import { getCourseImage } from "../lib/image-mapping";
 import { theme } from "./theme";
 
 type CourseCardProps = {
@@ -51,7 +52,7 @@ export function CourseCard({
       {variant === "featured" ? (
         <>
           <View style={styles.featuredImageWrap}>
-            <AppImage source={{ uri: image }} style={styles.image} />
+            <AppImage source={getCourseImage(image)} style={styles.image} />
             <View style={styles.imageOverlay} />
             <View style={styles.featuredChipRow}>
               <View style={styles.featuredStyleChip}>
@@ -90,7 +91,7 @@ export function CourseCard({
         </>
       ) : (
         <>
-          <AppImage source={{ uri: image }} style={[styles.compactImage, isSmallCompact && styles.compactImageSmall]} />
+          <AppImage source={getCourseImage(image)} style={[styles.compactImage, isSmallCompact && styles.compactImageSmall]} />
           <View style={[styles.compactBody, isSmallCompact && styles.compactBodySmall]}>
             <View style={styles.compactHeaderRow}>
               <View style={styles.compactTextBlock}>

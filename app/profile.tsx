@@ -10,6 +10,7 @@ import { signOut, useAuthSession } from "../components/auth";
 import {
   formatBookingDate,
   formatBookingTime,
+  getBookingTotal,
   isHistoricalBooking,
   isUpcomingBooking,
   useBookingState,
@@ -17,6 +18,7 @@ import {
 import { getManagedCourseById } from "../components/course-management";
 import { useResponsiveLayout } from "../components/responsive-layout";
 import { theme } from "../components/theme";
+import { getCourseImage } from "../lib/image-mapping";
 
 const PROFILE_IMAGE =
   "https://lh3.googleusercontent.com/aida-public/AB6AXuAtvP2yhWDyZzMmfqZm-64GbAQU1leygJR4XvWNEjNG-Y8v081n1CW6IT037D9o6EKGbW_KzlgUSeCaCsuls8kaOf3CWCfDCpuRg8mTqgE-TvlTlJ199VKcyl-HIuK5JNRGgRMDI0MCL7rrfrId46EMJzwDzPgyJ6MBXm5NL-UpL9rSHD-IMzKPu2uHWDcsyttzykYhj97m06K2Ih3V4L9cOmmEglnPOpkQSsXlM-Q66XRa4f4pJiywM7snw8CbQmvG5e7G8ASXoJA";
@@ -49,7 +51,7 @@ function BookingPreviewCard({
   return (
     <Pressable style={styles.previewCard} onPress={() => onPress(bookingId)} variant="card">
       <View style={styles.previewImageWrap}>
-        <AppImage source={{ uri: image }} style={styles.previewImage} />
+        <AppImage source={getCourseImage(image)} style={styles.previewImage} />
         <View style={styles.previewOverlay} />
 
         <View style={styles.confirmedPill}>
@@ -99,7 +101,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const auth = useAuthSession();
   const bookingState = useBookingState();
-  const { screenBottomPadding, scaleFont, scaleLineHeight } = useResponsiveLayout();
+  const { screenBottomPadding, horizontalPadding, scaleFont, scaleLineHeight } = useResponsiveLayout();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const upcomingBookings = bookingState.bookings.filter(isUpcomingBooking).slice(0, 2);
@@ -124,7 +126,7 @@ export default function ProfileScreen() {
     ? new Date(auth.profile.member_since).getFullYear()
     : new Date().getFullYear();
   const handicapValue = auth.profile?.handicap != null ? auth.profile.handicap.toFixed(1) : "--";
-  const membershipTier = auth.profile?.membership_tier?.toUpperCase() || "FREE";
+  const membershipTier = (auth.profile as any)?.membership_tiers?.name?.toUpperCase() || "FREE";
   const avatarSource = auth.profile?.avatar_url || PROFILE_IMAGE;
 
   const handleLogout = useCallback(async () => {
@@ -164,12 +166,14 @@ export default function ProfileScreen() {
         overScrollMode="never"
       >
         <View style={styles.profileSection}>
-          <Pressable style={styles.avatarWrap} onPress={() => router.push("/account")} variant="card">
-            <AppImage source={{ uri: avatarSource }} style={styles.avatarImage} />
-            <Pressable style={[styles.editButton]} onPress={() => router.push("/account")} variant="icon">
+          <View style={styles.avatarContainer}>
+            <Pressable style={styles.avatarWrap} onPress={() => router.push("/account")} variant="card">
+              <AppImage source={{ uri: avatarSource }} style={styles.avatarImage} />
+            </Pressable>
+            <Pressable style={styles.editButton} onPress={() => router.push("/account")} variant="icon">
               <Ionicons name="create" size={13} color={theme.colors.surface} />
             </Pressable>
-          </Pressable>
+          </View>
 
           <Text style={styles.memberSince}>MEMBER SINCE {memberSince}</Text>
           <Text
@@ -327,18 +331,18 @@ export default function ProfileScreen() {
               >
                 <View style={styles.historyLeft}>
                   <View style={styles.historyThumb}>
-                    <AppImage source={{ uri: item.course.image }} style={styles.historyThumbImage} />
+                    <AppImage source={getCourseImage(item.course.image)} style={styles.historyThumbImage} />
                   </View>
                   <View>
                     <Text style={styles.historyName}>{item.course.title}</Text>
                     <Text style={styles.historyMeta}>
-                      {formatBookingDate(item.booking.tee_date)} • {item.booking.status.toUpperCase()}
+                      {formatBookingDate(item.booking.tee_date)} â€¢ {item.booking.status.toUpperCase()}
                     </Text>
                   </View>
                 </View>
 
                 <View style={styles.historyRight}>
-                  <Text style={styles.historyPrice}>${item.booking.total.toFixed(2)}</Text>
+                  <Text style={styles.historyPrice}>${getBookingTotal(item.booking).toFixed(2)}</Text>
                   <Text style={styles.historyStatus}>{item.booking.status.toUpperCase()}</Text>
                 </View>
               </Pressable>
@@ -371,6 +375,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginBottom: 26,
   },
+  avatarContainer: {
+    position: "relative",
+    marginBottom: 12,
+  },
   avatarWrap: {
     width: 120,
     height: 120,
@@ -378,8 +386,7 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: theme.colors.surface,
     overflow: "hidden",
-    position: "relative",
-    marginBottom: 12,
+    backgroundColor: theme.colors.surface,
   },
   avatarImage: {
     width: "100%",
@@ -387,16 +394,22 @@ const styles = StyleSheet.create({
   },
   editButton: {
     position: "absolute",
-    right: 4,
-    bottom: 4,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    right: 0,
+    bottom: 0,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: theme.colors.primary,
     borderWidth: 2,
     borderColor: theme.colors.surface,
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: theme.colors.shadow,
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+    zIndex: 10,
   },
   memberSince: {
     fontSize: theme.typography.caption.fontSize,

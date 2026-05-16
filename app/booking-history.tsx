@@ -5,10 +5,11 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
-import { formatBookingDate, isHistoricalBooking, useBookingState } from "../components/bookings";
+import { formatBookingDate, getBookingTotal, isHistoricalBooking, useBookingState } from "../components/bookings";
 import { getManagedCourseById } from "../components/course-management";
 import { useResponsiveLayout } from "../components/responsive-layout";
 import { theme } from "../components/theme";
+import { getCourseImage } from "../lib/image-mapping";
 
 export default function BookingHistoryScreen() {
   const router = useRouter();
@@ -17,7 +18,7 @@ export default function BookingHistoryScreen() {
   const historyBookings = bookingState.bookings.filter(isHistoricalBooking).reverse();
   const completedBookings = historyBookings.filter((booking) => booking.status === "completed");
   const averageSpend = historyBookings.length
-    ? historyBookings.reduce((total, booking) => total + booking.total, 0) / historyBookings.length
+    ? historyBookings.reduce((total, booking) => total + getBookingTotal(booking), 0) / historyBookings.length
     : 0;
 
   return (
@@ -69,7 +70,7 @@ export default function BookingHistoryScreen() {
                 variant="card"
               >
                 <View style={styles.historyImageWrap}>
-                  <AppImage source={{ uri: course.image }} style={styles.historyImage} />
+                  <AppImage source={getCourseImage(course.image)} style={styles.historyImage} />
                   <View style={styles.historyOverlay} />
                   <View style={styles.badge}>
                     <Text style={styles.badgeText}>{badgeText}</Text>
@@ -99,7 +100,7 @@ export default function BookingHistoryScreen() {
                     </View>
                     <View>
                       <Text style={styles.metaLabel}>SPEND</Text>
-                      <Text style={styles.metaValue}>${booking.total.toFixed(2)}</Text>
+                      <Text style={styles.metaValue}>${getBookingTotal(booking).toFixed(2)}</Text>
                     </View>
                   </View>
 

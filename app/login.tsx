@@ -530,7 +530,7 @@ export default function LoginScreen() {
               <Pressable
                 style={[styles.socialButton]}
                 onPress={() => {
-                  setAuthNotice("Google login is not configured yet. It can be added later from Supabase Auth providers.");
+                  setAuthNotice("Google login is currently unavailable. Please sign in with your email.");
                 }}
                 variant="button"
               >
@@ -541,7 +541,7 @@ export default function LoginScreen() {
               <Pressable
                 style={[styles.socialButton]}
                 onPress={() => {
-                  setAuthNotice("Apple login is not configured yet. It can be added later from Supabase Auth providers.");
+                  setAuthNotice("Apple login is currently unavailable. Please sign in with your email.");
                 }}
                 variant="button"
               >

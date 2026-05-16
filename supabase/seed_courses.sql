@@ -1,39 +1,129 @@
-insert into public.golf_courses (
+-- 1. Seed Locations
+INSERT INTO public.locations (city_name, region_name)
+VALUES 
+  ('Colombo', 'Western Province'),
+  ('Kandy / Digana', 'Central Province'),
+  ('Nuwara Eliya', 'Central Province'),
+  ('Trincomalee', 'Eastern Province'),
+  ('Anuradhapura', 'North Central Province'),
+  ('Hambantota', 'Southern Province'),
+  ('Koggala', 'Southern Province'),
+  ('Diyathalawa', 'Central Province')
+ON CONFLICT (city_name) DO UPDATE SET region_name = excluded.region_name;
+
+-- 2. Seed Course Styles
+INSERT INTO public.course_styles (name, description)
+VALUES 
+  ('PARKLAND', 'Manicured fairways with mature trees and traditional routing.'),
+  ('COASTAL', 'Exposed to sea breezes with sandy soil and water views.'),
+  ('LINKS', 'Firm, fast-running ground with natural contours and minimal trees.'),
+  ('DESERT', 'Arid conditions with waste areas and striking contrasts.')
+ON CONFLICT (name) DO NOTHING;
+
+-- 3. Seed Membership Tiers
+INSERT INTO public.membership_tiers (name, discount_percent)
+VALUES 
+  ('Standard', 0), 
+  ('Gold', 10), 
+  ('Platinum', 20)
+ON CONFLICT (name) DO NOTHING;
+
+-- 3. Seed Golf Courses
+INSERT INTO public.golf_courses (
   id,
   title,
-  location,
   place_query,
+  place_id,
   image,
-  style,
   price,
   rating,
   latitude,
   longitude,
-  sort_order
+  sort_order,
+  location_id,
+  style_id
 )
-values
-  ('1', 'Royal Colombo Golf Club', 'Colombo', 'Royal Colombo Golf Club, Colombo, Sri Lanka', 'https://lh3.googleusercontent.com/aida-public/AB6AXuBFQTuBLe-u9FmukU3SbNqqdu9ybgr516nOv7pIwNqJMyOdvzkJNlpecYklTJRLn23WmSdej7h_1PeRAbRY5NwkwjlKUVeMwzNz4otStyk8hkhwncL_f1zt8JxrDJS0l0n0QdXzQalyyxCB3o1Uh9DT7uEEjnKspurv5JeH7qNQ9l4bV9ykKP8NbNSqMPlmAjZ-m6UDxUCAnzOJsLvH3kgFViRtbYyM2sHrH640XNMpsIKPFpJYb-WTFF2gOmZ24dEDrtC8ohCD6Gw', 'PARKLAND', 120, 4.9, 6.905285380135911, 79.88419185299367, 1),
-  ('2', 'Victoria Golf & Country Resort', 'Kandy / Digana', 'Victoria Golf & Country Resort, Digana, Sri Lanka', 'https://lh3.googleusercontent.com/aida-public/AB6AXuBjFo59jzOkI8-rO5frZNhtdjOiYRt03WfnXDDG2L4auf1lfvlvQFfKkwCIJ0F-kPui754kDVL6wn2X4vSigAzfQnCCjPEQo1gOOVWiPHa146pimZe5ClBkkz64WVvNTd6IWiNt3FBjdA3tvbyNTLJJcT3oRe8Edt0286YpuVJPrSmJJkeZyl3cNnGIKyvBSS7BwfPo7yRTbQpHkA5jsQUcq1Hiw3CVBky9zg4demJUXPsKxHvcuNIM1cdkM6HX0Mg7UI0wnvyBmNc', 'COASTAL', 85, 4.7, 7.264680696986498, 80.77403805582475, 2),
-  ('3', 'Nuwara Eliya Golf Club', 'Nuwara Eliya', 'Nuwara Eliya Golf Club, Nuwara Eliya, Sri Lanka', 'https://lh3.googleusercontent.com/aida-public/AB6AXuBR2vOLXJsdBEqWB6Q9upkrN10Svhfc246lYZU4Fni0ScD-0JEHntcZj8NMErKGhaqy74dz5jvl6jlTO1W4n5T6q3a-GDJQiq1E5SGB91pMi5cqGoYrHgdFDQzDjDomSDVuNFk2Ihl7RABF3xVnk6-R8B__IgTG624jx4CIL43zQviW_lEl0Sz8un_M0iV16w5nyOaB5ZYmNAV4IytXOyuCrE6jwGwO9S462sVb2WKw9GxCtcf3O-F0tM_ULIW875SVwC111cm1Jc8', 'LINKS', 145, 4.8, 6.971971282155486, 80.76571996611204, 3),
-  ('4', 'Eagles Golf Link', 'Trincomalee', 'Eagles Golf Link, Trincomalee, Sri Lanka', 'https://lh3.googleusercontent.com/aida-public/AB6AXuDpvFBwGBjyRw5Mem3SVr2AHnm794__vb9sSGUsv0QxbHyUH0YcGJZyWjAjb66vrbEc_EZCcQSpZyMghcTdy95ZkH26Mw4qmKUbrrfyOUKUlka8C0e8l3J8BRMgMfCkaDsNPWckcGbGO_Jo_gAg-DPXkYt6PN__50HZieWdaiTLYRltjVFHz7tZAWur9Q-B2g67T5-i-CF73a-w6KAAo17EmNI40zaJbdTOEnz1Dzphn0lJDPCFHhwmdnjJmsUerwBOEzSggKyuqms', 'DESERT', 110, 4.6, 8.535798504973808, 81.19818322309355, 4),
-  ('5', 'Eagles Heritage Golf Club', 'Anuradhapura', 'Eagles Heritage Golf Club, Anuradhapura, Sri Lanka', 'https://lh3.googleusercontent.com/aida-public/AB6AXuCXVAcC8Jz0cxWoEcL8HzY41-Xl0S7u8IJAyeDp58DmmhgwWPAqeD8HgZUchre51G5mu6x7XO3__KfQHSnC5eer3jPdBsvGjSs1VPZkGCDDHwspT8ro3Za5Jnk_e4KeOeNDGSDCj3MoCGUXJBUfGt9AniK9XZtnt7hYfujjT_FKIFXBLRzGYZCkZpmtlXI-BwsmjH-EZ7IpGSUsABmjjyM8uXvjd9_Fra4ulzKVRmOyIyUu36KFG0O4_Apl8QjuDCxtFr2EBXKmh7w', 'PARKLAND', 95, 4.5, 8.296735106202165, 80.42496812379707, 5),
-  ('6', 'Shangri La Hambantota Golf Resort & Spa', 'Hambantota', 'Shangri La Hambantota Golf Resort & Spa, Hambantota, Sri Lanka', 'https://lh3.googleusercontent.com/aida-public/AB6AXuBut3NJMZaZTZ2-bmwu4OkdeZWK3U-d1wyW1gmn99dV80PF4sd-8KusqMSGria4aB7Jyt80OaWM7ZetSr59mdfzzHxTSNUVhOLYXhQu867Y_O-5GSAWAJATeVjYd8CNZa1WKQRDRycSVR8ZleCz-5AhlfmyBaO-zAesitS1YzQjkPXZGT_JeGibjGF5x1gbVlBh3lkh7Oac6cIcF-BM0iA0NBFT7cgy38VUNHuheRaMvFlOAU_jylr-jXkogprFvozbmSvjgg2aoto', 'COASTAL', 155, 4.9, 6.112915947036785, 81.06407119678414, 6),
-  ('7', 'Koggala Golf Club', 'Koggala', 'Koggala Golf Club, Koggala, Sri Lanka', 'https://lh3.googleusercontent.com/aida-public/AB6AXuA0640pZ_20kbgD7XrQUbBD5Pjpy4xkGtvKNPjjj4L1hitNXjYktH26mbFSwUQIaHspT0a-U5N0jnLe745HI-aDY9i9Su2SfrtizuLtTpZI3DLzCALg_C9LMEDDsGkWTjZc-0CilhSDw-CVsFmxNvE6jqqVL6AE1DyXwXc1_fmWILIa94wLMRxBazupMapu8HyNDTTsn5ahjIy-ka34UlslSTcuSRrCFsSeQa8F6voYhIfN5MaObRDLhIei3L5w926oyavHx9I5A20', 'LINKS', 130, 4.8, 5.996820130056448, 80.32463590631559, 7),
-  ('8', 'Army Golf Course', 'Diyathalawa', 'Army Golf Course, Diyatalawa, Sri Lanka', 'https://lh3.googleusercontent.com/aida-public/AB6AXuD31va63-poQTz5DcokODagG8JILUhhL-OdfABzYz32H9Ai45HxghyORQuW-Fn6CERGSBCHBNBk_JkINDdjugFA2bd84JXqM5xXR995T0nPgCq12n3wqlMdxu3mJM6B_pNCIXdWbBdEN4_rxEjYCZJMpyP86-lfqZsixsCKnqTaG0TVh0wMTMoTYGndn6E7JXPlqBH3rHQIaL45Ymb8OgfPBxUKKOfyXSbSHnNDavOLwz5SGZem6kOq_e6cA7vSQeJe7FfuelZPZo8', 'DESERT', 210, 4.7, 6.809702575280297, 80.94806013954602, 8)
-on conflict (id) do update
-set
+VALUES
+  (
+    '1', 'Royal Colombo Golf Club', 'Royal Colombo Golf Club, Colombo, Sri Lanka', 
+    'ChIJ9076Hh7X4zoRDWwU-B87H6k',
+    'assets/images/courses/royal_colombo.png', 
+    120, 4.9, 6.905285380135911, 79.88419185299367, 1,
+    (SELECT id FROM public.locations WHERE city_name = 'Colombo' LIMIT 1),
+    (SELECT id FROM public.course_styles WHERE name = 'PARKLAND' LIMIT 1)
+  ),
+  (
+    '2', 'Victoria Golf & Country Resort', 'Victoria Golf & Country Resort, Digana, Sri Lanka', 
+    'ChIJsS-7U29X4zoR1i7zY5D6D3A',
+    'assets/images/courses/victoria_digana.png', 
+    85, 4.7, 7.264680696986498, 80.77403805582475, 2,
+    (SELECT id FROM public.locations WHERE city_name = 'Kandy / Digana' LIMIT 1),
+    (SELECT id FROM public.course_styles WHERE name = 'COASTAL' LIMIT 1)
+  ),
+  (
+    '3', 'Nuwara Eliya Golf Club', 'Nuwara Eliya Golf Club, Nuwara Eliya, Sri Lanka', 
+    'ChIJxR7vFp_r4ToR5Q6_pC9q8Xo',
+    'assets/images/courses/nuwara_eliya.png', 
+    145, 4.8, 6.971971282155486, 80.76571996611204, 3,
+    (SELECT id FROM public.locations WHERE city_name = 'Nuwara Eliya' LIMIT 1),
+    (SELECT id FROM public.course_styles WHERE name = 'LINKS' LIMIT 1)
+  ),
+  (
+    '4', 'Eagles Golf Link', 'Eagles Golf Link, Trincomalee, Sri Lanka', 
+    'ChIJ_UP_yq8z5DoR4F4W5v_3L5w',
+    'assets/images/courses/trincomalee.png', 
+    110, 4.6, 8.535798504973808, 81.19818322309355, 4,
+    (SELECT id FROM public.locations WHERE city_name = 'Trincomalee' LIMIT 1),
+    (SELECT id FROM public.course_styles WHERE name = 'DESERT' LIMIT 1)
+  ),
+  (
+    '5', 'Eagles Heritage Golf Club', 'Eagles Heritage Golf Club, Anuradhapura, Sri Lanka', 
+    'ChIJ7_P_Yq8z5DoR4F4W5v_3L5w',
+    'assets/images/courses/anuradhapura.png', 
+    95, 4.5, 8.296735106202165, 80.42496812379707, 5,
+    (SELECT id FROM public.locations WHERE city_name = 'Anuradhapura' LIMIT 1),
+    (SELECT id FROM public.course_styles WHERE name = 'PARKLAND' LIMIT 1)
+  ),
+  (
+    '6', 'Shangri La Hambantota Golf Resort & Spa', 'Shangri La Hambantota Golf Resort & Spa, Hambantota, Sri Lanka', 
+    'ChIJR_P_Yq8z5DoR4F4W5v_3L5w',
+    'assets/images/courses/hambantota.png', 
+    155, 4.9, 6.112915947036785, 81.06407119678414, 6,
+    (SELECT id FROM public.locations WHERE city_name = 'Hambantota' LIMIT 1),
+    (SELECT id FROM public.course_styles WHERE name = 'COASTAL' LIMIT 1)
+  ),
+  (
+    '7', 'Koggala Golf Club', 'Koggala Golf Club, Koggala, Sri Lanka', 
+    'ChIJS_P_Yq8z5DoR4F4W5v_3L5w',
+    'assets/images/courses/koggala.png', 
+    130, 4.8, 5.996820130056448, 80.32463590631559, 7,
+    (SELECT id FROM public.locations WHERE city_name = 'Koggala' LIMIT 1),
+    (SELECT id FROM public.course_styles WHERE name = 'LINKS' LIMIT 1)
+  ),
+  (
+    '8', 'Army Golf Course', 'Army Golf Course, Diyatalawa, Sri Lanka', 
+    'ChIJT_P_Yq8z5DoR4F4W5v_3L5w',
+    'assets/images/courses/diyathalawa.png', 
+    210, 4.7, 6.809702575280297, 80.94806013954602, 8,
+    (SELECT id FROM public.locations WHERE city_name = 'Diyathalawa' LIMIT 1),
+    (SELECT id FROM public.course_styles WHERE name = 'DESERT' LIMIT 1)
+  )
+ON CONFLICT (id) DO UPDATE
+SET
   title = excluded.title,
-  location = excluded.location,
   place_query = excluded.place_query,
+  place_id = excluded.place_id,
   image = excluded.image,
-  style = excluded.style,
   price = excluded.price,
   rating = excluded.rating,
   latitude = excluded.latitude,
   longitude = excluded.longitude,
   sort_order = excluded.sort_order,
+  location_id = excluded.location_id,
+  style_id = excluded.style_id,
   is_active = true;
 
+-- 4. Seed Tee Slot Templates
 insert into public.course_tee_slot_templates (course_id, tee_time, time_period, max_players, sort_order)
 values
   ('1', '07:20', 'MORNING', 4, 1), ('1', '07:45', 'MORNING', 4, 2), ('1', '08:00', 'MORNING', 4, 3), ('1', '08:15', 'MORNING', 4, 4), ('1', '08:30', 'MORNING', 4, 5), ('1', '09:00', 'MORNING', 4, 6), ('1', '10:15', 'MORNING', 4, 7), ('1', '11:30', 'MORNING', 4, 8), ('1', '12:15', 'AFTERNOON', 4, 9), ('1', '12:45', 'AFTERNOON', 4, 10), ('1', '13:30', 'AFTERNOON', 4, 11), ('1', '14:00', 'AFTERNOON', 4, 12), ('1', '14:30', 'AFTERNOON', 4, 13), ('1', '15:15', 'AFTERNOON', 4, 14), ('1', '16:00', 'AFTERNOON', 4, 15), ('1', '16:30', 'AFTERNOON', 4, 16),
@@ -51,6 +141,7 @@ set
   sort_order = excluded.sort_order,
   is_active = true;
 
+-- 5. Seed Course Content
 insert into public.course_content (
   course_id,
   hero_badge,
@@ -58,20 +149,21 @@ insert into public.course_content (
   experience_description
 )
 values
-  ('1', 'SIGNATURE COURSE', 128, 'Designed for precision and rhythm, Royal Colombo delivers a city-club round with mature trees, fast greens, and strategic lines that reward thoughtful shot shaping from the first tee through the closing stretch.'),
-  ('2', 'HIGHLANDS ESCAPE', 96, 'Set above the reservoir in Digana, Victoria blends elevation changes, sweeping lake views, and demanding approach angles into a resort round that feels scenic on every hole and exacting on the scorecard.'),
-  ('3', 'HERITAGE CLASSIC', 114, 'Nuwara Eliya offers a cool-climate test with old-world character, tighter corridors, and disciplined green complexes that ask for controlled ball flight and smart club selection throughout the round.'),
-  ('4', 'EAST COAST CHALLENGE', 82, 'Eagles Golf Link pairs open fairways with exposed coastal winds and firm running surfaces, creating a round where trajectory control and patience matter as much as distance.'),
-  ('5', 'ANCIENT CITY FAVORITE', 74, 'Eagles Heritage combines relaxed resort play with polished conditioning, offering forgiving tee shots, balanced risk-reward holes, and a steady pace that suits both newer players and returning regulars.'),
-  ('6', 'RESORT SHOWPIECE', 143, 'Shangri La Hambantota brings bold bunkering, ocean air, and expansive landing areas together for a premium resort experience that stays playable while still rewarding aggressive scoring lines.'),
-  ('7', 'SOUTH COAST LINKS', 88, 'Koggala leans into natural movement and seaside conditions, giving players a breezy links-style test with creative recovery shots, wide visuals, and plenty of options into the greens.'),
-  ('8', 'HILL COUNTRY TEST', 69, 'Army Golf Course in Diyatalawa offers thinner mountain air, rolling terrain, and a more exacting second-shot challenge that makes every well-managed hole feel earned.')
+  ('1', 'SIGNATURE COURSE', 128, 'Founded in 1879, the Royal Colombo Golf Club is the oldest in Sri Lanka and a sanctuary of tranquility in the heart of the capital. The course features lush fairways, strategic bunkering, and the famous Kelani Valley railway line that traverses the property.'),
+  ('2', 'HIGHLANDS ESCAPE', 96, 'Designed by Donald Steel, Victoria is ranked among the top 100 most beautiful courses in the world. Set on a peninsula overlooking the Victoria Reservoir, it offers dramatic undulations and vistas of the Knuckles Mountain Range.'),
+  ('3', 'HERITAGE CLASSIC', 114, 'Established in 1889, the Nuwara Eliya Golf Club is one of Asia''s oldest. Located 6,000 feet above sea level, the cool-climate course winds through tea plantations and the historic town center, preserving its colonial charm.'),
+  ('4', 'EAST COAST CHALLENGE', 82, 'Eagles’ Golf Link is located on the picturesque east coast. Built on a peninsula, the course offers stunning views of the Indian Ocean and China Bay, with breezy coastal conditions that challenge players of all levels.'),
+  ('5', 'ANCIENT CITY FAVORITE', 74, 'Set in the historic city of Anuradhapura, Eagles’ Heritage offers a serene parkland experience. The course is flat and inviting, surrounded by mature tropical trees and the peaceful atmosphere of the ancient kingdom.'),
+  ('6', 'RESORT SHOWPIECE', 143, 'Sri Lanka''s first resort golf course, designed by Rodney Wright. The championship layout features three distinct zones—coconut plantations, dune landscapes, and former sapphire mines—with breathtaking ocean views.'),
+  ('7', 'SOUTH COAST LINKS', 88, 'Koggala Golf Club is a natural links-style course on the southern coast. The sea breeze and natural contours define the round, demanding creative shot-making and offering an authentic seaside test.'),
+  ('8', 'HILL COUNTRY TEST', 69, 'The Army Golf Course in Diyatalawa offers a unique high-altitude mountain experience. Set within a military cantonment, it features rolling terrain, crisp mountain air, and scenic pine forests.')
 on conflict (course_id) do update
 set
   hero_badge = excluded.hero_badge,
   review_count = excluded.review_count,
   experience_description = excluded.experience_description;
 
+-- 6. Seed Course Detail Items
 delete from public.course_detail_items;
 
 insert into public.course_detail_items (
@@ -132,6 +224,7 @@ values
   ('8', 'highlight', 'leaf', 'Altitude Advantage', 'Ball flight and distance play differently.', 1),
   ('8', 'highlight', 'water', 'Second-Shot Test', 'Approaches decide whether rounds hold together.', 2);
 
+-- 7. Seed Course Reviews
 delete from public.course_reviews;
 
 insert into public.course_reviews (

@@ -3,6 +3,69 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Database = {
   public: {
     Tables: {
+      locations: {
+        Row: {
+          id: string;
+          city_name: string;
+          region_name: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          city_name: string;
+          region_name?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          city_name?: string;
+          region_name?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      course_styles: {
+        Row: {
+          id: string;
+          name: string;
+          description: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          description?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          description?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      membership_tiers: {
+        Row: {
+          id: string;
+          name: string;
+          discount_percent: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          discount_percent?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          discount_percent?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       favorite_courses: {
         Row: {
           course_id: string;
@@ -19,7 +82,14 @@ export type Database = {
           created_at?: string;
           user_id?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "favorite_courses_course_id_fkey"
+            columns: ["course_id"]
+            referencedRelation: "golf_courses"
+            referencedColumns: ["id"]
+          }
+        ];
       };
       golf_courses: {
         Row: {
@@ -27,14 +97,14 @@ export type Database = {
           image: string;
           is_active: boolean;
           latitude: number;
-          location: string;
+          location_id: string;
           longitude: number;
           place_id: string | null;
           place_query: string;
           price: number;
           rating: number;
           sort_order: number;
-          style: string;
+          style_id: string;
           title: string;
           updated_at: string;
         };
@@ -43,14 +113,14 @@ export type Database = {
           image: string;
           is_active?: boolean;
           latitude: number;
-          location: string;
+          location_id: string;
           longitude: number;
           place_id?: string | null;
           place_query: string;
           price: number;
           rating: number;
           sort_order?: number;
-          style: string;
+          style_id: string;
           title: string;
           updated_at?: string;
         };
@@ -59,18 +129,31 @@ export type Database = {
           image?: string;
           is_active?: boolean;
           latitude?: number;
-          location?: string;
+          location_id?: string;
           longitude?: number;
           place_id?: string | null;
           place_query?: string;
           price?: number;
           rating?: number;
           sort_order?: number;
-          style?: string;
+          style_id?: string;
           title?: string;
           updated_at?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "golf_courses_location_id_fkey"
+            columns: ["location_id"]
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "golf_courses_style_id_fkey"
+            columns: ["style_id"]
+            referencedRelation: "course_styles"
+            referencedColumns: ["id"]
+          }
+        ];
       };
       course_tee_slot_templates: {
         Row: {
@@ -233,7 +316,6 @@ export type Database = {
           tee_date: string;
           tee_time: string;
           time_period: string;
-          total: number;
           updated_at: string;
           user_id: string;
         };
@@ -253,7 +335,6 @@ export type Database = {
           tee_date: string;
           tee_time: string;
           time_period: string;
-          total: number;
           updated_at?: string;
           user_id: string;
         };
@@ -273,11 +354,23 @@ export type Database = {
           tee_date?: string;
           tee_time?: string;
           time_period?: string;
-          total?: number;
           updated_at?: string;
           user_id?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "tee_time_bookings_course_id_fkey"
+            columns: ["course_id"]
+            referencedRelation: "golf_courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tee_time_bookings_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ];
       };
       profiles: {
         Row: {
@@ -285,10 +378,10 @@ export type Database = {
           created_at: string;
           full_name: string | null;
           handicap: number | null;
-          home_club: string | null;
+          home_club_id: string | null;
           id: string;
           member_since: string;
-          membership_tier: string;
+          tier_id: string;
           phone: string | null;
           updated_at: string;
           username: string | null;
@@ -298,10 +391,10 @@ export type Database = {
           created_at?: string;
           full_name?: string | null;
           handicap?: number | null;
-          home_club?: string | null;
+          home_club_id?: string | null;
           id: string;
           member_since?: string;
-          membership_tier?: string;
+          tier_id: string;
           phone?: string | null;
           updated_at?: string;
           username?: string | null;
@@ -311,15 +404,28 @@ export type Database = {
           created_at?: string;
           full_name?: string | null;
           handicap?: number | null;
-          home_club?: string | null;
+          home_club_id?: string | null;
           id?: string;
           member_since?: string;
-          membership_tier?: string;
+          tier_id?: string;
           phone?: string | null;
           updated_at?: string;
           username?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "profiles_home_club_id_fkey"
+            columns: ["home_club_id"]
+            referencedRelation: "golf_courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_tier_id_fkey"
+            columns: ["tier_id"]
+            referencedRelation: "membership_tiers"
+            referencedColumns: ["id"]
+          }
+        ];
       };
     };
     Views: Record<string, never>;

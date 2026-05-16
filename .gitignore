@@ -12,11 +12,25 @@ expo-env.d.ts
 # Native
 .kotlin/
 *.orig.*
-*.jks
-*.p8
-*.p12
-*.key
 *.mobileprovision
+
+# Secrets & Certificates
+*.pem
+*.key
+*.cert
+*.crt
+*.pfx
+*.p12
+*.der
+*.jks
+*.keystore
+*.gpg
+*.pub
+secrets.json
+credentials.json
+service-account.json
+google-services.json
+GoogleService-Info.plist
 
 # Metro
 .metro-health-check*
@@ -28,7 +42,47 @@ yarn-error.*
 
 # macOS
 .DS_Store
-*.pem
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
 
 # local env files
 .env
@@ -69,3 +123,51 @@ app-example
 # generated native folders
 /ios
 /android
+
+# Temporary / Scratch
+scratch/
+.temp/
+tmp/
+
+# Production artifacts
+build/
+
+# VS Code specific
+.history/
+*.vsix
+
+# Optional: Supabase generated types if you want to keep them local-only
+# lib/database.types.ts
+
+# Binary artifacts
+*.apk
+*.ipa
+*.app
+*.exe
+*.dmg
+
+# Test & Coverage
+coverage/
+*.lcov
+.nyc_output/
+junit.xml
+
+# Extra Environment Files (Safe for public repos)
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Editor specific (more robust)
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
