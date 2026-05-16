@@ -615,12 +615,8 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingRight: 10,
   },
-  trendingCard: {
-    width: 316,
-  },
-  trendingCardTablet: {
-    width: 316,
-  },
+  trendingCard: {},
+  trendingCardTablet: {},
   getawaysSection: {
     marginBottom: 12,
   },

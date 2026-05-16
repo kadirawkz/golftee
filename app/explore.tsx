@@ -896,9 +896,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     maxWidth: 280,
   },
-  trendingCard: {
-    width: 316,
-  },
+  trendingCard: {},
   sectionSeparator: {
     marginHorizontal: 16,
     marginTop: 4,

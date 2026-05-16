@@ -80,16 +80,28 @@ function updateSnapshot(patch: Partial<CourseCatalogSnapshot>) {
 }
 
 function mapRowToCourse(row: any): CourseRecord {
+  // 1. Try to get data from joined tables (prioritize these)
+  const locationJoin = row.joined_location;
+  const styleJoin = row.joined_style;
+
+  // Handle both object and single-item array formats
+  const cityName = Array.isArray(locationJoin) ? locationJoin[0]?.city_name : locationJoin?.city_name;
+  const styleName = Array.isArray(styleJoin) ? styleJoin[0]?.name : styleJoin?.name;
+
+  // 2. Fallback to legacy columns if joins are null (likely RLS or migration issue)
+  const finalLocation = cityName ?? row.location ?? "Sri Lanka";
+  const finalStyle = styleName ?? row.style ?? "PARKLAND";
+
   return {
     id: row.id,
     title: row.title,
     price: `$${Math.round(row.price)}`,
     rating: row.rating.toFixed(1),
-    location: row.locations?.city_name ?? "Unknown",
+    location: finalLocation,
     placeQuery: row.place_query,
     placeId: row.place_id ?? undefined,
     image: row.image,
-    style: (row.course_styles?.name ?? "PARKLAND") as CourseStyle,
+    style: (finalStyle as string).toUpperCase() as CourseStyle,
     coordinates: {
       latitude: row.latitude,
       longitude: row.longitude,
@@ -143,7 +155,11 @@ async function loadCourseCatalogInternal() {
 
   const { data, error } = await supabase
     .from("golf_courses")
-    .select("*, locations(city_name), course_styles(name)")
+    .select(`
+      *,
+      joined_location:locations!location_id(city_name),
+      joined_style:course_styles!style_id(name)
+    `)
     .eq("is_active", true)
     .order("sort_order", { ascending: true })
     .order("title", { ascending: true });

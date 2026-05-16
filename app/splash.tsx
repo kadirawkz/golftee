@@ -27,15 +27,10 @@ export default function Index() {
 
           <View style={styles.brandBlock}>
             <View style={styles.logoShell}>
-              <View style={styles.logoCircle}>
-                <View style={styles.ballGroup}>
-                  <View style={styles.ballDotLarge} />
-                  <View style={styles.ballDotSmall} />
-                  <View style={styles.ballDotSmall} />
-                </View>
-              </View>
-              <View style={styles.teeStem} />
-              <View style={styles.teeBase} />
+              <AppImage
+                source={require("../assets/images/icon.png")}
+                style={styles.logoImage}
+              />
             </View>
 
             <Text
@@ -69,17 +64,23 @@ export default function Index() {
               onPress={() => router.push("/login")}
               variant="cta"
             >
-              <Text
-                style={[
-                  styles.ctaText,
-                  {
-                    fontSize: scaleFont(styles.ctaText.fontSize),
-                    lineHeight: scaleLineHeight(styles.ctaText.lineHeight),
-                  },
-                ]}
-              >
-                Get Started
-              </Text>
+              <View style={styles.ctaContent}>
+                <AppImage
+                  source={require("../assets/images/icon.png")}
+                  style={styles.ctaIcon}
+                />
+                <Text
+                  style={[
+                    styles.ctaText,
+                    {
+                      fontSize: scaleFont(styles.ctaText.fontSize),
+                      lineHeight: scaleLineHeight(styles.ctaText.lineHeight),
+                    },
+                  ]}
+                >
+                  Get Started
+                </Text>
+              </View>
             </Pressable>
           </View>
         </SafeAreaView>
@@ -130,52 +131,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 10 },
     elevation: 12,
   },
-  logoCircle: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: theme.colors.surface,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  ballGroup: {
-    width: 26,
-    height: 26,
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 3,
-  },
-  ballDotLarge: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: theme.colors.primary,
-  },
-  ballDotSmall: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: theme.colors.primary,
-  },
-  teeStem: {
-    marginTop: 6,
-    width: 28,
-    height: 10,
-    borderTopWidth: 4,
-    borderTopColor: theme.colors.surface,
-    borderLeftWidth: 3,
-    borderRightWidth: 3,
-    borderLeftColor: "transparent",
-    borderRightColor: "transparent",
-  },
-  teeBase: {
-    width: 8,
-    height: 10,
-    marginTop: -1,
-    borderRadius: 4,
-    backgroundColor: theme.colors.surface,
+  logoImage: {
+    width: 170,
+    height: 170,
+    borderRadius: 85,
   },
   title: {
     marginTop: 12,
@@ -215,6 +174,16 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 6 },
     elevation: 6,
+  },
+  ctaContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  ctaIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
   },
   ctaText: {
     fontSize: theme.typography.title.fontSize,

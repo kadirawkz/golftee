@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   featuredCard: {
-    width: 292,
+    width: 316,
   },
   compactCard: {
     flexDirection: "row",
@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
     minHeight: 132,
   },
   compactCardSmall: {
-    minHeight: 120,
+    minHeight: 132,
   },
   featuredImageWrap: {
     height: 170,
