@@ -39,31 +39,31 @@ This repo normalizes text files with [.gitattributes](.gitattributes), so line-e
 ## Local setup
 
 1. Create a Supabase project.
-2. In Supabase SQL editor, run [supabase/schema.sql](supabase/schema.sql).
-3. Then run [supabase/seed_courses.sql](supabase/seed_courses.sql).
-4. Copy [.env.example](.env.example) to `.env`.
-5. Set values in `.env`:
+2. In Supabase SQL editor, execute the following scripts in order:
+   - [supabase/schema.sql](supabase/schema.sql) (Initial structure)
+   - [supabase/migrations/20240516_normalization_3nf.sql](supabase/migrations/20240516_normalization_3nf.sql) (3NF normalization)
+   - [supabase/migrations/20240516_cleanup_legacy.sql](supabase/migrations/20240516_cleanup_legacy.sql) (Legacy cleanup)
+   - [supabase/seed_courses.sql](supabase/seed_courses.sql) (Professional course data)
+3. Copy [.env.example](.env.example) to `.env`.
+4. Set your credentials in `.env`:
 
 ```env
 EXPO_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-6. In Supabase Auth settings:
-   - Keep Email provider enabled
-   - Configure confirmation policy based on your release needs
-   - Configure redirect URLs if you add in-app reset confirmation flow
-7. Start the app with `npm run start`.
+5. In Supabase Auth settings:
+   - Enable the Email provider.
+   - Configure redirect URLs if you plan to use password resets.
+6. Start the development server: `npm run android` or `npm run ios`.
 
-## Security model
+## Professional Architecture
 
-- Client only uses public anon key (never service role key).
-- Row Level Security is enabled for user-owned tables.
-- Profile, favorites, and bookings are scoped to `auth.uid()`.
-- Booking slot availability is exposed via RPC instead of broad booking table reads.
-- Booking writes go through RPC so pricing and slot rules are enforced server-side.
-- RPC execution is restricted to `authenticated` in [supabase/schema.sql](supabase/schema.sql).
-- Session tokens are persisted in secure storage where available.
+- **3NF Database**: Fully normalized schema for courses, locations, and styles.
+- **Image Mapping**: High-resolution local asset resolution for premium visuals.
+- **Colombo Timezone Logic**: Booking slots are strictly synchronized with Sri Lankan local time to prevent "past-slot" booking errors.
+- **Secure RPCs**: Critical business logic (booking validation, pricing) is handled via server-side PostgreSQL functions to prevent client-side manipulation.
+- **RLS (Row Level Security)**: Data is protected at the database level; users can only access their own profiles and bookings.
 
 ## Pre-push checklist
 
