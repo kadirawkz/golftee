@@ -8,12 +8,12 @@ import { AnimatedPressable as Pressable } from "../components/animated-pressable
 import { AppImage } from "../components/app-image";
 import { signOut, useAuthSession } from "../components/auth";
 import {
-  formatBookingDate,
-  formatBookingTime,
-  getBookingTotal,
-  isHistoricalBooking,
-  isUpcomingBooking,
-  useBookingState,
+    formatBookingDate,
+    formatBookingTime,
+    getBookingTotal,
+    isHistoricalBooking,
+    isUpcomingBooking,
+    useBookingState,
 } from "../components/bookings";
 import { getManagedCourseById } from "../components/course-management";
 import { useResponsiveLayout } from "../components/responsive-layout";
@@ -101,7 +101,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const auth = useAuthSession();
   const bookingState = useBookingState();
-  const { screenBottomPadding, horizontalPadding, scaleFont, scaleLineHeight } = useResponsiveLayout();
+  const { screenBottomPadding, scaleFont, scaleLineHeight } = useResponsiveLayout();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const upcomingBookings = bookingState.bookings.filter(isUpcomingBooking).slice(0, 2);

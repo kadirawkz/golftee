@@ -1,5 +1,5 @@
 import { useEffect, useSyncExternalStore } from "react";
-import type { CourseContentRow, CourseDetailItemRow, CourseReviewRow, GolfCourseRow } from "../lib/database.types";
+import type { CourseContentRow, CourseDetailItemRow, CourseReviewRow } from "../lib/database.types";
 import { assertSupabaseConfigured, supabase } from "../lib/supabase";
 import {
     type CourseRecord,

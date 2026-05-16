@@ -1,6 +1,6 @@
 import type { Session } from "@supabase/supabase-js";
 import { useSyncExternalStore } from "react";
-import type { ProfileInsert, ProfileRow, ProfileUpdate } from "../lib/database.types";
+import type { ProfileRow, ProfileUpdate } from "../lib/database.types";
 import { supabase, supabaseConfigurationError } from "../lib/supabase";
 
 type AuthSnapshot = {

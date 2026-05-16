@@ -6,7 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
 import { refreshProfile, updateProfile, useAuthSession } from "../components/auth";
-import { getManagedCourseById, useCourseCatalog } from "../components/course-management";
+import { useCourseCatalog } from "../components/course-management";
 import { useResponsiveLayout } from "../components/responsive-layout";
 import { theme } from "../components/theme";
 
