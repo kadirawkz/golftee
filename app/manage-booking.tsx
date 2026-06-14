@@ -67,7 +67,7 @@ export default function ManageBookingScreen() {
 
   if (!bookingState.initialized || bookingState.loading) {
     return (
-      <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
+      <SafeAreaView style={styles.screen} edges={["bottom"]}>
         <StatusBar style="dark" />
         <View style={styles.centerState}>
           <Text style={styles.centerStateText}>Loading booking details...</Text>
@@ -78,7 +78,7 @@ export default function ManageBookingScreen() {
 
   if (!booking) {
     return (
-      <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
+      <SafeAreaView style={styles.screen} edges={["bottom"]}>
         <StatusBar style="dark" />
         <View style={styles.centerState}>
           <Text style={styles.centerStateText}>Booking not found.</Text>
@@ -88,7 +88,7 @@ export default function ManageBookingScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
+    <SafeAreaView style={styles.screen} edges={["bottom"]}>
       <StatusBar style="dark" />
 
       <ScrollView

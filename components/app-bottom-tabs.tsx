@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "./animated-pressable";
 import { AppHeader } from "./app-header";
 import { theme } from "./theme";
+import { useNotificationState } from "./notifications";
 
 type TabRoute = "/home" | "/explore" | "/bookings" | "/profile";
 
@@ -38,6 +39,7 @@ type HeaderRoute =
   | "/settings"
   | "/notifications"
   | "/login"
+  | "/signup"
   | "/forgot-password"
   | "/course-details"
   | "/tee-time-booking"
@@ -78,6 +80,7 @@ const HEADER_CONFIG_BY_ROUTE: Partial<Record<HeaderRoute, Partial<HeaderConfig>>
   "/settings": { title: "Settings", showRightButton: false, showLeftButton: true },
   "/notifications": { title: "Notifications", showRightButton: false },
   "/login": { showHeader: false, showRightButton: false, showLeftButton: false },
+  "/signup": { showHeader: false, showRightButton: false, showLeftButton: false },
   "/forgot-password": { showHeader: false, showRightButton: false, showLeftButton: false },
   "/course-details": { title: "Course Details" },
   "/tee-time-booking": { title: "Book Tee Time", showHeader: true, showRightButton: false, showLeftButton: true },
@@ -104,7 +107,11 @@ export function AppBottomTabs({ children }: AppBottomTabsProps) {
     !isSecureNoChromeRoute &&
     (tabItems.some((item) => item.route === pathname) || pathname === "/course-details" || pathname === "/manage-booking");
   const routeHeaderConfig = HEADER_CONFIG_BY_ROUTE[pathname as HeaderRoute] ?? {};
-  const hasUnreadNotifications = pathname !== "/notifications";
+  
+  const { notifications } = useNotificationState();
+  const unreadCount = notifications.filter((n) => !n.read).length;
+  const hasUnreadNotifications = unreadCount > 0;
+
   const headerConfig: HeaderConfig = {
     ...DEFAULT_HEADER_CONFIG,
     rightIcon: hasUnreadNotifications ? "notifications" : "notifications-outline",
@@ -115,8 +122,8 @@ export function AppBottomTabs({ children }: AppBottomTabsProps) {
   const navHorizontalInset = isTabletLike ? Math.max((width - 480) / 2, 28) : isCompact ? 12 : 16;
   const navHeight = isTabletLike ? 74 : isCompact ? 62 : 68;
   const navBottom = Math.max(insets.bottom + 6, 8);
-  const iconSize = isCompact ? 16 : 17;
-  const iconPillSize = isTabletLike ? 30 : isCompact ? 24 : 27;
+  const iconSize = isTabletLike ? 24 : isCompact ? 18 : 22;
+  const iconPillSize = isTabletLike ? 40 : isCompact ? 30 : 34;
   const labelStyle = [
     styles.navLabel,
     isCompact && styles.navLabelCompact,
@@ -291,20 +298,20 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.accentSoft,
   },
   navLabel: {
-    fontSize: 10,
-    lineHeight: 12,
+    fontSize: theme.typography.caption.fontSize,
+    lineHeight: theme.typography.caption.lineHeight,
     color: theme.colors.muted,
-    fontWeight: "600",
-    letterSpacing: 0.45,
+    fontWeight: theme.typography.caption.fontWeight,
+    letterSpacing: theme.typography.caption.letterSpacing,
   },
   navLabelCompact: {
-    fontSize: 8,
-    lineHeight: 10,
-    letterSpacing: 0.35,
+    fontSize: theme.typography.overline.fontSize,
+    lineHeight: theme.typography.overline.lineHeight,
+    letterSpacing: theme.typography.overline.letterSpacing,
   },
   navLabelTablet: {
-    fontSize: 10,
-    lineHeight: 12,
+    fontSize: theme.typography.caption.fontSize,
+    lineHeight: theme.typography.caption.lineHeight,
   },
   navLabelActive: {
     color: theme.colors.primary,

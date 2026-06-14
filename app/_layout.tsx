@@ -1,3 +1,4 @@
+import "../components/ignore-warnings";
 import { Stack, usePathname, useRouter } from "expo-router";
 import * as SystemUI from "expo-system-ui";
 import { useEffect, useRef, useState } from "react";
@@ -35,28 +36,33 @@ export default function RootLayout() {
     const isPublicAuthRoute =
       pathname === "/splash" ||
       pathname === "/login" ||
+      pathname === "/signup" ||
       pathname === "/forgot-password" ||
       pathname === "/" ||
       pathname === "/launch";
 
-    if (!auth.isAuthenticated) {
-      if (!isPublicAuthRoute) {
-        routerRef.current.replace("/splash");
-      }
-      setIsReady(true);
-      return;
-    }
-
-    if (
-      pathname === "/splash" ||
-      pathname === "/login" ||
-      pathname === "/forgot-password" ||
-      pathname === "/"
-    ) {
-      routerRef.current.replace("/home");
-    }
-
     setIsReady(true);
+
+    const timer = setTimeout(() => {
+      if (!auth.isAuthenticated) {
+        if (!isPublicAuthRoute) {
+          routerRef.current.replace("/splash");
+        }
+        return;
+      }
+
+      if (
+        pathname === "/splash" ||
+        pathname === "/login" ||
+        pathname === "/signup" ||
+        pathname === "/forgot-password" ||
+        pathname === "/"
+      ) {
+        routerRef.current.replace("/home");
+      }
+    }, 0);
+
+    return () => clearTimeout(timer);
   }, [auth.initialized, auth.isAuthenticated, pathname]);
 
   if (!isReady || !auth.initialized) {
@@ -82,6 +88,7 @@ export default function RootLayout() {
       <Stack.Screen name="notifications" />
       <Stack.Screen name="splash" />
       <Stack.Screen name="login" />
+      <Stack.Screen name="signup" />
       <Stack.Screen name="forgot-password" />
     </Stack>
   );

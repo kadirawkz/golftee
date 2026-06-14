@@ -7,84 +7,23 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { useResponsiveLayout } from "../components/responsive-layout";
 import { theme } from "../components/theme";
+import {
+  AppNotification,
+  NotificationType,
+  useNotificationState,
+  markAsRead,
+  markAllAsRead,
+  deleteNotification,
+} from "../components/notifications";
 
-type NotificationType = "booking" | "promotion" | "achievement" | "updates";
 type NotificationFilter = "all" | "booking" | "promotion" | "achievement" | "updates";
-
-interface AppNotification {
-  id: string;
-  type: NotificationType;
-  title: string;
-  message: string;
-  timestampLabel: string;
-  occurredAt: string;
-  read: boolean;
-  icon: keyof typeof Ionicons.glyphMap;
-  actionText?: string;
-}
-
-const INITIAL_NOTIFICATIONS: AppNotification[] = [
-  {
-    id: "1",
-    type: "booking",
-    title: "Booking Confirmed",
-    message: "Your tee time at Royal Colombo Golf Club on Oct 24 at 08:15 AM is confirmed.",
-    timestampLabel: "2 hours ago",
-    occurredAt: "2026-04-09T08:00:00Z",
-    read: false,
-    icon: "checkmark-circle",
-    actionText: "View Booking",
-  },
-  {
-    id: "2",
-    type: "promotion",
-    title: "Limited Time Offer",
-    message: "Get 20% off your next booking at any 5-star course this weekend.",
-    timestampLabel: "5 hours ago",
-    occurredAt: "2026-04-09T05:00:00Z",
-    read: false,
-    icon: "gift",
-    actionText: "Explore Offers",
-  },
-  {
-    id: "3",
-    type: "achievement",
-    title: "Milestone Achieved",
-    message: "You hit your 50th round and unlocked a Gold member badge.",
-    timestampLabel: "1 day ago",
-    occurredAt: "2026-04-08T07:30:00Z",
-    read: true,
-    icon: "trophy",
-  },
-  {
-    id: "4",
-    type: "updates",
-    title: "Account Security",
-    message: "Your profile is now protected with enhanced data encryption.",
-    timestampLabel: "2 days ago",
-    occurredAt: "2026-04-07T09:00:00Z",
-    read: true,
-    icon: "shield-checkmark",
-  },
-  {
-    id: "5",
-    type: "booking",
-    title: "Booking Reminder",
-    message: "Your round at Victoria Golf & Country Resort is tomorrow at 10:00 AM.",
-    timestampLabel: "3 days ago",
-    occurredAt: "2026-04-06T08:30:00Z",
-    read: true,
-    icon: "notifications",
-    actionText: "Open Booking",
-  },
-];
 
 const FILTER_OPTIONS: { label: string; value: NotificationFilter }[] = [
   { label: "All", value: "all" },
   { label: "Bookings", value: "booking" },
   { label: "Offers", value: "promotion" },
   { label: "Achievements", value: "achievement" },
-  { label: "App News", value: "updates" },
+  { label: "App & Account", value: "updates" },
 ];
 
 function getIconColor(type: NotificationType) {
@@ -134,10 +73,12 @@ function NotificationCard({
   notification,
   onMarkRead,
   onAction,
+  onDelete,
 }: {
   notification: AppNotification;
   onMarkRead: (id: string) => void;
   onAction: (notification: AppNotification) => void;
+  onDelete: (id: string) => void;
 }) {
   const iconColor = getIconColor(notification.type);
   const timestampLabel = getRelativeTimeLabel(notification.occurredAt);
@@ -145,13 +86,16 @@ function NotificationCard({
   return (
     <View style={[styles.notificationCard, !notification.read && styles.notificationCardUnread]}>
       <View style={[styles.iconWrap, { backgroundColor: `${iconColor}20` }]}>
-        <Ionicons name={notification.icon} size={20} color={iconColor} />
+        <Ionicons name={notification.icon as any} size={20} color={iconColor} />
       </View>
 
       <View style={styles.contentWrap}>
         <View style={styles.headerRow}>
           <Text style={styles.notificationTitle}>{notification.title}</Text>
           {!notification.read ? <View style={styles.readIndicator} /> : null}
+          <Pressable style={styles.dismissButton} onPress={() => onDelete(notification.id)} variant="icon">
+            <Ionicons name="close-outline" size={18} color={theme.colors.muted} />
+          </Pressable>
         </View>
         <Text style={styles.notificationMessage}>{notification.message}</Text>
         <View style={styles.footerRow}>
@@ -177,7 +121,7 @@ function NotificationCard({
 export default function NotificationsScreen() {
   const router = useRouter();
   const { horizontalPadding, screenBottomPadding } = useResponsiveLayout();
-  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
+  const { notifications } = useNotificationState();
   const [activeFilter, setActiveFilter] = useState<NotificationFilter>("all");
 
   const sortedNotifications = useMemo(
@@ -201,20 +145,28 @@ export default function NotificationsScreen() {
   const unreadCount = notifications.filter((notification) => !notification.read).length;
 
   const handleMarkAllRead = () => {
-    setNotifications((current) => current.map((notification) => ({ ...notification, read: true })));
+    void markAllAsRead();
   };
 
   const handleMarkRead = (id: string) => {
-    setNotifications((current) =>
-      current.map((notification) =>
-        notification.id === id ? { ...notification, read: true } : notification
-      )
-    );
+    void markAsRead(id);
+  };
+
+  const handleDelete = (id: string) => {
+    void deleteNotification(id);
   };
 
   const handleNotificationAction = (notification: AppNotification) => {
     if (!notification.read) {
-      handleMarkRead(notification.id);
+      void markAsRead(notification.id);
+    }
+
+    if (notification.route) {
+      router.push({
+        pathname: notification.route as any,
+        params: notification.routeParams,
+      });
+      return;
     }
 
     if (notification.type === "booking") {
@@ -228,7 +180,7 @@ export default function NotificationsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
+    <SafeAreaView style={styles.screen} edges={["bottom"]}>
       <StatusBar style="dark" />
 
       <ScrollView
@@ -284,7 +236,7 @@ export default function NotificationsScreen() {
         </ScrollView>
 
         <View style={styles.notificationsSection}>
-          {unreadNotifications.length > 0 ? (
+           {unreadNotifications.length > 0 ? (
             <View style={styles.groupSection}>
               <Text style={styles.sectionLabel}>Unread</Text>
               <View style={styles.notificationsList}>
@@ -294,6 +246,7 @@ export default function NotificationsScreen() {
                     notification={notification}
                     onMarkRead={handleMarkRead}
                     onAction={handleNotificationAction}
+                    onDelete={handleDelete}
                   />
                 ))}
               </View>
@@ -310,6 +263,7 @@ export default function NotificationsScreen() {
                     notification={notification}
                     onMarkRead={handleMarkRead}
                     onAction={handleNotificationAction}
+                    onDelete={handleDelete}
                   />
                 ))}
               </View>
@@ -484,6 +438,13 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: theme.colors.primary,
     flexShrink: 0,
+  },
+  dismissButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
   },
   notificationMessage: {
     fontSize: theme.typography.bodySm.fontSize,

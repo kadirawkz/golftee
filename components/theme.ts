@@ -29,6 +29,7 @@ type AppRouteName =
   | "notifications"
   | "splash"
   | "login"
+  | "signup"
   | "forgot-password";
 
 type ScreenTransitionPreset = "shared" | "boot" | "splash" | "auth" | "root" | "detail" | "taskFlow";
@@ -51,6 +52,7 @@ type AppPathname =
   | "/notifications"
   | "/splash"
   | "/login"
+  | "/signup"
   | "/forgot-password";
 
 const colors = {
@@ -263,6 +265,7 @@ const routeTransitionPresets: Record<AppRouteName, ScreenTransitionPreset> = {
   launch: "boot",
   splash: "splash",
   login: "auth",
+  signup: "auth",
   "forgot-password": "auth",
   home: "root",
   explore: "root",

@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { ScrollView, StyleSheet, Text, useWindowDimensions, View, Linking } from "react-native";
 import Animated, {
     interpolate,
     interpolateColor,
@@ -18,16 +18,23 @@ import {
     calculateDistanceKm,
     DEFAULT_USER_LOCATION,
 } from "../components/course-data";
-import { useCourseCatalog } from "../components/course-management";
+import { useCourseCatalog, getManagedCourseById } from "../components/course-management";
 import { FavoriteCoursesSection } from "../components/favorite-courses-section";
 import { useFavoriteCourseIds } from "../components/favorites";
 import { useResponsiveLayout } from "../components/responsive-layout";
 import { theme } from "../components/theme";
 import { getCourseImage } from "../lib/image-mapping";
+import { useAuthSession } from "../components/auth";
+import {
+  useBookingState,
+  isUpcomingBooking,
+  formatBookingDateTime,
+  isHistoricalBooking,
+} from "../components/bookings";
 
-const HERO_NEWS_IMAGE = require("../assets/images/home-hero-news.jpg");
-const HERO_OFFER_IMAGE = require("../assets/images/home-hero-offer.jpg");
-const HERO_MEMBER_IMAGE = require("../assets/images/home-hero-member.jpg");
+const HERO_NEWS_IMAGE = require("../assets/images/home-hero-news.webp");
+const HERO_OFFER_IMAGE = require("../assets/images/home-hero-offer.webp");
+const HERO_MEMBER_IMAGE = require("../assets/images/home-hero-member.webp");
 
 const HERO_SLIDES = [
   {
@@ -96,6 +103,8 @@ function HeroIndicatorDot({
 
 export default function HomeScreen() {
   const router = useRouter();
+  const auth = useAuthSession();
+  const bookingState = useBookingState();
   const courseCatalog = useCourseCatalog();
   const { width } = useWindowDimensions();
   const { horizontalPadding, screenBottomPadding, scaleFont, scaleLineHeight } = useResponsiveLayout();
@@ -108,6 +117,23 @@ export default function HomeScreen() {
   const allCourses = courseCatalog.courses;
   const favoriteCourseIds = useFavoriteCourseIds();
   const favoriteCourseIdSet = useMemo(() => new Set(favoriteCourseIds), [favoriteCourseIds]);
+
+  const upcomingBookings = useMemo(() => {
+    return bookingState.bookings.filter(isUpcomingBooking);
+  }, [bookingState.bookings]);
+
+  const completedRounds = useMemo(() => {
+    return bookingState.bookings.filter((b) => b.status === "completed" || isHistoricalBooking(b)).length;
+  }, [bookingState.bookings]);
+
+  const nextBooking = useMemo(() => {
+    return upcomingBookings[0] || null;
+  }, [upcomingBookings]);
+
+  const nextBookingCourse = useMemo(() => {
+    if (!nextBooking) return null;
+    return getManagedCourseById(nextBooking.course_id);
+  }, [nextBooking]);
   const featuredHomeCourses = useMemo(() => allCourses.slice(0, 3), [allCourses]);
   const getawayHomeCourses = useMemo(
     () => allCourses.slice(4, 8).map((course) => ({ id: course.id, title: course.title, place: course.location, image: course.image })),
@@ -225,6 +251,143 @@ export default function HomeScreen() {
         overScrollMode="never"
         contentInsetAdjustmentBehavior="never"
       >
+        {/* Welcome Header */}
+        <View style={styles.dashboardHeader}>
+          <Text style={styles.welcomeSubtitle}>
+            {(() => {
+              const hour = new Date().getHours();
+              if (hour < 12) return "GOOD MORNING";
+              if (hour < 17) return "GOOD AFTERNOON";
+              return "GOOD EVENING";
+            })()}
+          </Text>
+          <Text style={styles.welcomeTitle}>
+            Hello, {auth.profile?.full_name || auth.profile?.username || "Golfer"}!
+          </Text>
+        </View>
+
+        {/* Player Stats Card */}
+        <View style={styles.playerCard}>
+          <View style={styles.playerCardHeader}>
+            <View>
+              <Text style={styles.playerCardLabel}>MEMBERSHIP TIER</Text>
+              <Text style={styles.playerCardTier}>
+                {((auth.profile as any)?.membership_tiers?.name as string)?.toUpperCase() ?? "STANDARD MEMBER"}
+              </Text>
+            </View>
+            <View style={styles.tierIconWrap}>
+              <Ionicons name="ribbon-outline" size={18} color={theme.colors.accentWarm} />
+            </View>
+          </View>
+          
+          <View style={styles.playerCardStats}>
+            <View style={styles.playerStatBox}>
+              <Text style={styles.playerStatVal}>
+                {auth.profile?.handicap ? Number(auth.profile.handicap).toFixed(1) : "—"}
+              </Text>
+              <Text style={styles.playerStatLabel}>Handicap</Text>
+            </View>
+            
+            <View style={styles.playerStatDivider} />
+            
+            <View style={styles.playerStatBox}>
+              <Text style={styles.playerStatVal}>{completedRounds}</Text>
+              <Text style={styles.playerStatLabel}>Rounds</Text>
+            </View>
+            
+            <View style={styles.playerStatDivider} />
+            
+            <View style={styles.playerStatBox}>
+              <Text style={[styles.playerStatVal, styles.playerStatStatus]}>
+                {auth.profile ? "Active" : "Guest"}
+              </Text>
+              <Text style={styles.playerStatLabel}>Status</Text>
+            </View>
+          </View>
+        </View>
+
+
+
+        {/* Next Round Widget */}
+        {nextBooking && nextBookingCourse ? (
+          <View style={styles.nextRoundSection}>
+            <View style={styles.nextRoundHeader}>
+              <Text style={styles.kicker}>UP NEXT</Text>
+              <Text style={styles.nextRoundTitle}>Your Upcoming Tee Time</Text>
+            </View>
+            <View style={styles.nextRoundCard}>
+              <View style={styles.nextRoundCardBody}>
+                <View style={styles.nextRoundCourseRow}>
+                  <Ionicons name="golf" size={16} color={theme.colors.primary} style={styles.nextRoundIcon} />
+                  <Text style={styles.nextRoundCourseName} numberOfLines={1}>
+                    {nextBookingCourse.title}
+                  </Text>
+                </View>
+                
+                <View style={styles.nextRoundTimeRow}>
+                  <Ionicons name="calendar-outline" size={14} color={theme.colors.textSoft} style={styles.nextRoundIcon} />
+                  <Text style={styles.nextRoundTimeText}>
+                    {formatBookingDateTime(nextBooking)}
+                  </Text>
+                </View>
+
+                <View style={styles.nextRoundPlayersRow}>
+                  <Ionicons name="people-outline" size={14} color={theme.colors.textSoft} style={styles.nextRoundIcon} />
+                  <Text style={styles.nextRoundTimeText}>
+                    {nextBooking.players} {nextBooking.players === 1 ? "Player" : "Players"}
+                  </Text>
+                </View>
+
+                <View style={styles.nextRoundActions}>
+                  <Pressable
+                    style={[styles.nextRoundBtn, styles.nextRoundBtnSecondary]}
+                    onPress={() => {
+                      const lat = nextBookingCourse.coordinates?.latitude ?? 6.9271;
+                      const lon = nextBookingCourse.coordinates?.longitude ?? 79.8612;
+                      const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+                      Linking.openURL(url);
+                    }}
+                    variant="chip"
+                  >
+                    <Ionicons name="map-outline" size={14} color={theme.colors.primary} />
+                    <Text style={styles.nextRoundBtnTextSecondary}>Directions</Text>
+                  </Pressable>
+                  
+                  <Pressable
+                    style={[styles.nextRoundBtn, styles.nextRoundBtnPrimary]}
+                    onPress={() => router.push({
+                      pathname: "/manage-booking",
+                      params: { bookingId: nextBooking.id }
+                    })}
+                    variant="cta"
+                  >
+                    <Text style={styles.nextRoundBtnTextPrimary}>Manage</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.nextRoundSection}>
+            <View style={styles.nextRoundCardEmpty}>
+              <View style={styles.nextRoundEmptyContent}>
+                <Ionicons name="golf-outline" size={28} color={theme.colors.muted} />
+                <View style={styles.nextRoundEmptyTextCol}>
+                  <Text style={styles.nextRoundEmptyTitle}>No Upcoming Tee Times</Text>
+                  <Text style={styles.nextRoundEmptyDesc}>Ready for a round? Book a signature green nearby.</Text>
+                </View>
+              </View>
+              <Pressable
+                style={styles.nextRoundEmptyBookBtn}
+                onPress={() => router.push("/explore")}
+                variant="cta"
+              >
+                <Text style={styles.nextRoundEmptyBookBtnText}>Book Now</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+
         <View style={styles.heroShell}>
           <ScrollView
             ref={heroScrollRef}
@@ -482,19 +645,19 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     fontSize: theme.typography.label.fontSize,
     lineHeight: theme.typography.label.lineHeight,
-    fontWeight: "700",
+    fontWeight: theme.typography.label.fontWeight,
     color: theme.colors.accentSoft,
     backgroundColor: theme.colors.primary,
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: 999,
     marginBottom: 10,
-    letterSpacing: 1.2,
+    letterSpacing: theme.typography.label.letterSpacing,
   },
   heroTitle: {
-    fontSize: theme.typography.h2.fontSize,
-    lineHeight: theme.typography.h2.lineHeight,
-    fontWeight: "800",
+    fontSize: theme.typography.h4.fontSize,
+    lineHeight: theme.typography.h4.lineHeight,
+    fontWeight: theme.typography.h4.fontWeight,
     color: theme.colors.surface,
     marginBottom: 6,
   },
@@ -573,15 +736,15 @@ const styles = StyleSheet.create({
   kicker: {
     fontSize: theme.typography.label.fontSize,
     lineHeight: theme.typography.label.lineHeight,
-    fontWeight: "700",
+    fontWeight: theme.typography.label.fontWeight,
     color: theme.colors.accentWarm,
-    letterSpacing: 2.4,
+    letterSpacing: theme.typography.label.letterSpacing,
     marginBottom: 2,
   },
   sectionTitle: {
-    fontSize: theme.typography.h1.fontSize,
-    lineHeight: theme.typography.h1.lineHeight,
-    fontWeight: "800",
+    fontSize: theme.typography.h4.fontSize,
+    lineHeight: theme.typography.h4.lineHeight,
+    fontWeight: theme.typography.h4.fontWeight,
     color: theme.colors.text,
   },
   featuredRow: {
@@ -597,9 +760,9 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   trendingTitle: {
-    fontSize: theme.typography.h1.fontSize,
-    lineHeight: theme.typography.h1.lineHeight,
-    fontWeight: "800",
+    fontSize: theme.typography.h4.fontSize,
+    lineHeight: theme.typography.h4.lineHeight,
+    fontWeight: theme.typography.h4.fontWeight,
     color: theme.colors.text,
   },
   trendingSubtitle: {
@@ -664,14 +827,270 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.title.fontSize,
     lineHeight: theme.typography.title.lineHeight,
     color: theme.colors.surface,
-    fontWeight: "700",
+    fontWeight: theme.typography.title.fontWeight,
   },
   getawaySquarePlace: {
     marginTop: 2,
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
     color: theme.colors.textOnPrimarySoft,
+    fontWeight: theme.typography.caption.fontWeight,
+    letterSpacing: theme.typography.caption.letterSpacing,
+  },
+  dashboardHeader: {
+    marginTop: 6,
+    marginBottom: 8,
+  },
+  welcomeSubtitle: {
+    fontSize: theme.typography.overline.fontSize,
+    lineHeight: theme.typography.overline.lineHeight,
+    fontWeight: theme.typography.overline.fontWeight,
+    color: theme.colors.accentWarm,
+    letterSpacing: theme.typography.overline.letterSpacing,
+    marginBottom: 2,
+  },
+  welcomeTitle: {
+    fontSize: theme.typography.h3.fontSize,
+    lineHeight: theme.typography.h3.lineHeight,
+    fontWeight: theme.typography.h3.fontWeight,
+    color: theme.colors.text,
+  },
+  playerCard: {
+    backgroundColor: theme.colors.primarySoft,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.borderSoft,
+    padding: 16,
+    marginBottom: 20,
+    shadowColor: theme.colors.shadow,
+    shadowOpacity: 0.03,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
+  playerCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.borderSoft,
+    paddingBottom: 12,
+    marginBottom: 12,
+  },
+  playerCardLabel: {
+    fontSize: theme.typography.overline.fontSize,
+    lineHeight: theme.typography.overline.lineHeight,
+    fontWeight: theme.typography.overline.fontWeight,
+    color: theme.colors.textSoft,
+    letterSpacing: theme.typography.overline.letterSpacing,
+    marginBottom: 2,
+  },
+  playerCardTier: {
+    fontSize: theme.typography.title.fontSize,
+    fontWeight: "800",
+    color: theme.colors.primary,
+  },
+  tierIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.borderSoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  playerCardStats: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  playerStatBox: {
+    flex: 1,
+    alignItems: "center",
+    gap: 2,
+  },
+  playerStatVal: {
+    fontSize: theme.typography.h4.fontSize,
+    fontWeight: theme.typography.h4.fontWeight,
+    color: theme.colors.primary,
+  },
+  playerStatStatus: {
+    color: theme.colors.accentWarm,
+  },
+  playerStatLabel: {
+    fontSize: theme.typography.caption.fontSize,
+    lineHeight: theme.typography.caption.lineHeight,
+    fontWeight: theme.typography.caption.fontWeight,
+    color: theme.colors.textSoft,
+  },
+  playerStatDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: theme.colors.borderSoft,
+  },
+  quickActionsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 24,
+    gap: 8,
+  },
+  quickActionBtn: {
+    flex: 1,
+    alignItems: "center",
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.md,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.borderSoft,
+    shadowColor: theme.colors.shadow,
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  quickActionIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 6,
+  },
+  quickActionLabel: {
+    fontSize: theme.typography.bodySm.fontSize,
     fontWeight: "700",
-    letterSpacing: 0.8,
+    color: theme.colors.text,
+  },
+  nextRoundSection: {
+    marginBottom: 26,
+  },
+  nextRoundHeader: {
+    marginBottom: 10,
+  },
+  nextRoundTitle: {
+    fontSize: theme.typography.h4.fontSize,
+    lineHeight: theme.typography.h4.lineHeight,
+    fontWeight: theme.typography.h4.fontWeight,
+    color: theme.colors.text,
+  },
+  nextRoundCard: {
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary,
+    borderRadius: theme.radius.lg,
+    overflow: "hidden",
+    shadowColor: theme.colors.shadow,
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
+  },
+  nextRoundCardBody: {
+    padding: 16,
+  },
+  nextRoundCourseRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  nextRoundCourseName: {
+    fontSize: theme.typography.title.fontSize,
+    lineHeight: theme.typography.title.lineHeight,
+    fontWeight: theme.typography.title.fontWeight,
+    color: theme.colors.primary,
+    flex: 1,
+  },
+  nextRoundTimeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  nextRoundPlayersRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+  nextRoundIcon: {
+    marginRight: 8,
+  },
+  nextRoundTimeText: {
+    fontSize: theme.typography.body.fontSize,
+    color: theme.colors.textSoft,
+    fontWeight: "500",
+  },
+  nextRoundActions: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  nextRoundBtn: {
+    flex: 1,
+    height: 38,
+    borderRadius: theme.radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
+  },
+  nextRoundBtnPrimary: {
+    backgroundColor: theme.colors.primary,
+  },
+  nextRoundBtnSecondary: {
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1.5,
+    borderColor: theme.colors.borderStrong,
+  },
+  nextRoundBtnTextPrimary: {
+    color: theme.colors.surface,
+    fontWeight: "700",
+    fontSize: theme.typography.bodySm.fontSize,
+  },
+  nextRoundBtnTextSecondary: {
+    color: theme.colors.primary,
+    fontWeight: "700",
+    fontSize: theme.typography.bodySm.fontSize,
+  },
+  nextRoundCardEmpty: {
+    backgroundColor: theme.colors.surfaceSoft,
+    borderWidth: 1,
+    borderColor: theme.colors.borderSoft,
+    borderRadius: theme.radius.lg,
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  nextRoundEmptyContent: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  nextRoundEmptyTextCol: {
+    flex: 1,
+    gap: 2,
+  },
+  nextRoundEmptyTitle: {
+    fontSize: theme.typography.title.fontSize,
+    fontWeight: theme.typography.title.fontWeight,
+    color: theme.colors.text,
+  },
+  nextRoundEmptyDesc: {
+    fontSize: theme.typography.bodySm.fontSize,
+    lineHeight: theme.typography.bodySm.lineHeight,
+    color: theme.colors.textSoft,
+  },
+  nextRoundEmptyBookBtn: {
+    paddingHorizontal: 16,
+    height: 36,
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  nextRoundEmptyBookBtnText: {
+    color: theme.colors.surface,
+    fontWeight: "700",
+    fontSize: theme.typography.bodySm.fontSize,
   },
 });

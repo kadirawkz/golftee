@@ -29,8 +29,13 @@ It uses Supabase for authentication, profiles, favorites, course catalog data, t
 - Run iOS: `npm run ios`
 - Run web: `npm run web`
 - Lint: `npm run lint`
+- Typecheck: `npm run typecheck`
 
-Note: There is currently no test runner configured in this repository.
+## CI/CD Pipeline
+
+This repository has a GitHub Actions CI pipeline configured at [.github/workflows/ci.yml](.github/workflows/ci.yml). The pipeline automatically runs ESLint (`npm run lint`) and TypeScript verification (`npm run typecheck`) on:
+- Every push to the `main` branch.
+- All Pull Requests targeting the `main` branch.
 
 ## Git hygiene
 
@@ -40,10 +45,8 @@ This repo normalizes text files with [.gitattributes](.gitattributes), so line-e
 
 1. Create a Supabase project.
 2. In Supabase SQL editor, execute the following scripts in order:
-   - [supabase/schema.sql](supabase/schema.sql) (Initial structure)
-   - [supabase/migrations/20240516_normalization_3nf.sql](supabase/migrations/20240516_normalization_3nf.sql) (3NF normalization)
-   - [supabase/migrations/20240516_cleanup_legacy.sql](supabase/migrations/20240516_cleanup_legacy.sql) (Legacy cleanup)
-   - [supabase/seed_courses.sql](supabase/seed_courses.sql) (Professional course data)
+   - [supabase/schema.sql](supabase/schema.sql) (Database structure, RLS policies, and RPC functions)
+   - [supabase/seed.sql](supabase/seed.sql) (Professional course data and templates)
 3. Copy [.env.example](.env.example) to `.env`.
 4. Set your credentials in `.env`:
 
@@ -71,7 +74,7 @@ Run from project root:
 
 ```bash
 npm run lint
-npx tsc --noEmit
+npm run typecheck
 npm audit --omit=dev
 git status --short
 ```

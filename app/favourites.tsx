@@ -27,7 +27,7 @@ export default function FavouritesScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
+    <SafeAreaView style={styles.screen} edges={["bottom"]}>
       <StatusBar style="dark" />
 
       <ScrollView

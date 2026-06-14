@@ -22,7 +22,7 @@ export default function BookingHistoryScreen() {
     : 0;
 
   return (
-    <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
+    <SafeAreaView style={styles.screen} edges={["bottom"]}>
       <StatusBar style="dark" />
 
       <ScrollView

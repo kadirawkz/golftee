@@ -84,12 +84,19 @@ yarn-error.log*
 lerna-debug.log*
 .pnpm-debug.log*
 
+# Secrets, Credentials & Local configs
+local.properties
+**/local.properties
+
 # local env files
 .env
 .env.*
 .env*.local
 .envrc
 !.env.example
+**/.env
+**/.env.*
+**/.env*.local
 
 # Supabase local state
 .supabase/

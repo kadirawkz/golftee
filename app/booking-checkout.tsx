@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ActivityIndicator, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
@@ -48,6 +49,22 @@ export default function BookingCheckoutScreen() {
   }>();
 
   const [selectedPayment, setSelectedPayment] = useState<"wallet" | "card">("wallet");
+
+  // Load preferred payment method from App Settings
+  useEffect(() => {
+    const loadDefaultPayment = async () => {
+      try {
+        const val = await AsyncStorage.getItem("golftee:settings:default_payment");
+        if (val === "wallet" || val === "card") {
+          setSelectedPayment(val);
+        }
+      } catch (err) {
+        console.warn("Failed to load default payment method", err);
+      }
+    };
+    loadDefaultPayment();
+  }, []);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -126,7 +143,7 @@ export default function BookingCheckoutScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
+    <SafeAreaView style={styles.screen} edges={["bottom"]}>
       <StatusBar style="dark" />
       <ScrollView
         showsVerticalScrollIndicator={false}

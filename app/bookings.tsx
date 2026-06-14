@@ -1,13 +1,24 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Animated,
+  Easing,
+  LayoutAnimation,
+  Linking,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
 import {
-  formatBookingDate,
   formatBookingDateTime,
   getBookingTotal,
   isHistoricalBooking,
@@ -19,51 +30,246 @@ import { useResponsiveLayout } from "../components/responsive-layout";
 import { theme } from "../components/theme";
 import { getCourseImage } from "../lib/image-mapping";
 
+const SEGMENTED_CONTROL_PADDING = 4;
+
+type WeatherInfo = {
+  temp: number;
+  description: string;
+};
+
+// Custom Toast component for visual feedback
+function Toast({ message, visible, onHide }: { message: string; visible: boolean; onHide: () => void }) {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.sequence([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+        Animated.delay(2000),
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        onHide();
+      });
+    }
+  }, [visible, fadeAnim, onHide]);
+
+  if (!visible) return null;
+
+  return (
+    <Animated.View style={[styles.toastContainer, { opacity: fadeAnim }]}>
+      <Ionicons name="checkmark-circle" size={18} color={theme.colors.successText} />
+      <Text style={styles.toastText}>{message}</Text>
+    </Animated.View>
+  );
+}
+
+function WeatherWidget({ lat, lon, date }: { lat: number; lon: number; date: string }) {
+  const [weather, setWeather] = useState<WeatherInfo | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const fetchWeather = async () => {
+      setLoading(true);
+      try {
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weathercode,temperature_2m_max&timezone=auto&start_date=${date}&end_date=${date}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (!active) return;
+        if (data?.daily?.temperature_2m_max?.[0] !== undefined) {
+          const temp = data.daily.temperature_2m_max[0];
+          const code = data.daily.weathercode[0];
+          let description = "Clear";
+          if (code >= 1 && code <= 3) description = "Partly Cloudy";
+          else if (code >= 45 && code <= 48) description = "Foggy";
+          else if (code >= 51 && code <= 67) description = "Rainy";
+          else if (code >= 71 && code <= 77) description = "Snowy";
+          else if (code >= 80 && code <= 82) description = "Showers";
+          else if (code >= 95) description = "Stormy";
+
+          setWeather({ temp, description });
+        }
+      } catch (err) {
+        console.warn("Weather fetch failed", err);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    fetchWeather();
+    return () => {
+      active = false;
+    };
+  }, [lat, lon, date]);
+
+  if (loading) {
+    return (
+      <View style={styles.weatherRow}>
+        <ActivityIndicator size="small" color={theme.colors.primary} />
+        <Text style={styles.weatherText}>Fetching weather forecast...</Text>
+      </View>
+    );
+  }
+
+  if (!weather) return null;
+
+  // Choose icon based on weather description
+  let weatherIcon: "sunny" | "cloudy" | "rainy" | "thunderstorm" | "snow" = "sunny";
+  if (weather.description.includes("Cloudy") || weather.description.includes("Foggy")) {
+    weatherIcon = "cloudy";
+  } else if (weather.description.includes("Rainy") || weather.description.includes("Showers")) {
+    weatherIcon = "rainy";
+  } else if (weather.description.includes("Stormy")) {
+    weatherIcon = "thunderstorm";
+  } else if (weather.description.includes("Snowy")) {
+    weatherIcon = "snow";
+  }
+
+  return (
+    <View style={styles.weatherRow}>
+      <Ionicons name={weatherIcon} size={14} color={theme.colors.accentWarm} />
+      <Text style={styles.weatherText}>
+        Forecast: {weather.temp}°C • {weather.description}
+      </Text>
+    </View>
+  );
+}
+
 function BookingCard({
-  bookingId,
-  courseId,
-  dateTime,
-  players,
-  status,
+  booking,
   onPressManage,
+  showToast,
 }: {
-  bookingId: string;
-  courseId: string;
-  dateTime: string;
-  players: number;
-  status: string;
+  booking: any;
   onPressManage: (bookingId: string) => void;
+  showToast: (msg: string) => void;
 }) {
-  const course = getManagedCourseById(courseId);
+  const router = useRouter();
+  const course = getManagedCourseById(booking.course_id);
+
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: `Tee time booked at ${course.title} on ${formatBookingDateTime(booking)} for ${booking.players} players. Let's play!`,
+      });
+      showToast("Tee time details shared!");
+    } catch (err) {
+      console.warn("Share failed", err);
+    }
+  };
+
+  const handleGetDirections = () => {
+    const lat = course.coordinates?.latitude ?? 6.9271;
+    const lon = course.coordinates?.longitude ?? 79.8612;
+    const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+    Linking.openURL(url);
+    showToast("Opening directions in Maps...");
+  };
+
+  const handleAddToCalendar = () => {
+    const start = new Date(`${booking.tee_date}T${booking.tee_time}`);
+    const end = new Date(start.getTime() + 4 * 60 * 60 * 1000); // 4 hour duration
+    const formatUtc = (d: Date) => d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+    const calUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(
+      "Tee Time at " + course.title
+    )}&dates=${formatUtc(start)}/${formatUtc(end)}&details=${encodeURIComponent(
+      "Tee time booking at " + course.title + " for " + booking.players + " players."
+    )}&location=${encodeURIComponent(course.location)}`;
+    Linking.openURL(calUrl);
+    showToast("Opening Calendar...");
+  };
+
+  const isUpcoming = isUpcomingBooking(booking);
 
   return (
     <View style={styles.bookingCard}>
       <View style={styles.bookingImageWrap}>
         <AppImage source={getCourseImage(course.image)} style={styles.bookingImage} />
-        <Text style={styles.confirmedBadge}>{status.toUpperCase()}</Text>
+        <Text style={[styles.confirmedBadge, booking.status === "cancelled" && styles.cancelledBadge]}>
+          {booking.status.toUpperCase()}
+        </Text>
       </View>
 
       <View style={styles.bookingBody}>
-        <Text style={styles.bookingTitle}>{course.title}</Text>
+        <View style={styles.cardHeaderRow}>
+          <Text style={styles.bookingTitle}>{course.title}</Text>
+          {isUpcoming && (
+            <Pressable style={styles.shareButton} onPress={handleShare} variant="icon">
+              <Ionicons name="share-social-outline" size={20} color={theme.colors.primary} />
+            </Pressable>
+          )}
+        </View>
+
         <View style={styles.bookingLocationRow}>
           <Ionicons name="location" size={12} color={theme.colors.textSoft} />
           <Text style={styles.bookingLocation}>{course.location}</Text>
         </View>
 
+        {isUpcoming && course.coordinates && (
+          <WeatherWidget
+            lat={course.coordinates.latitude}
+            lon={course.coordinates.longitude}
+            date={booking.tee_date}
+          />
+        )}
+
         <View style={styles.bookingMetaPanel}>
           <View>
             <Text style={styles.metaLabel}>DATE & TIME</Text>
-            <Text style={styles.metaValue}>{dateTime}</Text>
+            <Text style={styles.metaValue}>{formatBookingDateTime(booking)}</Text>
           </View>
           <View style={styles.metaRight}>
             <Text style={styles.metaLabel}>PLAYERS</Text>
-            <Text style={styles.metaValue}>{players} People</Text>
+            <Text style={styles.metaValue}>{booking.players} People</Text>
           </View>
         </View>
 
-        <Pressable style={styles.manageButton} onPress={() => onPressManage(bookingId)} variant="cta">
-          <Text style={styles.manageButtonText}>Manage Booking</Text>
-        </Pressable>
+        {isUpcoming ? (
+          <View style={styles.actionRow}>
+            <Pressable style={[styles.actionBtn, styles.borderBtn]} onPress={handleGetDirections} variant="chip">
+              <Ionicons name="map-outline" size={16} color={theme.colors.primary} />
+              <Text style={styles.actionBtnText}>Directions</Text>
+            </Pressable>
+
+            <Pressable style={[styles.actionBtn, styles.borderBtn]} onPress={handleAddToCalendar} variant="chip">
+              <Ionicons name="calendar-outline" size={16} color={theme.colors.primary} />
+              <Text style={styles.actionBtnText}>Calendar</Text>
+            </Pressable>
+
+            <Pressable style={[styles.actionBtn, styles.primaryBtn]} onPress={() => onPressManage(booking.id)} variant="cta">
+              <Text style={styles.primaryBtnText}>Manage</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.actionRow}>
+            <View>
+              <Text style={styles.metaLabel}>TOTAL PAID</Text>
+              <Text style={styles.historyPrice}>${getBookingTotal(booking).toFixed(2)}</Text>
+            </View>
+
+            <Pressable
+              style={[styles.actionBtn, styles.primaryBtn, { flex: 0, paddingHorizontal: 20 }]}
+              onPress={() =>
+                router.push({
+                  pathname: "/tee-time-booking",
+                  params: { courseId: course.id },
+                })
+              }
+              variant="cta"
+            >
+              <Ionicons name="refresh" size={16} color={theme.colors.surface} />
+              <Text style={styles.primaryBtnText}>Book Again</Text>
+            </Pressable>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -73,21 +279,227 @@ export default function BookingsScreen() {
   const router = useRouter();
   const { horizontalPadding, screenBottomPadding } = useResponsiveLayout();
   const bookingState = useBookingState();
-  const upcomingBookings = bookingState.bookings.filter(isUpcomingBooking);
-  const historyBookings = bookingState.bookings.filter(isHistoricalBooking).slice(-3).reverse();
 
-  const handleManageBooking = useCallback((bookingId: string) => {
-    router.push({
-      pathname: "/manage-booking",
-      params: {
-        bookingId,
+  const [activeTab, setActiveTab] = useState<"upcoming" | "history" | "insights">("upcoming");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [segmentWidth, setSegmentWidth] = useState(0);
+
+  const [toastMessage, setToastMessage] = useState("");
+  const [toastVisible, setToastVisible] = useState(false);
+
+  const segmentProgress = useRef(new Animated.Value(0)).current;
+
+  const showToast = useCallback((msg: string) => {
+    setToastMessage(msg);
+    setToastVisible(true);
+  }, []);
+
+  useEffect(() => {
+    let toValue = 0;
+    if (activeTab === "history") toValue = 1;
+    else if (activeTab === "insights") toValue = 2;
+
+    Animated.timing(segmentProgress, {
+      toValue,
+      duration: 180,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [activeTab, segmentProgress]);
+
+  const handleTabChange = (nextTab: "upcoming" | "history" | "insights") => {
+    if (nextTab === activeTab) return;
+
+    LayoutAnimation.configureNext({
+      duration: 180,
+      create: {
+        type: LayoutAnimation.Types.easeInEaseOut,
+        property: LayoutAnimation.Properties.opacity,
+      },
+      update: {
+        type: LayoutAnimation.Types.easeInEaseOut,
       },
     });
-  }, [router]);
+
+    setActiveTab(nextTab);
+    setSearchQuery("");
+    setStatusFilter("all");
+  };
+
+  const handleManageBooking = useCallback(
+    (bookingId: string) => {
+      router.push({
+        pathname: "/manage-booking",
+        params: { bookingId },
+      });
+    },
+    [router]
+  );
+
+  // Filter Bookings logic
+  const upcomingBookings = useMemo(() => {
+    return bookingState.bookings.filter(isUpcomingBooking);
+  }, [bookingState.bookings]);
+
+  const historyBookings = useMemo(() => {
+    return bookingState.bookings.filter(isHistoricalBooking).reverse();
+  }, [bookingState.bookings]);
+
+  const filteredUpcoming = useMemo(() => {
+    return upcomingBookings.filter((b) => {
+      const course = getManagedCourseById(b.course_id);
+      const matchesSearch =
+        course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        course.location.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesStatus = statusFilter === "all" || b.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [upcomingBookings, searchQuery, statusFilter]);
+
+  const filteredHistory = useMemo(() => {
+    return historyBookings.filter((b) => {
+      const course = getManagedCourseById(b.course_id);
+      const matchesSearch =
+        course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        course.location.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesStatus = statusFilter === "all" || b.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [historyBookings, searchQuery, statusFilter]);
+
+  // Aggregate Insights stats
+  const insightsStats = useMemo(() => {
+    const completedOrPast = bookingState.bookings.filter((b) => b.status === "completed" || isHistoricalBooking(b));
+    const totalSpent = completedOrPast.reduce((sum, b) => sum + getBookingTotal(b), 0);
+    const roundsPlayed = completedOrPast.filter((b) => b.status === "completed" || b.status === "confirmed").length;
+
+    // Calculate favorite course
+    const counts: Record<string, number> = {};
+    completedOrPast.forEach((b) => {
+      counts[b.course_id] = (counts[b.course_id] || 0) + 1;
+    });
+    let favCourseId = "";
+    let maxCount = 0;
+    Object.keys(counts).forEach((cid) => {
+      if (counts[cid] > maxCount) {
+        maxCount = counts[cid];
+        favCourseId = cid;
+      }
+    });
+
+    const favCourse = favCourseId ? getManagedCourseById(favCourseId) : null;
+
+    return {
+      totalSpent,
+      roundsPlayed,
+      favCourse,
+      favCount: maxCount,
+    };
+  }, [bookingState.bookings]);
+
+  // Tab indicator translation logic
+  const segmentIndicatorWidth = Math.max((segmentWidth - SEGMENTED_CONTROL_PADDING * 2) / 3, 0);
+  const segmentIndicatorTranslateX = segmentProgress.interpolate({
+    inputRange: [0, 1, 2],
+    outputRange: [0, segmentIndicatorWidth, segmentIndicatorWidth * 2],
+  });
 
   return (
-    <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
+    <SafeAreaView style={styles.screen} edges={["bottom"]}>
       <StatusBar style="dark" />
+
+      {/* Segmented Tab Control */}
+      <View style={[styles.headerContainer, { paddingHorizontal: horizontalPadding }]}>
+        <View style={styles.segmentedWrap} onLayout={(e) => setSegmentWidth(e.nativeEvent.layout.width)}>
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.segmentIndicator,
+              {
+                width: segmentIndicatorWidth,
+                transform: [{ translateX: segmentIndicatorTranslateX }],
+              },
+            ]}
+          />
+          <Pressable
+            style={[styles.segmentButton, activeTab === "upcoming" && styles.segmentButtonActive]}
+            onPress={() => handleTabChange("upcoming")}
+            variant="tab"
+          >
+            <Text style={[styles.segmentText, activeTab === "upcoming" && styles.segmentTextActive]}>Upcoming</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.segmentButton, activeTab === "history" && styles.segmentButtonActive]}
+            onPress={() => handleTabChange("history")}
+            variant="tab"
+          >
+            <Text style={[styles.segmentText, activeTab === "history" && styles.segmentTextActive]}>History</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.segmentButton, activeTab === "insights" && styles.segmentButtonActive]}
+            onPress={() => handleTabChange("insights")}
+            variant="tab"
+          >
+            <Text style={[styles.segmentText, activeTab === "insights" && styles.segmentTextActive]}>Insights</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      {/* Filter / Search Bar for lists */}
+      {activeTab !== "insights" && (
+        <View style={[styles.searchFilterContainer, { paddingHorizontal: horizontalPadding }]}>
+          <View style={styles.searchBarWrap}>
+            <Ionicons name="search" size={18} color={theme.colors.muted} style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search by course or location..."
+              placeholderTextColor={theme.colors.muted}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery.length > 0 && (
+              <Pressable onPress={() => setSearchQuery("")} variant="icon">
+                <Ionicons name="close-circle" size={16} color={theme.colors.muted} />
+              </Pressable>
+            )}
+          </View>
+
+          {/* Quick Filters */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterChipsRow}>
+            <Pressable
+              style={[styles.filterChip, statusFilter === "all" && styles.filterChipActive]}
+              onPress={() => setStatusFilter("all")}
+              variant="chip"
+            >
+              <Text style={[styles.filterChipText, statusFilter === "all" && styles.filterChipTextActive]}>All Status</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.filterChip, statusFilter === "confirmed" && styles.filterChipActive]}
+              onPress={() => setStatusFilter("confirmed")}
+              variant="chip"
+            >
+              <Text style={[styles.filterChipText, statusFilter === "confirmed" && styles.filterChipTextActive]}>Confirmed</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.filterChip, statusFilter === "cancelled" && styles.filterChipActive]}
+              onPress={() => setStatusFilter("cancelled")}
+              variant="chip"
+            >
+              <Text style={[styles.filterChipText, statusFilter === "cancelled" && styles.filterChipTextActive]}>Cancelled</Text>
+            </Pressable>
+            {activeTab === "history" && (
+              <Pressable
+                style={[styles.filterChip, statusFilter === "completed" && styles.filterChipActive]}
+                onPress={() => setStatusFilter("completed")}
+                variant="chip"
+              >
+                <Text style={[styles.filterChipText, statusFilter === "completed" && styles.filterChipTextActive]}>Completed</Text>
+              </Pressable>
+            )}
+          </ScrollView>
+        </View>
+      )}
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -98,81 +510,117 @@ export default function BookingsScreen() {
         bounces={false}
         overScrollMode="never"
       >
-        <View style={styles.sectionWrap}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Upcoming Bookings</Text>
-            <Text style={styles.sectionRightText}>{upcomingBookings.length} Rounds Scheduled</Text>
-          </View>
+        {bookingState.loading && (
+          <ActivityIndicator size="large" color={theme.colors.primary} style={{ marginTop: 24 }} />
+        )}
 
-          {!bookingState.initialized || bookingState.loading ? (
-            <Text style={styles.emptyText}>Loading your bookings...</Text>
-          ) : null}
-          {bookingState.error ? <Text style={styles.emptyText}>{bookingState.error}</Text> : null}
-
-          {upcomingBookings.map((booking) => (
-            <BookingCard
-              key={booking.id}
-              bookingId={booking.id}
-              courseId={booking.course_id}
-              dateTime={formatBookingDateTime(booking)}
-              players={booking.players}
-              status={booking.status}
-              onPressManage={handleManageBooking}
-            />
-          ))}
-
-          {bookingState.initialized && !bookingState.loading && !upcomingBookings.length ? (
-            <Text style={styles.emptyText}>No upcoming bookings yet. Book a tee time to get started.</Text>
-          ) : null}
-        </View>
-
-
-        <View style={styles.sectionWrap}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Booking History</Text>
-            <Pressable style={styles.viewAllButton} onPress={() => router.push("/booking-history")} variant="chip">
-              <Text style={styles.viewAllText}>View All</Text>
-              <Ionicons name="arrow-forward" size={14} color={theme.colors.primary} />
-            </Pressable>
-          </View>
-
-          <View style={styles.historyList}>
-            {historyBookings.map((booking) => {
-              const course = getManagedCourseById(booking.course_id);
-
-              return (
-                <Pressable
+        {/* Tab 1: Upcoming */}
+        {activeTab === "upcoming" && !bookingState.loading && (
+          <View style={styles.sectionWrap}>
+            {filteredUpcoming.length > 0 ? (
+              filteredUpcoming.map((booking) => (
+                <BookingCard
                   key={booking.id}
-                  style={styles.historyItem}
-                  onPress={() => router.push({ pathname: "/manage-booking", params: { bookingId: booking.id } })}
-                  variant="card"
+                  booking={booking}
+                  onPressManage={handleManageBooking}
+                  showToast={showToast}
+                />
+              ))
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="calendar-outline" size={48} color={theme.colors.muted} />
+                <Text style={styles.emptyTextTitle}>No upcoming bookings</Text>
+                <Text style={styles.emptyTextDesc}>Book a tee time now and enjoy your game.</Text>
+                <Pressable
+                  style={styles.bookTeeTimeBtn}
+                  onPress={() => router.push("/home")}
+                  variant="cta"
                 >
-                  <View style={styles.historyLeft}>
-                    <View style={styles.historyIconWrap}>
-                      <Ionicons
-                        name={booking.status === "cancelled" ? "close-circle" : "golf"}
-                        size={18}
-                        color={theme.colors.primary}
-                      />
-                    </View>
-                    <View>
-                      <Text style={styles.historyName}>{course.title}</Text>
-                      <Text style={styles.historyDate}>{formatBookingDate(booking.tee_date)}</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.historyRight}>
-                    <Text style={styles.metaLabel}>TOTAL</Text>
-                    <Text style={styles.historyPrice}>${getBookingTotal(booking).toFixed(2)}</Text>
-                  </View>
-
-                  <Ionicons name="chevron-forward" size={16} color={theme.colors.muted} />
+                  <Text style={styles.bookTeeTimeText}>Book a Tee Time</Text>
                 </Pressable>
-              );
-            })}
+              </View>
+            )}
           </View>
-        </View>
+        )}
+
+        {/* Tab 2: History */}
+        {activeTab === "history" && !bookingState.loading && (
+          <View style={styles.sectionWrap}>
+            {filteredHistory.length > 0 ? (
+              filteredHistory.map((booking) => (
+                <BookingCard
+                  key={booking.id}
+                  booking={booking}
+                  onPressManage={handleManageBooking}
+                  showToast={showToast}
+                />
+              ))
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="journal-outline" size={48} color={theme.colors.muted} />
+                <Text style={styles.emptyTextTitle}>No history found</Text>
+                <Text style={styles.emptyTextDesc}>Your completed or cancelled rounds will appear here.</Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Tab 3: Insights Dashboard */}
+        {activeTab === "insights" && (
+          <View style={styles.insightsContainer}>
+            <Text style={styles.insightsHeadline}>Your Performance & Stats</Text>
+
+            <View style={styles.statsGrid}>
+              <View style={styles.statBox}>
+                <Ionicons name="golf-outline" size={24} color={theme.colors.primary} />
+                <Text style={styles.statNumber}>{insightsStats.roundsPlayed}</Text>
+                <Text style={styles.statLabel}>Rounds Played</Text>
+              </View>
+              <View style={styles.statBox}>
+                <Ionicons name="card-outline" size={24} color={theme.colors.accentWarm} />
+                <Text style={styles.statNumber}>${insightsStats.totalSpent.toFixed(0)}</Text>
+                <Text style={styles.statLabel}>Total Spend</Text>
+              </View>
+            </View>
+
+            {insightsStats.favCourse ? (
+              <View style={styles.favoriteCourseCard}>
+                <Text style={styles.favoriteCourseTag}>FAVOURITE COURSE</Text>
+                <AppImage source={getCourseImage(insightsStats.favCourse.image)} style={styles.favCourseImage} />
+                <View style={styles.favCourseDetails}>
+                  <Text style={styles.favCourseTitle}>{insightsStats.favCourse.title}</Text>
+                  <Text style={styles.favCourseLocation}>{insightsStats.favCourse.location}</Text>
+                  <View style={styles.favCourseStatRow}>
+                    <Ionicons name="repeat" size={14} color={theme.colors.accentWarm} />
+                    <Text style={styles.favCourseStatText}>Played {insightsStats.favCount} times</Text>
+                  </View>
+                  <Pressable
+                    style={styles.bookFavBtn}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/tee-time-booking",
+                        params: { courseId: insightsStats.favCourse!.id },
+                      })
+                    }
+                    variant="cta"
+                  >
+                    <Text style={styles.bookFavText}>Book Again</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="analytics-outline" size={48} color={theme.colors.muted} />
+                <Text style={styles.emptyTextTitle}>Insights Unavailable</Text>
+                <Text style={styles.emptyTextDesc}>Complete some rounds to see your personal statistics here.</Text>
+              </View>
+            )}
+          </View>
+        )}
       </ScrollView>
+
+      {/* Floating Toast Notification */}
+      <Toast message={toastMessage} visible={toastVisible} onHide={() => setToastVisible(false)} />
     </SafeAreaView>
   );
 }
@@ -182,56 +630,121 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
+  headerContainer: {
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
   scrollContent: {
-    paddingHorizontal: 16,
     paddingTop: 10,
-    paddingBottom: 160,
     gap: 16,
   },
-  sectionWrap: {
-    gap: 10,
-  },
-  sectionHeaderRow: {
+  segmentedWrap: {
+    position: "relative",
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    borderRadius: 16,
+    padding: SEGMENTED_CONTROL_PADDING,
+    backgroundColor: theme.colors.surfaceSoft,
+    borderWidth: 1,
+    borderColor: theme.colors.borderSoft,
   },
-  viewAllButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-    alignSelf: "flex-end",
-    paddingHorizontal: 11,
-    height: 36,
+  segmentIndicator: {
+    position: "absolute",
+    top: SEGMENTED_CONTROL_PADDING,
+    bottom: SEGMENTED_CONTROL_PADDING,
+    left: SEGMENTED_CONTROL_PADDING,
     borderRadius: theme.radius.pill,
     backgroundColor: theme.colors.surface,
-    borderWidth: 2,
-    borderColor: theme.colors.border,
+    borderWidth: 1,
+    borderColor: theme.colors.borderSoft,
+    shadowColor: theme.colors.shadow,
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  viewAllText: {
-    fontSize: theme.typography.bodySm.fontSize,
-    lineHeight: theme.typography.bodySm.lineHeight,
-    fontWeight: "700",
+  segmentButton: {
+    flex: 1,
+    borderRadius: theme.radius.pill,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1,
+  },
+  segmentButtonActive: {
+    backgroundColor: "transparent",
+  },
+  segmentText: {
+    fontSize: theme.typography.subtitle.fontSize,
+    lineHeight: theme.typography.subtitle.lineHeight,
+    fontWeight: "600",
+    color: theme.colors.textSoft,
+  },
+  segmentTextActive: {
     color: theme.colors.primary,
+    fontWeight: "700",
   },
-  sectionTitle: {
-    fontSize: theme.typography.title.fontSize,
-    lineHeight: theme.typography.title.lineHeight,
+  searchFilterContainer: {
+    marginTop: 8,
+    gap: 8,
+  },
+  searchBarWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: theme.colors.surfaceSoft,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 12,
+    height: 44,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
     color: theme.colors.text,
+    fontSize: theme.typography.body.fontSize,
+    paddingVertical: 0,
+  },
+  filterChipsRow: {
+    gap: 8,
+    paddingVertical: 4,
+  },
+  filterChip: {
+    height: 32,
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.surface,
+  },
+  filterChipActive: {
+    backgroundColor: theme.colors.primarySoft,
+    borderColor: theme.colors.primary,
+  },
+  filterChipText: {
+    fontSize: theme.typography.bodySm.fontSize,
+    color: theme.colors.textSoft,
+    fontWeight: "600",
+  },
+  filterChipTextActive: {
+    color: theme.colors.primary,
     fontWeight: "700",
   },
-  sectionRightText: {
-    fontSize: theme.typography.bodySm.fontSize,
-    lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.accentWarm,
-    fontWeight: "700",
+  sectionWrap: {
+    gap: 16,
   },
   bookingCard: {
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: "hidden",
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
+    shadowColor: theme.colors.shadow,
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 1,
   },
   bookingImageWrap: {
     height: 140,
@@ -243,27 +756,44 @@ const styles = StyleSheet.create({
   },
   confirmedBadge: {
     position: "absolute",
-    top: 10,
-    left: 10,
+    top: 12,
+    left: 12,
     backgroundColor: theme.colors.primary,
     color: theme.colors.surface,
     fontSize: theme.typography.caption.fontSize,
-    lineHeight: theme.typography.caption.lineHeight,
     fontWeight: "700",
     letterSpacing: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
     borderRadius: 999,
   },
+  cancelledBadge: {
+    backgroundColor: theme.colors.danger,
+  },
   bookingBody: {
-    padding: 12,
-    gap: 10,
+    padding: 16,
+    gap: 12,
+  },
+  cardHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   bookingTitle: {
     fontSize: theme.typography.h3.fontSize,
-    lineHeight: theme.typography.h3.lineHeight,
-    color: theme.colors.text,
     fontWeight: "800",
+    color: theme.colors.text,
+    flex: 1,
+  },
+  shareButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.surface,
   },
   bookingLocationRow: {
     flexDirection: "row",
@@ -272,16 +802,30 @@ const styles = StyleSheet.create({
   },
   bookingLocation: {
     fontSize: theme.typography.bodySm.fontSize,
-    lineHeight: theme.typography.bodySm.lineHeight,
     color: theme.colors.textSoft,
   },
+  weatherRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: theme.colors.primarySoft,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignSelf: "flex-start",
+  },
+  weatherText: {
+    fontSize: theme.typography.bodySm.fontSize,
+    color: theme.colors.primary,
+    fontWeight: "600",
+  },
   bookingMetaPanel: {
-    borderRadius: 10,
+    borderRadius: 12,
     backgroundColor: theme.colors.surfaceSoft,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -291,82 +835,198 @@ const styles = StyleSheet.create({
   },
   metaLabel: {
     fontSize: theme.typography.caption.fontSize,
-    lineHeight: theme.typography.caption.lineHeight,
     color: theme.colors.accentWarm,
     letterSpacing: 0.9,
     fontWeight: "700",
+    marginBottom: 2,
   },
   metaValue: {
     fontSize: theme.typography.body.fontSize,
-    lineHeight: theme.typography.body.lineHeight,
     color: theme.colors.text,
     fontWeight: "700",
   },
-  manageButton: {
-    height: 46,
-    borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  manageButtonText: {
-    color: theme.colors.surface,
-    fontSize: theme.typography.subtitle.fontSize,
-    lineHeight: theme.typography.subtitle.lineHeight,
-    fontWeight: "700",
-  },
-  historyList: {
-    gap: 8,
-  },
-  historyItem: {
-    borderRadius: 10,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    padding: 10,
+  actionRow: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     gap: 8,
-  },
-  historyLeft: {
-    flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    marginTop: 4,
+  },
+  actionBtn: {
     flex: 1,
-  },
-  historyIconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 8,
-    backgroundColor: theme.colors.surfaceSoft,
+    height: 40,
+    borderRadius: theme.radius.pill,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 6,
   },
-  historyName: {
-    fontSize: theme.typography.body.fontSize,
-    lineHeight: theme.typography.body.lineHeight,
-    color: theme.colors.text,
+  borderBtn: {
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary,
+    backgroundColor: "transparent",
+  },
+  primaryBtn: {
+    backgroundColor: theme.colors.primary,
+  },
+  actionBtnText: {
+    fontSize: theme.typography.bodySm.fontSize,
     fontWeight: "700",
+    color: theme.colors.primary,
   },
-  historyDate: {
-    fontSize: theme.typography.caption.fontSize,
-    lineHeight: theme.typography.caption.lineHeight,
-    color: theme.colors.textSoft,
-  },
-  historyRight: {
-    alignItems: "flex-end",
+  primaryBtnText: {
+    fontSize: theme.typography.bodySm.fontSize,
+    fontWeight: "700",
+    color: theme.colors.surface,
   },
   historyPrice: {
     fontSize: theme.typography.title.fontSize,
-    lineHeight: theme.typography.title.lineHeight,
     color: theme.colors.accentWarm,
     fontWeight: "800",
   },
-  emptyText: {
+  emptyContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 48,
+    gap: 12,
+  },
+  emptyTextTitle: {
+    fontSize: theme.typography.h3.fontSize,
+    fontWeight: "700",
+    color: theme.colors.text,
+    marginTop: 8,
+  },
+  emptyTextDesc: {
+    fontSize: theme.typography.body.fontSize,
+    color: theme.colors.textSoft,
+    textAlign: "center",
+    maxWidth: 240,
+  },
+  bookTeeTimeBtn: {
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: 20,
+    height: 44,
+    borderRadius: theme.radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 8,
+  },
+  bookTeeTimeText: {
+    color: theme.colors.surface,
+    fontSize: theme.typography.body.fontSize,
+    fontWeight: "700",
+  },
+  insightsContainer: {
+    gap: 16,
+  },
+  insightsHeadline: {
+    fontSize: theme.typography.h2.fontSize,
+    fontWeight: "800",
+    color: theme.colors.text,
+  },
+  statsGrid: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  statBox: {
+    flex: 1,
+    backgroundColor: theme.colors.surfaceSoft,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 16,
+    padding: 16,
+    alignItems: "center",
+    gap: 4,
+  },
+  statNumber: {
+    fontSize: theme.typography.displayS.fontSize,
+    fontWeight: "900",
+    color: theme.colors.primary,
+  },
+  statLabel: {
     fontSize: theme.typography.bodySm.fontSize,
-    lineHeight: theme.typography.bodySm.lineHeight,
     color: theme.colors.textSoft,
     fontWeight: "600",
+  },
+  favoriteCourseCard: {
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 20,
+    overflow: "hidden",
+  },
+  favoriteCourseTag: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    backgroundColor: theme.colors.accentSoft,
+    color: theme.colors.accentWarm,
+    fontSize: theme.typography.caption.fontSize,
+    fontWeight: "800",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: theme.radius.pill,
+    zIndex: 1,
+  },
+  favCourseImage: {
+    width: "100%",
+    height: 160,
+  },
+  favCourseDetails: {
+    padding: 16,
+    gap: 8,
+  },
+  favCourseTitle: {
+    fontSize: theme.typography.h3.fontSize,
+    fontWeight: "800",
+    color: theme.colors.text,
+  },
+  favCourseLocation: {
+    fontSize: theme.typography.bodySm.fontSize,
+    color: theme.colors.textSoft,
+  },
+  favCourseStatRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 4,
+  },
+  favCourseStatText: {
+    fontSize: theme.typography.bodySm.fontSize,
+    color: theme.colors.textSoft,
+    fontWeight: "700",
+  },
+  bookFavBtn: {
+    backgroundColor: theme.colors.primary,
+    height: 44,
+    borderRadius: theme.radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 10,
+  },
+  bookFavText: {
+    color: theme.colors.surface,
+    fontSize: theme.typography.body.fontSize,
+    fontWeight: "700",
+  },
+  toastContainer: {
+    position: "absolute",
+    bottom: 110,
+    alignSelf: "center",
+    backgroundColor: theme.colors.success,
+    borderRadius: theme.radius.pill,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    shadowColor: theme.colors.shadow,
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  toastText: {
+    fontSize: theme.typography.bodySm.fontSize,
+    fontWeight: "700",
+    color: theme.colors.successText,
   },
 });

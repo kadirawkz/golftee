@@ -1,9 +1,13 @@
 import type { PostgrestError } from "@supabase/supabase-js";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Notifications from "expo-notifications";
 import { useEffect, useSyncExternalStore } from "react";
 import type { TeeTimeBookingRow } from "../lib/database.types";
 import { assertSupabaseConfigured, supabase } from "../lib/supabase";
 import { getColomboDateKey, getColomboMinutes } from "./colombo-time";
 import { ensureAuthReady, useAuthSession } from "./auth";
+import { getManagedCourseById } from "./course-management";
+import { addNotification } from "./notifications";
 
 type PaymentMethod = "wallet" | "card";
 type TimePeriod = "MORNING" | "AFTERNOON";
@@ -38,6 +42,79 @@ const DEFAULT_SNAPSHOT: BookingSnapshot = {
 let snapshot = DEFAULT_SNAPSHOT;
 let pendingLoad: Promise<TeeTimeBookingRow[]> | null = null;
 const listeners = new Set<BookingListener>();
+
+// Helper to cancel OS-scheduled tee time reminders
+export async function cancelTeeTimeReminders(bookingId: string) {
+  try {
+    const key = `golftee:reminders:${bookingId}`;
+    const rawIds = await AsyncStorage.getItem(key);
+    if (rawIds) {
+      const ids = JSON.parse(rawIds) as string[];
+      for (const id of ids) {
+        await Notifications.cancelScheduledNotificationAsync(id);
+      }
+      await AsyncStorage.removeItem(key);
+    }
+  } catch (err) {
+    console.warn("Failed to cancel scheduled reminders for booking " + bookingId, err);
+  }
+}
+
+// Helper to schedule OS-level tee time reminders at 24h, 12h, and 2h before the round
+export async function scheduleTeeTimeReminders(
+  bookingId: string,
+  courseTitle: string,
+  teeDate: string,
+  teeTime: string
+) {
+  // Always clear existing reminders for this booking ID first
+  await cancelTeeTimeReminders(bookingId);
+
+  try {
+    // Parse booking datetime
+    const teeDateTime = new Date(`${teeDate}T${teeTime}`);
+    if (Number.isNaN(teeDateTime.getTime())) {
+      return;
+    }
+
+    const intervals = [
+      { hoursBefore: 24, label: "24 hours" },
+      { hoursBefore: 12, label: "12 hours" },
+      { hoursBefore: 2, label: "2 hours" },
+    ];
+
+    const scheduledIds: string[] = [];
+
+    for (const interval of intervals) {
+      const triggerTime = new Date(teeDateTime.getTime() - interval.hoursBefore * 60 * 60 * 1000);
+
+      // Only schedule if the trigger time is in the future
+      if (triggerTime.getTime() > Date.now()) {
+        const id = await Notifications.scheduleNotificationAsync({
+          content: {
+            title: `Tee Time Reminder - ${interval.label} to go!`,
+            body: `Reminder: Your round at ${courseTitle} is in ${interval.label} (${formatBookingDate(teeDate)} at ${formatBookingTime(teeTime)}).`,
+            data: {
+              route: "/manage-booking",
+              routeParams: { bookingId },
+            },
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: triggerTime,
+          },
+        });
+        scheduledIds.push(id);
+      }
+    }
+
+    if (scheduledIds.length > 0) {
+      await AsyncStorage.setItem(`golftee:reminders:${bookingId}`, JSON.stringify(scheduledIds));
+    }
+  } catch (err) {
+    console.warn("Failed to schedule reminders for booking " + bookingId, err);
+  }
+}
 
 function emitBookingsChange() {
   for (const listener of listeners) {
@@ -261,6 +338,30 @@ export async function createBooking(input: BookingMutationInput) {
     userId,
   });
 
+  try {
+    const course = getManagedCourseById(data.course_id);
+    const formattedTime = new Date(`1970-01-01T${data.tee_time}`).toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    void addNotification(
+      "booking",
+      "Booking Confirmed",
+      `Your round at ${course.title} is scheduled for ${formatBookingDate(data.tee_date)} at ${formattedTime}.`,
+      "checkmark-circle",
+      {
+        actionText: "View Booking",
+        route: "/manage-booking",
+        routeParams: { bookingId: data.id },
+        triggerSystemNotification: true,
+      }
+    );
+    // Schedule multi-stage offline reminders
+    void scheduleTeeTimeReminders(data.id, course.title, data.tee_date, data.tee_time);
+  } catch (err) {
+    console.warn("Failed to dispatch booking notification", err);
+  }
+
   return data;
 }
 
@@ -293,6 +394,30 @@ export async function updateBooking(bookingId: string, input: BookingMutationInp
     userId,
   });
 
+  try {
+    const course = getManagedCourseById(data.course_id);
+    const formattedTime = new Date(`1970-01-01T${data.tee_time}`).toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    void addNotification(
+      "booking",
+      "Booking Updated",
+      `Your tee time at ${course.title} has been moved to ${formatBookingDate(data.tee_date)} at ${formattedTime}.`,
+      "calendar",
+      {
+        actionText: "View Booking",
+        route: "/manage-booking",
+        routeParams: { bookingId: data.id },
+        triggerSystemNotification: true,
+      }
+    );
+    // Reschedule multi-stage offline reminders
+    void scheduleTeeTimeReminders(data.id, course.title, data.tee_date, data.tee_time);
+  } catch (err) {
+    console.warn("Failed to dispatch update notification", err);
+  }
+
   return data;
 }
 
@@ -318,6 +443,26 @@ export async function cancelBooking(bookingId: string) {
     loading: false,
     userId,
   });
+
+  try {
+    const course = getManagedCourseById(data.course_id);
+    void addNotification(
+      "booking",
+      "Booking Cancelled",
+      `Your round at ${course.title} on ${formatBookingDate(data.tee_date)} has been cancelled.`,
+      "close-circle",
+      {
+        actionText: "Book Again",
+        route: "/tee-time-booking",
+        routeParams: { courseId: course.id },
+        triggerSystemNotification: true,
+      }
+    );
+    // Cancel any scheduled offline reminders
+    void cancelTeeTimeReminders(data.id);
+  } catch (err) {
+    console.warn("Failed to dispatch cancellation notification", err);
+  }
 
   return data;
 }

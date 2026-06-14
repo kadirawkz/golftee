@@ -1,6 +1,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import type { CourseContentRow, CourseDetailItemRow, CourseReviewRow } from "../lib/database.types";
 import { assertSupabaseConfigured, supabase } from "../lib/supabase";
+import { useAuthSession } from "./auth";
 import {
     type CourseRecord,
     type CourseStyle,
@@ -346,6 +347,7 @@ export function subscribeCourseDetails(courseId: string, listener: CourseDetails
 }
 
 export function useCourseCatalog() {
+  const auth = useAuthSession();
   const state = useSyncExternalStore(
     subscribeCourseCatalog,
     () => snapshot,
@@ -353,10 +355,10 @@ export function useCourseCatalog() {
   );
 
   useEffect(() => {
-    if (!state.initialized) {
+    if (auth.initialized && auth.isAuthenticated) {
       void refreshCourseCatalog();
     }
-  }, [state.initialized]);
+  }, [auth.initialized, auth.isAuthenticated]);
 
   return state;
 }

@@ -254,7 +254,7 @@ export default function CourseDetailsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.screen} edges={["top"]}>
+    <SafeAreaView style={styles.screen} edges={[]}>
       <StatusBar style="dark" />
 
       <ScrollView

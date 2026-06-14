@@ -3,6 +3,8 @@ import { useEffect, useSyncExternalStore } from "react";
 import type { FavoriteCourseInsert } from "../lib/database.types";
 import { assertSupabaseConfigured, supabase } from "../lib/supabase";
 import { ensureAuthReady, useAuthSession } from "./auth";
+import { addNotification } from "./notifications";
+import { getManagedCourseById } from "./course-management";
 
 const FAVORITE_COURSES_KEY = "golftee:courses:favorites";
 
@@ -231,6 +233,22 @@ export async function toggleFavoriteCourse(courseId: string) {
       throw error;
     }
 
+    try {
+      const course = getManagedCourseById(courseId);
+      void addNotification(
+        "promotion",
+        "Favorite Removed",
+        `Removed ${course.title} from your favorite courses.`,
+        "heart-dislike-outline",
+        {
+          actionText: "View Courses",
+          route: "/explore",
+        }
+      );
+    } catch (err) {
+      console.warn("Failed to dispatch favorite notification", err);
+    }
+
     return optimisticIds;
   }
 
@@ -245,6 +263,22 @@ export async function toggleFavoriteCourse(courseId: string) {
       error: error.message,
     });
     throw error;
+  }
+
+  try {
+    const course = getManagedCourseById(courseId);
+    void addNotification(
+      "promotion",
+      "Course Favourited",
+      `Added ${course.title} to your favorite courses list.`,
+      "heart",
+      {
+        actionText: "View Favourites",
+        route: "/favourites",
+      }
+    );
+  } catch (err) {
+    console.warn("Failed to dispatch favorite notification", err);
   }
 
   return optimisticIds;

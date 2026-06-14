@@ -3,14 +3,49 @@ create schema if not exists extensions;
 create extension if not exists citext with schema extensions;
 alter extension citext set schema extensions;
 
+-- Drop existing tables to ensure clean schema recreation
+-- drop table if exists public.tee_time_bookings cascade;
+-- drop table if exists public.favorite_courses cascade;
+-- drop table if exists public.profiles cascade;
+-- drop table if exists public.course_reviews cascade;
+-- drop table if exists public.course_detail_items cascade;
+-- drop table if exists public.course_content cascade;
+-- drop table if exists public.course_tee_slot_templates cascade;
+-- drop table if exists public.golf_courses cascade;
+-- drop table if exists public.locations cascade;
+-- drop table if exists public.course_styles cascade;
+-- drop table if exists public.membership_tiers cascade;
+
+
+create table if not exists public.locations (
+  id uuid primary key default gen_random_uuid(),
+  city_name text unique not null,
+  region_name text,
+  created_at timestamptz default now()
+);
+
+create table if not exists public.course_styles (
+  id uuid primary key default gen_random_uuid(),
+  name text unique not null,
+  description text,
+  created_at timestamptz default now()
+);
+
+create table if not exists public.membership_tiers (
+  id uuid primary key default gen_random_uuid(),
+  name text unique not null,
+  discount_percent decimal default 0,
+  created_at timestamptz default now()
+);
+
 create table if not exists public.golf_courses (
   id text primary key,
   title text not null,
-  location text not null,
+  location_id uuid references public.locations(id),
   place_query text not null,
   place_id text,
   image text not null,
-  style text not null,
+  style_id uuid references public.course_styles(id),
   price numeric(10, 2) not null,
   rating numeric(2, 1) not null,
   latitude double precision not null,
@@ -18,7 +53,6 @@ create table if not exists public.golf_courses (
   sort_order integer not null default 0,
   is_active boolean not null default true,
   updated_at timestamptz not null default timezone('utc', now()),
-  constraint golf_courses_style_valid check (style in ('LINKS', 'PARKLAND', 'DESERT', 'COASTAL')),
   constraint golf_courses_price_valid check (price >= 0),
   constraint golf_courses_rating_valid check (rating >= 0 and rating <= 5)
 );
@@ -82,9 +116,9 @@ create table if not exists public.profiles (
   username extensions.citext unique,
   full_name text,
   phone text,
-  home_club text,
+  home_club_id text references public.golf_courses(id),
   handicap numeric(4, 1),
-  membership_tier text not null default 'Free',
+  tier_id uuid references public.membership_tiers(id),
   avatar_url text,
   member_since date not null default timezone('utc', now())::date,
   created_at timestamptz not null default timezone('utc', now()),
@@ -114,7 +148,6 @@ create table if not exists public.tee_time_bookings (
   service_fee numeric(10, 2) not null,
   caddy_fee numeric(10, 2) not null,
   taxes numeric(10, 2) not null,
-  total numeric(10, 2) not null,
   payment_method text not null default 'wallet',
   status text not null default 'confirmed',
   canceled_at timestamptz,
@@ -126,8 +159,7 @@ create table if not exists public.tee_time_bookings (
     green_fee >= 0 and
     service_fee >= 0 and
     caddy_fee >= 0 and
-    taxes >= 0 and
-    total >= 0
+    taxes >= 0
   ),
   constraint tee_time_bookings_valid_time_period check (time_period in ('MORNING', 'AFTERNOON')),
   constraint tee_time_bookings_valid_payment_method check (payment_method in ('wallet', 'card')),
@@ -186,22 +218,28 @@ declare
   raw_username text;
   raw_full_name text;
   raw_handicap text;
+  default_tier_id uuid;
 begin
   raw_username := nullif(trim(new.raw_user_meta_data ->> 'username'), '');
   raw_full_name := nullif(trim(new.raw_user_meta_data ->> 'full_name'), '');
   raw_handicap := nullif(trim(new.raw_user_meta_data ->> 'handicap'), '');
 
+  -- Get default 'Standard' tier id
+  select id into default_tier_id from public.membership_tiers where name = 'Standard' limit 1;
+
   insert into public.profiles (
     id,
     username,
     full_name,
-    handicap
+    handicap,
+    tier_id
   )
   values (
     new.id,
     case when raw_username is null then null else lower(raw_username)::extensions.citext end,
     coalesce(raw_full_name, raw_username),
-    case when raw_handicap is null then null else raw_handicap::numeric(4, 1) end
+    case when raw_handicap is null then null else raw_handicap::numeric(4, 1) end,
+    default_tier_id
   )
   on conflict (id) do nothing;
 
@@ -238,7 +276,6 @@ declare
   computed_service_fee numeric(10, 2) := 12.50;
   computed_caddy_fee numeric(10, 2);
   computed_taxes numeric(10, 2);
-  computed_total numeric(10, 2);
   saved_booking public.tee_time_bookings;
 begin
   current_user_id := auth.uid();
@@ -331,7 +368,6 @@ begin
   computed_green_fee := round((course_record.price * normalized_players)::numeric, 2);
   computed_caddy_fee := round((normalized_players * 7.50)::numeric, 2);
   computed_taxes := round((computed_green_fee * 0.0845)::numeric, 2);
-  computed_total := round((computed_green_fee + computed_service_fee + computed_caddy_fee + computed_taxes)::numeric, 2);
 
   if target_booking_id is null then
     insert into public.tee_time_bookings (
@@ -345,7 +381,6 @@ begin
       service_fee,
       caddy_fee,
       taxes,
-      total,
       payment_method,
       status,
       canceled_at
@@ -361,7 +396,6 @@ begin
       computed_service_fee,
       computed_caddy_fee,
       computed_taxes,
-      computed_total,
       normalized_payment_method,
       'confirmed',
       null
@@ -380,7 +414,6 @@ begin
       service_fee = computed_service_fee,
       caddy_fee = computed_caddy_fee,
       taxes = computed_taxes,
-      total = computed_total,
       payment_method = normalized_payment_method,
       status = 'confirmed',
       canceled_at = null
@@ -548,14 +581,21 @@ as $$
   limit 1;
 $$;
 
-revoke all on function public.get_available_tee_slots(text, date) from public;
+revoke execute on function public.get_available_tee_slots(text, date) from public, anon;
 grant execute on function public.get_available_tee_slots(text, date) to authenticated;
-revoke all on function public.get_next_bookable_tee_slot(text, date) from public;
+
+revoke execute on function public.get_next_bookable_tee_slot(text, date) from public, anon;
 grant execute on function public.get_next_bookable_tee_slot(text, date) to authenticated;
-revoke all on function public.save_tee_time_booking(uuid, text, date, time, text, integer, text) from public;
+
+revoke execute on function public.save_tee_time_booking(uuid, text, date, time, text, integer, text) from public, anon;
 grant execute on function public.save_tee_time_booking(uuid, text, date, time, text, integer, text) to authenticated;
-revoke all on function public.cancel_tee_time_booking(uuid) from public;
+
+revoke execute on function public.cancel_tee_time_booking(uuid) from public, anon;
 grant execute on function public.cancel_tee_time_booking(uuid) to authenticated;
+
+revoke execute on function public.handle_new_user() from public, anon, authenticated;
+revoke execute on function public.set_current_timestamp_updated_at() from public, anon, authenticated;
+revoke execute on function public.rls_auto_enable() from public, anon, authenticated;
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
@@ -563,6 +603,9 @@ after insert on auth.users
 for each row
 execute function public.handle_new_user();
 
+alter table public.locations enable row level security;
+alter table public.course_styles enable row level security;
+alter table public.membership_tiers enable row level security;
 alter table public.profiles enable row level security;
 alter table public.favorite_courses enable row level security;
 alter table public.golf_courses enable row level security;
@@ -571,6 +614,24 @@ alter table public.course_content enable row level security;
 alter table public.course_detail_items enable row level security;
 alter table public.course_reviews enable row level security;
 alter table public.tee_time_bookings enable row level security;
+
+drop policy if exists "Allow public read access for locations" on public.locations;
+create policy "Allow public read access for locations"
+on public.locations
+for select
+using (auth.role() = 'authenticated');
+
+drop policy if exists "Allow public read access for course styles" on public.course_styles;
+create policy "Allow public read access for course styles"
+on public.course_styles
+for select
+using (auth.role() = 'authenticated');
+
+drop policy if exists "Allow public read access for membership tiers" on public.membership_tiers;
+create policy "Allow public read access for membership tiers"
+on public.membership_tiers
+for select
+using (auth.role() = 'authenticated');
 
 drop policy if exists "Profiles are viewable by the owner" on public.profiles;
 create policy "Profiles are viewable by the owner"
@@ -675,5 +736,18 @@ on public.tee_time_bookings
 for update
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
+
+-- Grant access to public tables for Data API
+grant select, insert, update, delete on table public.locations to anon, authenticated, service_role;
+grant select, insert, update, delete on table public.course_styles to anon, authenticated, service_role;
+grant select, insert, update, delete on table public.membership_tiers to anon, authenticated, service_role;
+grant select, insert, update, delete on table public.golf_courses to anon, authenticated, service_role;
+grant select, insert, update, delete on table public.course_tee_slot_templates to anon, authenticated, service_role;
+grant select, insert, update, delete on table public.course_content to anon, authenticated, service_role;
+grant select, insert, update, delete on table public.course_detail_items to anon, authenticated, service_role;
+grant select, insert, update, delete on table public.course_reviews to anon, authenticated, service_role;
+grant select, insert, update, delete on table public.profiles to anon, authenticated, service_role;
+grant select, insert, update, delete on table public.favorite_courses to anon, authenticated, service_role;
+grant select, insert, update, delete on table public.tee_time_bookings to anon, authenticated, service_role;
 
 revoke insert, update on public.tee_time_bookings from authenticated;

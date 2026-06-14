@@ -118,14 +118,14 @@ const styles = StyleSheet.create({
     letterSpacing: 1.6,
   },
   title: {
-    fontSize: theme.typography.h1.fontSize,
-    lineHeight: theme.typography.h1.lineHeight,
+    fontSize: theme.typography.h4.fontSize,
+    lineHeight: theme.typography.h4.lineHeight,
     color: theme.colors.text,
     fontWeight: "800",
   },
   titleSmall: {
-    fontSize: theme.typography.h2.fontSize,
-    lineHeight: theme.typography.h2.lineHeight,
+    fontSize: theme.typography.title.fontSize,
+    lineHeight: theme.typography.title.lineHeight,
   },
   viewAllButton: {
     flexDirection: "row",

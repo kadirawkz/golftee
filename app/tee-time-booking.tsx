@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -83,6 +84,24 @@ export default function TeeTimeBookingScreen() {
   const [selectedDateKey, setSelectedDateKey] = useState<string>(() => getColomboDateKey());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedPlayers, setSelectedPlayers] = useState(1);
+
+  // Load default player preference from App Settings
+  useEffect(() => {
+    const loadDefaultPlayers = async () => {
+      try {
+        const val = await AsyncStorage.getItem("golftee:settings:default_players");
+        if (val && !existingBooking) {
+          const count = parseInt(val, 10);
+          if (count >= 1 && count <= 4) {
+            setSelectedPlayers(count);
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to load default players", err);
+      }
+    };
+    loadDefaultPlayers();
+  }, [existingBooking]);
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("MORNING");
   const [selectedTime, setSelectedTime] = useState("08:00");
   const [todayHasBookableSlots, setTodayHasBookableSlots] = useState(true);
@@ -570,7 +589,7 @@ export default function TeeTimeBookingScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
+    <SafeAreaView style={styles.screen} edges={["bottom"]}>
       <StatusBar style="dark" />
       <ScrollView
         showsVerticalScrollIndicator={false}

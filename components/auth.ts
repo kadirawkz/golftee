@@ -1,7 +1,10 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import type { Session } from "@supabase/supabase-js";
 import { useSyncExternalStore } from "react";
 import type { ProfileRow, ProfileUpdate } from "../lib/database.types";
 import { supabase, supabaseConfigurationError } from "../lib/supabase";
+import { addNotification } from "./notifications";
 
 type AuthSnapshot = {
   initialized: boolean;
@@ -119,6 +122,43 @@ async function bootstrapAuth() {
     return;
   }
 
+  let rememberMe = true;
+  try {
+    const flag = await SecureStore.getItemAsync("golftee:remember_me");
+    if (flag === "false") {
+      rememberMe = false;
+    }
+  } catch {
+    try {
+      const flag = await AsyncStorage.getItem("golftee:remember_me");
+      if (flag === "false") {
+        rememberMe = false;
+      }
+    } catch {}
+  }
+
+  if (!rememberMe) {
+    try {
+      await supabase.auth.signOut();
+    } catch {}
+    updateSnapshot({
+      initialized: true,
+      isAuthenticated: false,
+      session: null,
+      profile: null,
+      profileLoading: false,
+      profileError: null,
+    });
+
+    if (!authListenerAttached) {
+      supabase.auth.onAuthStateChange((_event, nextSession) => {
+        void applySession(nextSession);
+      });
+      authListenerAttached = true;
+    }
+    return;
+  }
+
   const { data, error } = await supabase.auth.getSession();
 
   if (error) {
@@ -161,12 +201,22 @@ export async function getIsLoggedIn(): Promise<boolean> {
 export async function signInWithEmail({
   email,
   password,
+  rememberMe = true,
 }: {
   email: string;
   password: string;
+  rememberMe?: boolean;
 }) {
   if (supabaseConfigurationError) {
     throw new Error(supabaseConfigurationError);
+  }
+
+  try {
+    await SecureStore.setItemAsync("golftee:remember_me", rememberMe ? "true" : "false");
+  } catch {
+    try {
+      await AsyncStorage.setItem("golftee:remember_me", rememberMe ? "true" : "false");
+    } catch {}
   }
 
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -179,6 +229,25 @@ export async function signInWithEmail({
   }
 
   await applySession(data.session);
+
+  // Dispatch Secure Login notification
+  try {
+    const username = data.session?.user?.user_metadata?.username ?? data.session?.user?.email ?? "Golfer";
+    void addNotification(
+      "updates",
+      "Secure Login",
+      `Successful login detected for user ${username}.`,
+      "shield-checkmark",
+      {
+        actionText: "View Profile",
+        route: "/profile",
+        triggerSystemNotification: true,
+      }
+    );
+  } catch (err) {
+    console.warn("Failed to dispatch login notification", err);
+  }
+
   return data;
 }
 
@@ -214,12 +283,52 @@ export async function signUpWithEmail({
     throw error;
   }
 
+  if (data.user && data.user.identities && data.user.identities.length === 0) {
+    throw new Error("An account with this email already exists. Please log in instead.");
+  }
+
   await applySession(data.session);
+
+  // Dispatch Welcome notification if session is active immediately
+  if (data.session) {
+    try {
+      void addNotification(
+        "updates",
+        "Welcome to GolfTee!",
+        `Hey ${username.trim()}, explore world-class courses and book your first tee time today!`,
+        "golf",
+        {
+          actionText: "Explore Courses",
+          route: "/explore",
+          triggerSystemNotification: true,
+        }
+      );
+    } catch (err) {
+      console.warn("Failed to dispatch signup notification", err);
+    }
+  }
+
   return {
     ...data,
     requiresEmailVerification: !data.session,
   };
 }
+
+export async function resendVerificationEmail(email: string) {
+  if (supabaseConfigurationError) {
+    throw new Error(supabaseConfigurationError);
+  }
+
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email: email.trim().toLowerCase(),
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
 
 export async function sendPasswordResetEmail(email: string) {
   if (supabaseConfigurationError) {
@@ -291,6 +400,27 @@ export async function updateProfile(profileUpdate: ProfileUpdate) {
     profileError: null,
     profileLoading: false,
   });
+
+  // Dispatch Profile update notification
+  try {
+    const updatedFields = Object.keys(profileUpdate);
+    let title = "Profile Updated";
+    let message = "Your profile information has been successfully updated.";
+    let icon = "person";
+
+    if (updatedFields.includes("handicap")) {
+      title = "Handicap Updated";
+      message = `Your handicap has been updated to ${profileUpdate.handicap ?? "N/A"}.`;
+      icon = "golf";
+    }
+
+    void addNotification("updates", title, message, icon, {
+      actionText: "View Profile",
+      route: "/profile",
+    });
+  } catch (err) {
+    console.warn("Failed to dispatch profile update notification", err);
+  }
 
   return data;
 }
