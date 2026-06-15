@@ -7,7 +7,7 @@ It uses Supabase for authentication, profiles, favorites, course catalog data, t
 
 - Email/password auth (sign up, sign in, sign out)
 - Password reset email trigger
-- Secure session persistence (`expo-secure-store` with AsyncStorage fallback)
+- Secure session persistence (`expo-secure-store` with AsyncStorage fallback) with user-controlled "Remember Me" toggle
 - User profile read/update flow
 - Per-user favorites with RLS
 - Tee-time booking create/update/cancel flows with slot conflict protection
@@ -28,8 +28,8 @@ It uses Supabase for authentication, profiles, favorites, course catalog data, t
 - Run Android: `npm run android`
 - Run iOS: `npm run ios`
 - Run web: `npm run web`
-- Lint: `npm run lint`
-- Typecheck: `npm run typecheck`
+- Run lint: `npm run lint`
+- Run typecheck: `npm run typecheck`
 
 ## CI/CD Pipeline
 
@@ -67,6 +67,7 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 - **Colombo Timezone Logic**: Booking slots are strictly synchronized with Sri Lankan local time to prevent "past-slot" booking errors.
 - **Secure RPCs**: Critical business logic (booking validation, pricing) is handled via server-side PostgreSQL functions to prevent client-side manipulation.
 - **RLS (Row Level Security)**: Data is protected at the database level; users can only access their own profiles and bookings.
+- **Secure Session Persistence**: Hybrid storage engine (`expo-secure-store` with `AsyncStorage` fallback) paired with a user-controlled "Remember Me" option during login. If selected, authentication credentials and tokens are securely stored across restarts; if toggled off, sessions are cleared cleanly on exit.
 
 ## Pre-push checklist
 
