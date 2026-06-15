@@ -9,6 +9,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.kadirawkz.golftee",
       "infoPlist": {
         "LSApplicationQueriesSchemes": [
           "comgooglemaps"
@@ -16,6 +17,7 @@
       }
     },
     "android": {
+      "package": "com.kadirawkz.golftee",
       "adaptiveIcon": {
         "backgroundColor": "#ffffff",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
