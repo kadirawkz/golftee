@@ -21,7 +21,7 @@ export default function LoginScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [authNotice, setAuthNotice] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -79,6 +79,7 @@ export default function LoginScreen() {
       await signInWithEmail({
         email: trimmedEmail,
         password: trimmedPassword,
+        rememberMe,
       });
       router.replace("/home");
     } catch (error) {
