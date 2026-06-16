@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "golftee",
+    "name": "Golftee",
     "slug": "golftee",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -21,9 +21,8 @@
     "android": {
       "package": "com.kadirawkz.golftee",
       "adaptiveIcon": {
-        "backgroundColor": "#ffffff",
+        "backgroundColor": "#12392D",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,

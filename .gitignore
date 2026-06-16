@@ -143,6 +143,7 @@ build/
 # VS Code specific
 .history/
 *.vsix
+.eas/
 
 # Optional: Supabase generated types if you want to keep them local-only
 # lib/database.types.ts

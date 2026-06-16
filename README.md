@@ -68,6 +68,17 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 - **Secure RPCs**: Critical business logic (booking validation, pricing) is handled via server-side PostgreSQL functions to prevent client-side manipulation.
 - **RLS (Row Level Security)**: Data is protected at the database level; users can only access their own profiles and bookings.
 - **Secure Session Persistence**: Hybrid storage engine (`expo-secure-store` with `AsyncStorage` fallback) paired with a user-controlled "Remember Me" option during login. If selected, authentication credentials and tokens are securely stored across restarts; if toggled off, sessions are cleared cleanly on exit.
+- **Location-based Services**: Integrates `expo-location` to request coarse/fine location access to determine the user's proximity to Sri Lankan golf courses for nearby recommendations.
+
+## EAS Build & Deployment
+
+This project is configured with EAS (Expo Application Services) for building and submitting mobile builds:
+- **Project ID**: Configured in `app.json` (`projectId: 2563be69-491d-4cd7-a07f-671d568260a8`).
+- **Profiles**: Configured in `eas.json` for:
+  - `development`: Used for internal development client builds.
+  - `preview` / `preview-simulator`: Used for sharing testing APKs / simulator builds.
+  - `production`: For app store deployment.
+- **App Version Source**: Configured to `remote` to manage builds and version sequences via Expo CLI.
 
 ## Pre-push checklist
 
