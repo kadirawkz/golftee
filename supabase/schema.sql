@@ -700,6 +700,51 @@ before update on public.course_reviews
 for each row
 execute function public.set_current_timestamp_updated_at();
 
+-- Trigger to automatically update course rating and review count when reviews are added/updated/deleted
+create or replace function public.update_course_rating_and_review_count()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_course_id text;
+  avg_rating numeric(2,1);
+  total_reviews integer;
+begin
+  if tg_op = 'DELETE' then
+    target_course_id := old.course_id;
+  else
+    target_course_id := new.course_id;
+  end if;
+
+  -- Calculate the new average rating and total count from published reviews
+  select coalesce(round(avg(rating)::numeric, 1), 0.0), count(*)
+  into avg_rating, total_reviews
+  from public.course_reviews
+  where course_id = target_course_id and is_published = true;
+
+  -- Update golf_courses rating
+  update public.golf_courses
+  set rating = avg_rating
+  where id = target_course_id;
+
+  -- Update course_content review_count
+  update public.course_content
+  set review_count = total_reviews
+  where course_id = target_course_id;
+
+  return null;
+end;
+$$;
+
+drop trigger if exists course_reviews_update_rating on public.course_reviews;
+create trigger course_reviews_update_rating
+after insert or update or delete
+on public.course_reviews
+for each row
+execute function public.update_course_rating_and_review_count();
+
 drop policy if exists "Course content is readable by authenticated users" on public.course_content;
 create policy "Course content is readable by authenticated users"
 on public.course_content
@@ -717,6 +762,13 @@ create policy "Course reviews are readable by authenticated users"
 on public.course_reviews
 for select
 using (auth.role() = 'authenticated');
+
+drop policy if exists "Course reviews are insertable by authenticated users" on public.course_reviews;
+create policy "Course reviews are insertable by authenticated users"
+on public.course_reviews
+for insert
+with check (auth.role() = 'authenticated');
+
 
 drop policy if exists "Bookings are viewable by the owner" on public.tee_time_bookings;
 create policy "Bookings are viewable by the owner"

@@ -1,18 +1,20 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
-import { InteractionManager, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { useEffect, useState, useRef } from "react";
+import { InteractionManager, ScrollView, StyleSheet, Text, View, useWindowDimensions, Modal, TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, TouchableOpacity, Animated } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
 import { getColomboDateKey } from "../components/colombo-time";
-import { getManagedCourseById, getNextBookableTeeSlot, useCourseDetails } from "../components/course-management";
+import { getManagedCourseById, getNextBookableTeeSlot, useCourseDetails, addCourseReview } from "../components/course-management";
 import { toggleFavoriteCourse, useIsFavoriteCourse } from "../components/favorites";
 import { openInGoogleMaps } from "../components/map-links";
 import { theme } from "../components/theme";
 import { getCourseImage } from "../lib/image-mapping";
 import { DailyWeatherForecast, getFourteenDayForecast, getWeatherCodeIconName } from "../components/weather";
+import { useAuthSession } from "../components/auth";
+
 
 interface CourseReview {
   id: string;
@@ -118,6 +120,82 @@ export default function CourseDetailsScreen() {
   const [now, setNow] = useState(() => new Date());
   const [showAllReviews, setShowAllReviews] = useState(false);
   const [favoriteNotice, setFavoriteNotice] = useState<string | null>(null);
+  const auth = useAuthSession();
+  const [isReviewModalVisible, setIsReviewModalVisible] = useState(false);
+  const [newRating, setNewRating] = useState(0);
+  const [newReviewText, setNewReviewText] = useState("");
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(450)).current;
+
+  const openReviewModal = () => {
+    setIsReviewModalVisible(true);
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        speed: 12,
+        bounciness: 4,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const closeReviewModal = () => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 450,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setIsReviewModalVisible(false);
+    });
+  };
+
+  const handleSubmitReview = async () => {
+    if (newRating < 1 || newRating > 5) {
+      Alert.alert("Required", "Please select a star rating between 1 and 5.");
+      return;
+    }
+    if (!newReviewText.trim()) {
+      Alert.alert("Required", "Please write a review message.");
+      return;
+    }
+    setIsSubmittingReview(true);
+    try {
+      const authorName = auth.profile?.full_name || auth.profile?.username || auth.session?.user?.email || "Golfer";
+      const authorBadge = auth.profile?.handicap != null ? `Handicap: ${auth.profile.handicap}` : "Golfer";
+      
+      await addCourseReview({
+        courseId: course.id,
+        authorName,
+        authorBadge,
+        rating: newRating,
+        reviewText: newReviewText.trim(),
+      });
+      
+      Alert.alert("Success", "Thank you! Your memory has been shared successfully.");
+      closeReviewModal();
+      setNewReviewText("");
+      setNewRating(0);
+    } catch (error) {
+      Alert.alert("Error", error instanceof Error ? error.message : "Unable to submit your review.");
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
+
   const course = getManagedCourseById(courseId);
   const courseDetails = useCourseDetails(course.id);
   const isFavorite = useIsFavoriteCourse(course.id);
@@ -409,6 +487,20 @@ export default function CourseDetailsScreen() {
           <View style={styles.section}>
             <View style={styles.reviewsHeader}>
               <Text style={styles.sectionTitle}>Player Memoirs</Text>
+              <Pressable
+                style={styles.writeReviewButton}
+                onPress={() => {
+                  if (!auth.isAuthenticated) {
+                    Alert.alert("Authentication Required", "Please sign in to share a memory.");
+                    return;
+                  }
+                  openReviewModal();
+                }}
+                variant="chip"
+              >
+                <Ionicons name="create-outline" size={14} color={theme.colors.primary} />
+                <Text style={styles.writeReviewButtonText}>Write Review</Text>
+              </Pressable>
             </View>
 
             <View style={styles.reviewsList}>
@@ -460,6 +552,85 @@ export default function CourseDetailsScreen() {
           </Pressable>
         </View>
       </View>
+
+      <Modal
+        visible={isReviewModalVisible}
+        animationType="none"
+        transparent={true}
+        onRequestClose={closeReviewModal}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.keyboardAvoidingView}
+        >
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={closeReviewModal}
+          >
+            <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]} />
+          </TouchableOpacity>
+
+          <Animated.View style={[styles.modalContent, { transform: [{ translateY: slideAnim }] }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Share a Memory</Text>
+              <TouchableOpacity
+                onPress={closeReviewModal}
+                style={styles.modalCloseButton}
+              >
+                <Ionicons name="close" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={styles.modalForm} bounces={false}>
+              <Text style={styles.inputLabel}>Rating</Text>
+              <View style={styles.modalRatingWrap}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <TouchableOpacity
+                    key={star}
+                    onPress={() => setNewRating(star === newRating ? 0 : star)}
+                    style={styles.starTouch}
+                  >
+                    <Ionicons
+                      name={star <= newRating ? "star" : "star-outline"}
+                      size={36}
+                      color={theme.colors.accentWarm}
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.inputLabel}>Your Experience / Memory</Text>
+              <TextInput
+                style={styles.reviewTextInput}
+                multiline
+                numberOfLines={6}
+                value={newReviewText}
+                onChangeText={setNewReviewText}
+                placeholder="How was the course conditions, clubhouse amenities, or your overall round? Share your memory here..."
+                placeholderTextColor={theme.colors.muted}
+                maxLength={500}
+              />
+              <Text style={styles.charCount}>
+                {newReviewText.length}/500 characters
+              </Text>
+
+              <Pressable
+                style={[styles.submitButton, isSubmittingReview && styles.disabledButton]}
+                onPress={handleSubmitReview}
+                disabled={isSubmittingReview}
+                variant="cta"
+              >
+                {isSubmittingReview ? (
+                  <ActivityIndicator color={theme.colors.surface} />
+                ) : (
+                  <Text style={styles.submitButtonText}>Submit Memory</Text>
+                )}
+              </Pressable>
+            </ScrollView>
+          </Animated.View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -918,6 +1089,115 @@ const styles = StyleSheet.create({
   bookButtonText: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
+    color: theme.colors.surface,
+    fontWeight: "700",
+  },
+  writeReviewButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    height: 30,
+    paddingHorizontal: 10,
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.primarySoft,
+    borderWidth: 1,
+    borderColor: theme.colors.borderSoft,
+  },
+  writeReviewButtonText: {
+    fontSize: theme.typography.caption.fontSize,
+    lineHeight: theme.typography.caption.lineHeight,
+    color: theme.colors.primary,
+    fontWeight: "700",
+  },
+  keyboardAvoidingView: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  modalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: theme.colors.overlayStrong,
+  },
+  modalContent: {
+    backgroundColor: theme.colors.surface,
+    borderTopLeftRadius: theme.radius.xl,
+    borderTopRightRadius: theme.radius.xl,
+    maxHeight: "85%",
+    paddingBottom: 24,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    borderBottomWidth: 1,
+    borderColor: theme.colors.borderSoft,
+  },
+  modalTitle: {
+    fontSize: theme.typography.h3.fontSize,
+    lineHeight: theme.typography.h3.lineHeight,
+    color: theme.colors.primary,
+    fontWeight: "800",
+  },
+  modalCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: theme.colors.surfaceSoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalForm: {
+    padding: 20,
+    gap: 16,
+  },
+  inputLabel: {
+    fontSize: theme.typography.title.fontSize,
+    lineHeight: theme.typography.title.lineHeight,
+    color: theme.colors.text,
+    fontWeight: "700",
+  },
+  modalRatingWrap: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 8,
+  },
+  starTouch: {
+    padding: 4,
+  },
+  reviewTextInput: {
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.md,
+    padding: 14,
+    color: theme.colors.text,
+    fontSize: theme.typography.body.fontSize,
+    lineHeight: theme.typography.body.lineHeight,
+    backgroundColor: theme.colors.surfaceTint,
+    textAlignVertical: "top",
+    minHeight: 120,
+  },
+  charCount: {
+    fontSize: theme.typography.caption.fontSize,
+    lineHeight: theme.typography.caption.lineHeight,
+    color: theme.colors.textSoft,
+    textAlign: "right",
+    marginTop: -8,
+  },
+  submitButton: {
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.radius.pill,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 8,
+  },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  submitButtonText: {
+    fontSize: theme.typography.body.fontSize,
+    lineHeight: theme.typography.body.lineHeight,
     color: theme.colors.surface,
     fontWeight: "700",
   },

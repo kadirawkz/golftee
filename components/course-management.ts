@@ -434,4 +434,43 @@ export async function getNextBookableTeeSlot(courseId: string, startDate?: strin
   } satisfies NextBookableTeeSlot;
 }
 
+export async function addCourseReview({
+  courseId,
+  authorName,
+  authorBadge,
+  rating,
+  reviewText,
+}: {
+  courseId: string;
+  authorName: string;
+  authorBadge: string;
+  rating: number;
+  reviewText: string;
+}) {
+  assertSupabaseConfigured();
+  const { data, error } = await supabase
+    .from("course_reviews")
+    .insert({
+      course_id: courseId,
+      author_name: authorName,
+      author_badge: authorBadge,
+      rating,
+      review_text: reviewText,
+      review_date: new Date().toISOString().split("T")[0],
+    })
+    .select()
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  // Refresh details to include the new review in the UI
+  await refreshCourseDetails(courseId);
+  // Refresh catalog to fetch updated rating averages for the course
+  await refreshCourseCatalog();
+  return data;
+}
+
 export type { NextBookableTeeSlot, TeeSlot };
+

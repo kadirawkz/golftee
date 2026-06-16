@@ -70,7 +70,7 @@ VALUES
   ),
   (
     '4', 'Eagles Golf Link', 'Eagles Golf Link, Trincomalee, Sri Lanka', 
-    NULL,
+    'ChIJd7465-H36joR-a6z55Z45-Y',
     'assets/images/courses/trincomalee.webp', 
     110, 4.6, 8.535798504973808, 81.19818322309355, 4,
     (SELECT id FROM public.locations WHERE city_name = 'Trincomalee' LIMIT 1),
@@ -78,7 +78,7 @@ VALUES
   ),
   (
     '5', 'Eagles Heritage Golf Club', 'Eagles Heritage Golf Club, Anuradhapura, Sri Lanka', 
-    NULL,
+    'ChIJ2_a82-y9_zoRzB014-9l48A',
     'assets/images/courses/anuradhapura.webp', 
     95, 4.5, 8.296735106202165, 80.42496812379707, 5,
     (SELECT id FROM public.locations WHERE city_name = 'Anuradhapura' LIMIT 1),
@@ -86,7 +86,7 @@ VALUES
   ),
   (
     '6', 'Shangri La Hambantota Golf Resort & Spa', 'Shangri La Hambantota Golf Resort & Spa, Hambantota, Sri Lanka', 
-    NULL,
+    'ChIJ36t4kRz66joR5tWw4Jz1e5Y',
     'assets/images/courses/hambantota.webp', 
     155, 4.9, 6.112915947036785, 81.06407119678414, 6,
     (SELECT id FROM public.locations WHERE city_name = 'Hambantota' LIMIT 1),
@@ -94,7 +94,7 @@ VALUES
   ),
   (
     '7', 'Koggala Golf Club', 'Koggala Golf Club, Koggala, Sri Lanka', 
-    NULL,
+    'ChIJ4V5OQx3P4joR_s5yL5f9y64',
     'assets/images/courses/koggala.webp', 
     130, 4.8, 5.996820130056448, 80.32463590631559, 7,
     (SELECT id FROM public.locations WHERE city_name = 'Koggala' LIMIT 1),
@@ -102,7 +102,7 @@ VALUES
   ),
   (
     '8', 'Army Golf Course', 'Army Golf Course, Diyatalawa, Sri Lanka', 
-    NULL,
+    'ChIJ85g3oGv04joR68Xp4v9G04U',
     'assets/images/courses/diyathalawa.webp', 
     210, 4.7, 6.809702575280297, 80.94806013954602, 8,
     (SELECT id FROM public.locations WHERE city_name = 'Diyathalawa' LIMIT 1),
