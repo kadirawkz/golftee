@@ -138,8 +138,6 @@ export default function SignupScreen() {
       if (result.requiresEmailVerification) {
         setIsVerificationSent(true);
         setCountdown(60);
-      } else {
-        router.replace("/home");
       }
     } catch (error) {
       setAuthNotice(error instanceof Error ? error.message : "Unable to register. Please try again.");

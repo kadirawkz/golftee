@@ -178,7 +178,6 @@ export default function ProfileScreen() {
     setLogoutError(null);
     try {
       await signOut();
-      router.replace("/splash");
     } catch (error) {
       setLogoutError(error instanceof Error ? error.message : "Unable to log out right now.");
     } finally {

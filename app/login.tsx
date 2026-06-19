@@ -83,7 +83,6 @@ export default function LoginScreen() {
         password: trimmedPassword,
         rememberMe,
       });
-      router.replace("/home");
     } catch (error) {
       setAuthNotice(error instanceof Error ? error.message : "Unable to sign in. Please verify your credentials.");
     } finally {
