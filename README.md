@@ -79,6 +79,7 @@ This project is configured with EAS (Expo Application Services) for building and
   - `preview` / `preview-simulator`: Used for sharing testing APKs / simulator builds.
   - `production`: For app store deployment.
 - **App Version Source**: Configured to `remote` to manage builds and version sequences via Expo CLI.
+- **Production Manual**: Refer to [PRODUCTION.md](PRODUCTION.md) for details on staging vs. production environment isolation, Supabase CLI database migrations, pgBouncer connection pooling, and the key rotation checklist.
 
 ## Pre-push checklist
 
