@@ -1,8 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useMemo, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import { ScrollView, StyleSheet, Text, View, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
@@ -15,6 +15,7 @@ import {
   markAllAsRead,
   deleteNotification,
   deleteAllNotifications,
+  refreshNotifications,
 } from "../services/notifications";
 
 type NotificationFilter = "all" | "booking" | "promotion" | "achievement" | "account";
@@ -131,6 +132,18 @@ export default function NotificationsScreen() {
   const { horizontalPadding, screenBottomPadding } = useResponsiveLayout();
   const { notifications } = useNotificationState();
   const [activeFilter, setActiveFilter] = useState<NotificationFilter>("all");
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refreshNotifications();
+    } catch (err) {
+      console.warn("Failed to refresh notifications", err);
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (filter) {
@@ -211,7 +224,15 @@ export default function NotificationsScreen() {
           styles.scrollContent,
           { paddingHorizontal: horizontalPadding, paddingBottom: screenBottomPadding },
         ]}
-        bounces={false}
+        bounces={true}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
         overScrollMode="never"
       >
         <View style={styles.summaryCard}>

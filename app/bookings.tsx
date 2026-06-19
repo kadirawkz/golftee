@@ -14,6 +14,7 @@ import {
   Text,
   TextInput,
   View,
+  RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
@@ -24,6 +25,7 @@ import {
   isHistoricalBooking,
   isUpcomingBooking,
   useBookingState,
+  refreshBookings,
 } from "../services/bookings";
 import { getManagedCourseById } from "../services/course-management";
 import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
@@ -287,6 +289,18 @@ export default function BookingsScreen() {
   const router = useRouter();
   const { horizontalPadding, screenBottomPadding } = useResponsiveLayout();
   const bookingState = useBookingState();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refreshBookings();
+    } catch (err) {
+      console.warn("Failed to refresh bookings", err);
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
 
   const [activeTab, setActiveTab] = useState<"upcoming" | "history" | "insights">("upcoming");
   const [searchQuery, setSearchQuery] = useState("");
@@ -515,7 +529,15 @@ export default function BookingsScreen() {
           styles.scrollContent,
           { paddingHorizontal: horizontalPadding, paddingBottom: screenBottomPadding },
         ]}
-        bounces={false}
+        bounces={true}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
         overScrollMode="never"
       >
         {bookingState.loading && (

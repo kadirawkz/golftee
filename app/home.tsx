@@ -1,8 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useMemo, useRef } from "react";
-import { ScrollView, StyleSheet, Text, useWindowDimensions, View, Linking } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ScrollView, StyleSheet, Text, useWindowDimensions, View, Linking, RefreshControl } from "react-native";
 import Animated, {
     interpolate,
     interpolateColor,
@@ -18,18 +18,19 @@ import {
     calculateDistanceKm,
     DEFAULT_USER_LOCATION,
 } from "../services/course-data";
-import { useCourseCatalog, getManagedCourseById } from "../services/course-management";
+import { useCourseCatalog, getManagedCourseById, refreshCourseCatalog } from "../services/course-management";
 import { FavoriteCoursesSection } from "../components/favorite-courses-section";
-import { useFavoriteCourseIds } from "../services/favorites";
+import { useFavoriteCourseIds, refreshFavoriteCourseIds } from "../services/favorites";
 import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
 import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../components/theme";
 import { getCourseImage } from "../lib/image-mapping";
-import { useAuthSession } from "../services/auth";
+import { useAuthSession, refreshProfile } from "../services/auth";
 import {
   useBookingState,
   isUpcomingBooking,
   formatBookingDateTime,
   isHistoricalBooking,
+  refreshBookings,
 } from "../services/bookings";
 
 const HERO_NEWS_IMAGE = require("../assets/images/home-hero-news.webp");
@@ -112,6 +113,23 @@ export default function HomeScreen() {
   const courseCatalog = useCourseCatalog();
   const { width } = useWindowDimensions();
   const { horizontalPadding, screenBottomPadding, scaleFont, scaleLineHeight } = useResponsiveLayout();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        refreshProfile(),
+        refreshBookings(),
+        refreshCourseCatalog(),
+        refreshFavoriteCourseIds(),
+      ]);
+    } catch (err) {
+      console.warn("Failed to refresh home screen data", err);
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
   const heroScrollRef = useRef<ScrollView>(null);
   const autoplayIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoplayResumeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -257,7 +275,15 @@ export default function HomeScreen() {
             paddingBottom: Math.max(screenBottomPadding - 20, 140),
           },
         ]}
-        bounces={false}
+        bounces={true}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
         overScrollMode="never"
         contentInsetAdjustmentBehavior="never"
       >

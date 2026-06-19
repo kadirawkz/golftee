@@ -362,3 +362,43 @@ export async function deleteAllNotifications() {
   }
 }
 
+export async function refreshNotifications() {
+  if (isBootstrapping) return;
+
+  updateSnapshot({ loading: true });
+  isBootstrapping = true;
+
+  const userId = currentUserId;
+  const storageKey = getStorageKey(userId);
+
+  if (userId) {
+    try {
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("*")
+        .eq("user_id", userId)
+        .order("occurred_at", { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      const mapped = (data || []).map(mapDbNotification);
+      updateSnapshot({
+        notifications: mapped,
+        initialized: true,
+        loading: false,
+      });
+      await saveNotifications(mapped);
+      return;
+    } catch (dbError) {
+      console.warn("Failed to refresh notifications from Supabase", dbError);
+    } finally {
+      isBootstrapping = false;
+    }
+  } else {
+    isBootstrapping = false;
+    updateSnapshot({ loading: false });
+  }
+}
+
