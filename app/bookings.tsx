@@ -532,7 +532,7 @@ export default function BookingsScreen() {
         bounces={true}
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
+            refreshing={refreshing || bookingState.loading}
             onRefresh={handleRefresh}
             tintColor={colors.primary}
             colors={[colors.primary]}
@@ -541,9 +541,6 @@ export default function BookingsScreen() {
         }
         overScrollMode="never"
       >
-        {bookingState.loading && !refreshing && (
-          <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 24 }} />
-        )}
 
         {/* Tab 1: Upcoming */}
         {activeTab === "upcoming" && !bookingState.loading && (
