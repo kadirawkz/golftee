@@ -171,6 +171,41 @@ export default function NotificationsScreen() {
     return sortedNotifications.filter((notification) => notification.type === activeFilter);
   }, [activeFilter, sortedNotifications]);
 
+  const emptyStateContent = useMemo(() => {
+    switch (activeFilter) {
+      case "booking":
+        return {
+          title: "No Booking Updates",
+          message: "Your active and past reservation alerts will appear here.",
+          icon: "calendar-outline" as const,
+        };
+      case "promotion":
+        return {
+          title: "No Offers or Updates",
+          message: "Check back later for exclusive deals and signature course announcements.",
+          icon: "pricetag-outline" as const,
+        };
+      case "account":
+        return {
+          title: "No Account Activity",
+          message: "Security logs, login history, and profile updates will be tracked here.",
+          icon: "shield-outline" as const,
+        };
+      case "achievement":
+        return {
+          title: "No Achievements Yet",
+          message: "Play rounds and hit milestones to earn premium profile badges.",
+          icon: "trophy-outline" as const,
+        };
+      default:
+        return {
+          title: "No Notifications",
+          message: "You're all caught up! Check back later for new updates.",
+          icon: "notifications-off-outline" as const,
+        };
+    }
+  }, [activeFilter]);
+
   const unreadNotifications = filteredNotifications.filter((notification) => !notification.read);
   const earlierNotifications = filteredNotifications.filter((notification) => notification.read);
   const unreadCount = notifications.filter((notification) => !notification.read).length;
@@ -323,11 +358,9 @@ export default function NotificationsScreen() {
 
           {filteredNotifications.length === 0 ? (
             <View style={styles.emptyState}>
-              <Ionicons name="notifications-off-outline" size={24} color={colors.muted} />
-              <Text style={styles.emptyStateTitle}>No notifications here</Text>
-              <Text style={styles.emptyStateText}>
-                Try a different filter or check back after your next booking update.
-              </Text>
+              <Ionicons name={emptyStateContent.icon} size={24} color={colors.muted} />
+              <Text style={styles.emptyStateTitle}>{emptyStateContent.title}</Text>
+              <Text style={styles.emptyStateText}>{emptyStateContent.message}</Text>
             </View>
           ) : null}
         </View>
