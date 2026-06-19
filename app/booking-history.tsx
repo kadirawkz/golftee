@@ -68,7 +68,7 @@ export default function BookingHistoryScreen() {
               <Pressable
                 key={booking.id}
                 style={styles.historyCard}
-                onPress={() => router.push({ pathname: "/manage-booking", params: { bookingId: booking.id } })}
+                onPress={() => router.navigate({ pathname: "/manage-booking", params: { bookingId: booking.id } })}
                 variant="card"
               >
                 <View style={styles.historyImageWrap}>

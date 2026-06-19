@@ -181,7 +181,7 @@ export default function ManageBookingScreen() {
           <Pressable
             style={styles.secondaryAction}
             onPress={() =>
-              router.push({
+              router.navigate({
                 pathname: "/tee-time-booking",
                 params: { bookingId: booking.id, id: course.id },
               })
@@ -212,7 +212,7 @@ export default function ManageBookingScreen() {
 
         <Pressable
           style={styles.detailsCard}
-          onPress={() => router.push({ pathname: "/course-details", params: { id: course.id } })}
+          onPress={() => router.navigate({ pathname: "/course-details", params: { id: course.id } })}
           variant="card"
         >
           <View style={styles.detailsLeft}>

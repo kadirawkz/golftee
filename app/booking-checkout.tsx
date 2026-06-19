@@ -255,7 +255,7 @@ export default function BookingCheckoutScreen() {
         <View style={styles.section}>
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionTitle}>Payment Method</Text>
-              <Pressable onPress={() => router.push("/payment-methods")} variant="chip">
+              <Pressable onPress={() => router.navigate("/payment-methods")} variant="chip">
                 <Text style={styles.manageMethodsLink}>Manage</Text>
               </Pressable>
             </View>
@@ -263,7 +263,7 @@ export default function BookingCheckoutScreen() {
             {paymentMethods.length === 0 ? (
               <Pressable
                 style={styles.paymentCard}
-                onPress={() => router.push("/payment-methods")}
+                onPress={() => router.navigate("/payment-methods")}
                 variant="card"
               >
                 <View style={styles.paymentLeft}>

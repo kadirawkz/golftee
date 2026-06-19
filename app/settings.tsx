@@ -264,7 +264,7 @@ export default function SettingsScreen() {
 
             <Pressable
               style={[styles.row, { borderTopWidth: 1, borderColor: colors.borderSoft }]}
-              onPress={() => router.push("/payment-methods")}
+              onPress={() => router.navigate("/payment-methods")}
               variant="card"
             >
               <View style={styles.iconSecondary}>

@@ -183,7 +183,7 @@ export default function Index() {
 
                 <Pressable
                   style={[styles.ctaButton, styles.secondaryCta]}
-                  onPress={() => router.push("/login")}
+                  onPress={() => router.navigate("/login")}
                   variant="button"
                 >
                   <Text style={[styles.ctaText, { color: colors.text }]}>
@@ -195,7 +195,7 @@ export default function Index() {
               <Pressable
                 style={[styles.ctaButton, styles.primaryCta]}
                 hitSlop={8}
-                onPress={() => router.push("/login")}
+                onPress={() => router.navigate("/login")}
                 variant="cta"
               >
                 <View style={styles.ctaContent}>

@@ -575,7 +575,7 @@ export default function TeeTimeBookingScreen() {
       return;
     }
 
-    router.push({
+    router.navigate({
       pathname: "/booking-checkout",
       params: {
         id: course.id,

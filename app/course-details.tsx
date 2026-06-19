@@ -374,7 +374,7 @@ export default function CourseDetailsScreen() {
               <Pressable
                 style={styles.metaMapButton}
                 onPress={() => {
-                  router.push({
+                  router.navigate({
                     pathname: "/explore",
                     params: { view: "map", courseId: course.id },
                   });
@@ -544,7 +544,7 @@ export default function CourseDetailsScreen() {
           </View>
           <Pressable
             style={[styles.bookButton]}
-            onPress={() => router.push({ pathname: "/tee-time-booking", params: { id: course.id } })}
+            onPress={() => router.navigate({ pathname: "/tee-time-booking", params: { id: course.id } })}
             variant="cta"
           >
             <Text style={styles.bookButtonText}>Book Tee Time</Text>

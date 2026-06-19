@@ -184,7 +184,7 @@ export default function NotificationsScreen() {
     }
 
     if (notification.route) {
-      router.push({
+      router.navigate({
         pathname: notification.route as any,
         params: notification.routeParams,
       });
@@ -192,12 +192,12 @@ export default function NotificationsScreen() {
     }
 
     if (notification.type === "booking") {
-      router.push("/bookings");
+      router.navigate("/bookings");
       return;
     }
 
     if (notification.type === "promotion" || notification.type === "updates") {
-      router.push("/explore");
+      router.navigate("/explore");
     }
   };
 

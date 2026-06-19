@@ -142,7 +142,7 @@ export default function ExploreScreen() {
   const coursesWithMetrics = useMemo(() => buildCoursesWithMetrics(courseCatalog.courses), [courseCatalog.courses]);
   const openCourseDetails = useCallback(
     (courseId: string) => {
-      router.push({ pathname: "/course-details", params: { id: courseId } });
+      router.navigate({ pathname: "/course-details", params: { id: courseId } });
     },
     [router]
   );
@@ -1158,7 +1158,7 @@ export default function ExploreScreen() {
 
                       <Pressable
                         style={[styles.mapCardBtn, styles.mapCardBtnPrimary]}
-                        onPress={() => router.push({
+                        onPress={() => router.navigate({
                           pathname: "/tee-time-booking",
                           params: { id: selectedCourse.id }
                         })}

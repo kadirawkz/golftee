@@ -173,7 +173,7 @@ export default function HomeScreen() {
   const heroCardHeight = width < 360 ? 290 : 312;
   const openCourseDetails = useCallback(
     (courseId: string) => {
-      router.push({ pathname: "/course-details", params: { id: courseId } });
+      router.navigate({ pathname: "/course-details", params: { id: courseId } });
     },
     [router]
   );
@@ -365,7 +365,7 @@ export default function HomeScreen() {
                   
                   <Pressable
                     style={[styles.nextRoundBtn, styles.nextRoundBtnPrimary]}
-                    onPress={() => router.push({
+                    onPress={() => router.navigate({
                       pathname: "/manage-booking",
                       params: { bookingId: nextBooking.id }
                     })}
@@ -389,7 +389,7 @@ export default function HomeScreen() {
               </View>
               <Pressable
                 style={styles.nextRoundEmptyBookBtn}
-                onPress={() => router.push("/explore")}
+                onPress={() => router.navigate("/explore")}
                 variant="cta"
               >
                 <Text style={styles.nextRoundEmptyBookBtnText}>Book Now</Text>
@@ -458,7 +458,7 @@ export default function HomeScreen() {
                   <Text style={[styles.heroSubtitle, isCompactScreen && styles.heroSubtitleCompact]}>
                     {slide.description}
                   </Text>
-                  <Pressable style={styles.bookButton} onPress={() => router.push(slide.route)} variant="cta">
+                  <Pressable style={styles.bookButton} onPress={() => router.navigate(slide.route)} variant="cta">
                     <Text style={styles.bookButtonText}>{slide.cta}</Text>
                   </Pressable>
                 </View>
@@ -491,7 +491,7 @@ export default function HomeScreen() {
           <Pressable
             style={styles.viewAllButton}
             onPress={() =>
-              router.push({
+              router.navigate({
                 pathname: "/explore",
                 params: { section: "all-courses", scrollOffset: String(EXPLORE_SCROLL_OFFSET) },
               })
@@ -528,7 +528,7 @@ export default function HomeScreen() {
         <FavoriteCoursesSection
           courses={favoriteCourses}
           onPressCourse={openCourseDetails}
-          onPressViewAll={() => router.push("/favourites")}
+          onPressViewAll={() => router.navigate("/favourites")}
         />
 
         <View style={styles.trendingSection}>

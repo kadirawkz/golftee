@@ -174,7 +174,7 @@ export function AppBottomTabs({ children }: AppBottomTabsProps) {
           onPressLeft={handleHeaderBack}
           showLeftButton={headerConfig.showLeftButton}
           rightIcon={headerConfig.rightIcon}
-          onPressRight={() => router.push("/notifications" as never)}
+          onPressRight={() => router.navigate("/notifications" as never)}
           showRightButton={headerConfig.showRightButton}
         />
       ) : null}

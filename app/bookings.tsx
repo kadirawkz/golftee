@@ -264,7 +264,7 @@ function BookingCard({
             <Pressable
               style={[styles.actionBtn, styles.primaryBtn, { flex: 0, paddingHorizontal: 20 }]}
               onPress={() =>
-                router.push({
+                router.navigate({
                   pathname: "/tee-time-booking",
                   params: { id: course.id },
                 })
@@ -337,7 +337,7 @@ export default function BookingsScreen() {
 
   const handleManageBooking = useCallback(
     (bookingId: string) => {
-      router.push({
+      router.navigate({
         pathname: "/manage-booking",
         params: { bookingId },
       });
@@ -541,7 +541,7 @@ export default function BookingsScreen() {
                 <Text style={styles.emptyTextDesc}>Book a tee time now and enjoy your game.</Text>
                 <Pressable
                   style={styles.bookTeeTimeBtn}
-                  onPress={() => router.push("/home")}
+                  onPress={() => router.navigate("/home")}
                   variant="cta"
                 >
                   <Text style={styles.bookTeeTimeText}>Book a Tee Time</Text>
@@ -605,7 +605,7 @@ export default function BookingsScreen() {
                   <Pressable
                     style={styles.bookFavBtn}
                     onPress={() =>
-                      router.push({
+                      router.navigate({
                         pathname: "/tee-time-booking",
                         params: { id: insightsStats.favCourse!.id },
                       })

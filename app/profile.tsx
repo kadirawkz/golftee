@@ -211,7 +211,7 @@ export default function ProfileScreen() {
         <View style={styles.profileHeaderCard}>
           <View style={styles.headerTopRow}>
             <View style={styles.avatarWrapContainer}>
-              <Pressable style={styles.avatarWrap} onPress={() => router.push("/account")} variant="card">
+              <Pressable style={styles.avatarWrap} onPress={() => router.navigate("/account")} variant="card">
                 {auth.profile?.avatar_url ? (
                   <AppImage source={{ uri: auth.profile.avatar_url }} style={styles.avatarImage} />
                 ) : (
@@ -237,7 +237,7 @@ export default function ProfileScreen() {
 
             <Pressable
               style={styles.settingsHeaderBtn}
-              onPress={() => router.push("/account")}
+              onPress={() => router.navigate("/account")}
               variant="icon"
             >
               <Ionicons name="create-outline" size={22} color={colors.primary} />
@@ -392,7 +392,7 @@ export default function ProfileScreen() {
 
 
           {/* Item 4: App Settings */}
-          <Pressable style={[styles.actionListItem, { borderBottomWidth: 0 }]} onPress={() => router.push("/settings")} variant="card">
+          <Pressable style={[styles.actionListItem, { borderBottomWidth: 0 }]} onPress={() => router.navigate("/settings")} variant="card">
             <View style={styles.actionListLeft}>
               <View style={[styles.actionListIconWrap, { backgroundColor: colors.primarySoft }]}>
                 <Ionicons name="settings" size={18} color={colors.primary} />

@@ -214,7 +214,7 @@ export default function LoginScreen() {
               </Pressable>
 
               <Pressable
-                onPress={() => router.push("/forgot-password")}
+                onPress={() => router.navigate("/forgot-password")}
                 variant="chip"
                 disabled={isSubmitting}
                 accessibilityRole="link"

@@ -68,7 +68,7 @@ export default function FavouritesScreen() {
           title="Your Favourites"
           cardActionLabel="Remove Favourite"
           cardActionIcon="heart-dislike-outline"
-          onPressCourse={(courseId) => router.push({ pathname: "/course-details", params: { id: courseId } })}
+          onPressCourse={(courseId) => router.navigate({ pathname: "/course-details", params: { id: courseId } })}
           onPressCardAction={(courseId) => void handleToggleFavorite(courseId)}
         />
       </ScrollView>
