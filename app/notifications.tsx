@@ -231,6 +231,7 @@ export default function NotificationsScreen() {
             onRefresh={handleRefresh}
             tintColor={colors.primary}
             colors={[colors.primary]}
+            progressBackgroundColor={colors.surface}
           />
         }
         overScrollMode="never"

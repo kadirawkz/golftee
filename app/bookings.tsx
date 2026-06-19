@@ -536,6 +536,7 @@ export default function BookingsScreen() {
             onRefresh={handleRefresh}
             tintColor={colors.primary}
             colors={[colors.primary]}
+            progressBackgroundColor={colors.surface}
           />
         }
         overScrollMode="never"
