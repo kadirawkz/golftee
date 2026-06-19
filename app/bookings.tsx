@@ -541,7 +541,7 @@ export default function BookingsScreen() {
         }
         overScrollMode="never"
       >
-        {bookingState.loading && (
+        {bookingState.loading && !refreshing && (
           <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 24 }} />
         )}
 
