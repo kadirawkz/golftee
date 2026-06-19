@@ -5,13 +5,15 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
-import { formatBookingDate, getBookingTotal, isHistoricalBooking, useBookingState } from "../components/bookings";
-import { getManagedCourseById } from "../components/course-management";
-import { useResponsiveLayout } from "../components/responsive-layout";
-import { theme } from "../components/theme";
+import { formatBookingDate, getBookingTotal, isHistoricalBooking, useBookingState } from "../services/bookings";
+import { getManagedCourseById } from "../services/course-management";
+import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
+import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../components/theme";
 import { getCourseImage } from "../lib/image-mapping";
 
 export default function BookingHistoryScreen() {
+  const { colors, resolvedTheme } = useAppTheme();
+  const styles = useThemedStyles(themedStyles);
   const router = useRouter();
   const { horizontalPadding, screenBottomPadding } = useResponsiveLayout();
   const bookingState = useBookingState();
@@ -23,7 +25,7 @@ export default function BookingHistoryScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={["bottom"]}>
-      <StatusBar style="dark" />
+      <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -82,11 +84,11 @@ export default function BookingHistoryScreen() {
                     <View style={styles.historyTitleWrap}>
                       <Text style={styles.historyTitle}>{course.title}</Text>
                       <View style={styles.locationRow}>
-                        <Ionicons name="location-outline" size={13} color={theme.colors.textSoft} />
+                        <Ionicons name="location-outline" size={13} color={colors.textSoft} />
                         <Text style={styles.locationText}>{course.location}</Text>
                       </View>
                     </View>
-                    <Ionicons name="chevron-forward" size={18} color={theme.colors.muted} />
+                    <Ionicons name="chevron-forward" size={18} color={colors.muted} />
                   </View>
 
                   <View style={styles.metaPanel}>
@@ -121,10 +123,10 @@ export default function BookingHistoryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const themedStyles = createThemedStyleSheet((colors) => ({
   screen: {
     flex: 1,
-    backgroundColor: theme.colors.page,
+    backgroundColor: colors.page,
   },
   scrollContent: {
     padding: 16,
@@ -133,9 +135,9 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     borderRadius: 20,
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: colors.primarySoft,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     padding: 16,
     flexDirection: "row",
     justifyContent: "space-between",
@@ -145,7 +147,7 @@ const styles = StyleSheet.create({
   summaryLabel: {
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontWeight: "700",
     letterSpacing: 1.2,
     marginBottom: 4,
@@ -153,7 +155,7 @@ const styles = StyleSheet.create({
   summaryValue: {
     fontSize: theme.typography.title.fontSize,
     lineHeight: theme.typography.title.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "800",
   },
   summaryMetric: {
@@ -162,7 +164,7 @@ const styles = StyleSheet.create({
   summaryMetricLabel: {
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
-    color: theme.colors.accentWarm,
+    color: colors.accentWarm,
     fontWeight: "700",
     letterSpacing: 1,
     marginBottom: 4,
@@ -170,7 +172,7 @@ const styles = StyleSheet.create({
   summaryMetricValue: {
     fontSize: theme.typography.h2.fontSize,
     lineHeight: theme.typography.h2.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "800",
   },
   list: {
@@ -179,9 +181,9 @@ const styles = StyleSheet.create({
   historyCard: {
     borderRadius: 18,
     overflow: "hidden",
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
   },
   historyImageWrap: {
     height: 156,
@@ -193,7 +195,7 @@ const styles = StyleSheet.create({
   },
   historyOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: theme.colors.overlaySoft,
+    backgroundColor: colors.overlaySoft,
   },
   badge: {
     position: "absolute",
@@ -202,13 +204,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     height: 28,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.glass,
+    backgroundColor: colors.glass,
     justifyContent: "center",
   },
   badgeText: {
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "800",
     letterSpacing: 1,
   },
@@ -229,7 +231,7 @@ const styles = StyleSheet.create({
   historyTitle: {
     fontSize: theme.typography.h3.fontSize,
     lineHeight: theme.typography.h3.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "800",
   },
   locationRow: {
@@ -240,15 +242,15 @@ const styles = StyleSheet.create({
   locationText: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   metaPanel: {
     flexDirection: "row",
     justifyContent: "space-between",
     borderRadius: 14,
-    backgroundColor: theme.colors.surfaceSoft,
+    backgroundColor: colors.surfaceSoft,
     borderWidth: 1,
-    borderColor: theme.colors.borderSoft,
+    borderColor: colors.borderSoft,
     paddingHorizontal: 12,
     paddingVertical: 10,
     gap: 8,
@@ -256,7 +258,7 @@ const styles = StyleSheet.create({
   metaLabel: {
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
-    color: theme.colors.accentWarm,
+    color: colors.accentWarm,
     fontWeight: "700",
     letterSpacing: 1,
     marginBottom: 2,
@@ -264,18 +266,18 @@ const styles = StyleSheet.create({
   metaValue: {
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
-    color: theme.colors.text,
+    color: colors.text,
     fontWeight: "700",
   },
   highlightText: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   statusText: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontWeight: "600",
   },
-});
+}));

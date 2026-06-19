@@ -7,7 +7,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import { useResponsiveLayout } from "./responsive-layout";
+import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
 import { theme, type PressableMotionVariant } from "./theme";
 
 type AnimatedPressableProps = Omit<PressableProps, "children" | "style"> & {

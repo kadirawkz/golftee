@@ -24,10 +24,10 @@ import {
   isHistoricalBooking,
   isUpcomingBooking,
   useBookingState,
-} from "../components/bookings";
-import { getManagedCourseById } from "../components/course-management";
-import { useResponsiveLayout } from "../components/responsive-layout";
-import { theme } from "../components/theme";
+} from "../services/bookings";
+import { getManagedCourseById } from "../services/course-management";
+import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
+import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../components/theme";
 import { getCourseImage } from "../lib/image-mapping";
 
 const SEGMENTED_CONTROL_PADDING = 4;
@@ -39,6 +39,8 @@ type WeatherInfo = {
 
 // Custom Toast component for visual feedback
 function Toast({ message, visible, onHide }: { message: string; visible: boolean; onHide: () => void }) {
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(themedStyles);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -65,13 +67,15 @@ function Toast({ message, visible, onHide }: { message: string; visible: boolean
 
   return (
     <Animated.View style={[styles.toastContainer, { opacity: fadeAnim }]}>
-      <Ionicons name="checkmark-circle" size={18} color={theme.colors.successText} />
+      <Ionicons name="checkmark-circle" size={18} color={colors.successText} />
       <Text style={styles.toastText}>{message}</Text>
     </Animated.View>
   );
 }
 
 function WeatherWidget({ lat, lon, date }: { lat: number; lon: number; date: string }) {
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(themedStyles);
   const [weather, setWeather] = useState<WeatherInfo | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -113,7 +117,7 @@ function WeatherWidget({ lat, lon, date }: { lat: number; lon: number; date: str
   if (loading) {
     return (
       <View style={styles.weatherRow}>
-        <ActivityIndicator size="small" color={theme.colors.primary} />
+        <ActivityIndicator size="small" color={colors.primary} />
         <Text style={styles.weatherText}>Fetching weather forecast...</Text>
       </View>
     );
@@ -135,7 +139,7 @@ function WeatherWidget({ lat, lon, date }: { lat: number; lon: number; date: str
 
   return (
     <View style={styles.weatherRow}>
-      <Ionicons name={weatherIcon} size={14} color={theme.colors.accentWarm} />
+      <Ionicons name={weatherIcon} size={14} color={colors.accentWarm} />
       <Text style={styles.weatherText}>
         Forecast: {weather.temp}°C • {weather.description}
       </Text>
@@ -152,6 +156,8 @@ function BookingCard({
   onPressManage: (bookingId: string) => void;
   showToast: (msg: string) => void;
 }) {
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(themedStyles);
   const router = useRouter();
   const course = getManagedCourseById(booking.course_id);
 
@@ -203,13 +209,13 @@ function BookingCard({
           <Text style={styles.bookingTitle}>{course.title}</Text>
           {isUpcoming && (
             <Pressable style={styles.shareButton} onPress={handleShare} variant="icon">
-              <Ionicons name="share-social-outline" size={20} color={theme.colors.primary} />
+              <Ionicons name="share-social-outline" size={20} color={colors.primary} />
             </Pressable>
           )}
         </View>
 
         <View style={styles.bookingLocationRow}>
-          <Ionicons name="location" size={12} color={theme.colors.textSoft} />
+          <Ionicons name="location" size={12} color={colors.textSoft} />
           <Text style={styles.bookingLocation}>{course.location}</Text>
         </View>
 
@@ -235,12 +241,12 @@ function BookingCard({
         {isUpcoming ? (
           <View style={styles.actionRow}>
             <Pressable style={[styles.actionBtn, styles.borderBtn]} onPress={handleGetDirections} variant="chip">
-              <Ionicons name="map-outline" size={16} color={theme.colors.primary} />
+              <Ionicons name="map-outline" size={16} color={colors.primary} />
               <Text style={styles.actionBtnText}>Directions</Text>
             </Pressable>
 
             <Pressable style={[styles.actionBtn, styles.borderBtn]} onPress={handleAddToCalendar} variant="chip">
-              <Ionicons name="calendar-outline" size={16} color={theme.colors.primary} />
+              <Ionicons name="calendar-outline" size={16} color={colors.primary} />
               <Text style={styles.actionBtnText}>Calendar</Text>
             </Pressable>
 
@@ -260,12 +266,12 @@ function BookingCard({
               onPress={() =>
                 router.push({
                   pathname: "/tee-time-booking",
-                  params: { courseId: course.id },
+                  params: { id: course.id },
                 })
               }
               variant="cta"
             >
-              <Ionicons name="refresh" size={16} color={theme.colors.surface} />
+              <Ionicons name="refresh" size={16} color={colors.surface} />
               <Text style={styles.primaryBtnText}>Book Again</Text>
             </Pressable>
           </View>
@@ -276,6 +282,8 @@ function BookingCard({
 }
 
 export default function BookingsScreen() {
+  const { colors, resolvedTheme } = useAppTheme();
+  const styles = useThemedStyles(themedStyles);
   const router = useRouter();
   const { horizontalPadding, screenBottomPadding } = useResponsiveLayout();
   const bookingState = useBookingState();
@@ -407,7 +415,7 @@ export default function BookingsScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={["bottom"]}>
-      <StatusBar style="dark" />
+      <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
 
       {/* Segmented Tab Control */}
       <View style={[styles.headerContainer, { paddingHorizontal: horizontalPadding }]}>
@@ -450,17 +458,17 @@ export default function BookingsScreen() {
       {activeTab !== "insights" && (
         <View style={[styles.searchFilterContainer, { paddingHorizontal: horizontalPadding }]}>
           <View style={styles.searchBarWrap}>
-            <Ionicons name="search" size={18} color={theme.colors.muted} style={styles.searchIcon} />
+            <Ionicons name="search" size={18} color={colors.muted} style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
               placeholder="Search by course or location..."
-              placeholderTextColor={theme.colors.muted}
+              placeholderTextColor={colors.muted}
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
             {searchQuery.length > 0 && (
               <Pressable onPress={() => setSearchQuery("")} variant="icon">
-                <Ionicons name="close-circle" size={16} color={theme.colors.muted} />
+                <Ionicons name="close-circle" size={16} color={colors.muted} />
               </Pressable>
             )}
           </View>
@@ -511,7 +519,7 @@ export default function BookingsScreen() {
         overScrollMode="never"
       >
         {bookingState.loading && (
-          <ActivityIndicator size="large" color={theme.colors.primary} style={{ marginTop: 24 }} />
+          <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 24 }} />
         )}
 
         {/* Tab 1: Upcoming */}
@@ -528,7 +536,7 @@ export default function BookingsScreen() {
               ))
             ) : (
               <View style={styles.emptyContainer}>
-                <Ionicons name="calendar-outline" size={48} color={theme.colors.muted} />
+                <Ionicons name="calendar-outline" size={48} color={colors.muted} />
                 <Text style={styles.emptyTextTitle}>No upcoming bookings</Text>
                 <Text style={styles.emptyTextDesc}>Book a tee time now and enjoy your game.</Text>
                 <Pressable
@@ -557,7 +565,7 @@ export default function BookingsScreen() {
               ))
             ) : (
               <View style={styles.emptyContainer}>
-                <Ionicons name="journal-outline" size={48} color={theme.colors.muted} />
+                <Ionicons name="journal-outline" size={48} color={colors.muted} />
                 <Text style={styles.emptyTextTitle}>No history found</Text>
                 <Text style={styles.emptyTextDesc}>Your completed or cancelled rounds will appear here.</Text>
               </View>
@@ -572,12 +580,12 @@ export default function BookingsScreen() {
 
             <View style={styles.statsGrid}>
               <View style={styles.statBox}>
-                <Ionicons name="golf-outline" size={24} color={theme.colors.primary} />
+                <Ionicons name="golf-outline" size={24} color={colors.primary} />
                 <Text style={styles.statNumber}>{insightsStats.roundsPlayed}</Text>
                 <Text style={styles.statLabel}>Rounds Played</Text>
               </View>
               <View style={styles.statBox}>
-                <Ionicons name="card-outline" size={24} color={theme.colors.accentWarm} />
+                <Ionicons name="card-outline" size={24} color={colors.accentWarm} />
                 <Text style={styles.statNumber}>${insightsStats.totalSpent.toFixed(0)}</Text>
                 <Text style={styles.statLabel}>Total Spend</Text>
               </View>
@@ -591,7 +599,7 @@ export default function BookingsScreen() {
                   <Text style={styles.favCourseTitle}>{insightsStats.favCourse.title}</Text>
                   <Text style={styles.favCourseLocation}>{insightsStats.favCourse.location}</Text>
                   <View style={styles.favCourseStatRow}>
-                    <Ionicons name="repeat" size={14} color={theme.colors.accentWarm} />
+                    <Ionicons name="repeat" size={14} color={colors.accentWarm} />
                     <Text style={styles.favCourseStatText}>Played {insightsStats.favCount} times</Text>
                   </View>
                   <Pressable
@@ -599,7 +607,7 @@ export default function BookingsScreen() {
                     onPress={() =>
                       router.push({
                         pathname: "/tee-time-booking",
-                        params: { courseId: insightsStats.favCourse!.id },
+                        params: { id: insightsStats.favCourse!.id },
                       })
                     }
                     variant="cta"
@@ -610,7 +618,7 @@ export default function BookingsScreen() {
               </View>
             ) : (
               <View style={styles.emptyContainer}>
-                <Ionicons name="analytics-outline" size={48} color={theme.colors.muted} />
+                <Ionicons name="analytics-outline" size={48} color={colors.muted} />
                 <Text style={styles.emptyTextTitle}>Insights Unavailable</Text>
                 <Text style={styles.emptyTextDesc}>Complete some rounds to see your personal statistics here.</Text>
               </View>
@@ -625,10 +633,10 @@ export default function BookingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const themedStyles = createThemedStyleSheet((colors) => ({
   screen: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: colors.background,
   },
   headerContainer: {
     paddingTop: 12,
@@ -643,9 +651,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     borderRadius: 16,
     padding: SEGMENTED_CONTROL_PADDING,
-    backgroundColor: theme.colors.surfaceSoft,
+    backgroundColor: colors.surfaceSoft,
     borderWidth: 1,
-    borderColor: theme.colors.borderSoft,
+    borderColor: colors.borderSoft,
   },
   segmentIndicator: {
     position: "absolute",
@@ -653,10 +661,10 @@ const styles = StyleSheet.create({
     bottom: SEGMENTED_CONTROL_PADDING,
     left: SEGMENTED_CONTROL_PADDING,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.borderSoft,
-    shadowColor: theme.colors.shadow,
+    borderColor: colors.borderSoft,
+    shadowColor: colors.shadow,
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
@@ -676,10 +684,10 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
     fontWeight: "600",
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   segmentTextActive: {
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "700",
   },
   searchFilterContainer: {
@@ -689,9 +697,9 @@ const styles = StyleSheet.create({
   searchBarWrap: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: theme.colors.surfaceSoft,
+    backgroundColor: colors.surfaceSoft,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     borderRadius: theme.radius.md,
     paddingHorizontal: 12,
     height: 44,
@@ -701,7 +709,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    color: theme.colors.text,
+    color: colors.text,
     fontSize: theme.typography.body.fontSize,
     paddingVertical: 0,
   },
@@ -714,22 +722,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: theme.radius.pill,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
   },
   filterChipActive: {
-    backgroundColor: theme.colors.primarySoft,
-    borderColor: theme.colors.primary,
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primary,
   },
   filterChipText: {
     fontSize: theme.typography.bodySm.fontSize,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontWeight: "600",
   },
   filterChipTextActive: {
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "700",
   },
   sectionWrap: {
@@ -738,16 +746,16 @@ const styles = StyleSheet.create({
   bookingCard: {
     borderRadius: 16,
     overflow: "hidden",
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    shadowColor: theme.colors.shadow,
+    borderColor: colors.border,
+    shadowColor: colors.shadow,
     shadowOpacity: 0.04,
     shadowRadius: 8,
     elevation: 1,
   },
   bookingImageWrap: {
-    height: 140,
+    height: 110,
     position: "relative",
   },
   bookingImage: {
@@ -758,8 +766,8 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 12,
     left: 12,
-    backgroundColor: theme.colors.primary,
-    color: theme.colors.surface,
+    backgroundColor: colors.primary,
+    color: colors.surface,
     fontSize: theme.typography.caption.fontSize,
     fontWeight: "700",
     letterSpacing: 1,
@@ -768,7 +776,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   cancelledBadge: {
-    backgroundColor: theme.colors.danger,
+    backgroundColor: colors.danger,
   },
   bookingBody: {
     padding: 16,
@@ -782,7 +790,7 @@ const styles = StyleSheet.create({
   bookingTitle: {
     fontSize: theme.typography.h3.fontSize,
     fontWeight: "800",
-    color: theme.colors.text,
+    color: colors.text,
     flex: 1,
   },
   shareButton: {
@@ -790,10 +798,10 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
   },
   bookingLocationRow: {
     flexDirection: "row",
@@ -802,13 +810,13 @@ const styles = StyleSheet.create({
   },
   bookingLocation: {
     fontSize: theme.typography.bodySm.fontSize,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   weatherRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: colors.primarySoft,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
@@ -816,14 +824,14 @@ const styles = StyleSheet.create({
   },
   weatherText: {
     fontSize: theme.typography.bodySm.fontSize,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "600",
   },
   bookingMetaPanel: {
     borderRadius: 12,
-    backgroundColor: theme.colors.surfaceSoft,
+    backgroundColor: colors.surfaceSoft,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     paddingHorizontal: 12,
     paddingVertical: 10,
     flexDirection: "row",
@@ -835,14 +843,14 @@ const styles = StyleSheet.create({
   },
   metaLabel: {
     fontSize: theme.typography.caption.fontSize,
-    color: theme.colors.accentWarm,
+    color: colors.accentWarm,
     letterSpacing: 0.9,
     fontWeight: "700",
     marginBottom: 2,
   },
   metaValue: {
     fontSize: theme.typography.body.fontSize,
-    color: theme.colors.text,
+    color: colors.text,
     fontWeight: "700",
   },
   actionRow: {
@@ -862,25 +870,25 @@ const styles = StyleSheet.create({
   },
   borderBtn: {
     borderWidth: 1.5,
-    borderColor: theme.colors.primary,
+    borderColor: colors.primary,
     backgroundColor: "transparent",
   },
   primaryBtn: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
   },
   actionBtnText: {
     fontSize: theme.typography.bodySm.fontSize,
     fontWeight: "700",
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   primaryBtnText: {
     fontSize: theme.typography.bodySm.fontSize,
     fontWeight: "700",
-    color: theme.colors.surface,
+    color: colors.surface,
   },
   historyPrice: {
     fontSize: theme.typography.title.fontSize,
-    color: theme.colors.accentWarm,
+    color: colors.accentWarm,
     fontWeight: "800",
   },
   emptyContainer: {
@@ -892,17 +900,17 @@ const styles = StyleSheet.create({
   emptyTextTitle: {
     fontSize: theme.typography.h3.fontSize,
     fontWeight: "700",
-    color: theme.colors.text,
+    color: colors.text,
     marginTop: 8,
   },
   emptyTextDesc: {
     fontSize: theme.typography.body.fontSize,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     textAlign: "center",
     maxWidth: 240,
   },
   bookTeeTimeBtn: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     paddingHorizontal: 20,
     height: 44,
     borderRadius: theme.radius.pill,
@@ -911,7 +919,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   bookTeeTimeText: {
-    color: theme.colors.surface,
+    color: colors.surface,
     fontSize: theme.typography.body.fontSize,
     fontWeight: "700",
   },
@@ -921,7 +929,7 @@ const styles = StyleSheet.create({
   insightsHeadline: {
     fontSize: theme.typography.h2.fontSize,
     fontWeight: "800",
-    color: theme.colors.text,
+    color: colors.text,
   },
   statsGrid: {
     flexDirection: "row",
@@ -929,9 +937,9 @@ const styles = StyleSheet.create({
   },
   statBox: {
     flex: 1,
-    backgroundColor: theme.colors.surfaceSoft,
+    backgroundColor: colors.surfaceSoft,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     borderRadius: 16,
     padding: 16,
     alignItems: "center",
@@ -940,17 +948,17 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: theme.typography.displayS.fontSize,
     fontWeight: "900",
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   statLabel: {
     fontSize: theme.typography.bodySm.fontSize,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontWeight: "600",
   },
   favoriteCourseCard: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     borderRadius: 20,
     overflow: "hidden",
   },
@@ -958,8 +966,8 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 12,
     right: 12,
-    backgroundColor: theme.colors.accentSoft,
-    color: theme.colors.accentWarm,
+    backgroundColor: colors.accentSoft,
+    color: colors.accentWarm,
     fontSize: theme.typography.caption.fontSize,
     fontWeight: "800",
     paddingHorizontal: 10,
@@ -978,11 +986,11 @@ const styles = StyleSheet.create({
   favCourseTitle: {
     fontSize: theme.typography.h3.fontSize,
     fontWeight: "800",
-    color: theme.colors.text,
+    color: colors.text,
   },
   favCourseLocation: {
     fontSize: theme.typography.bodySm.fontSize,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   favCourseStatRow: {
     flexDirection: "row",
@@ -992,11 +1000,11 @@ const styles = StyleSheet.create({
   },
   favCourseStatText: {
     fontSize: theme.typography.bodySm.fontSize,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontWeight: "700",
   },
   bookFavBtn: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     height: 44,
     borderRadius: theme.radius.pill,
     alignItems: "center",
@@ -1004,7 +1012,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   bookFavText: {
-    color: theme.colors.surface,
+    color: colors.surface,
     fontSize: theme.typography.body.fontSize,
     fontWeight: "700",
   },
@@ -1012,14 +1020,14 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 110,
     alignSelf: "center",
-    backgroundColor: theme.colors.success,
+    backgroundColor: colors.success,
     borderRadius: theme.radius.pill,
     paddingHorizontal: 16,
     paddingVertical: 10,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    shadowColor: theme.colors.shadow,
+    shadowColor: colors.shadow,
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
@@ -1027,6 +1035,6 @@ const styles = StyleSheet.create({
   toastText: {
     fontSize: theme.typography.bodySm.fontSize,
     fontWeight: "700",
-    color: theme.colors.successText,
+    color: colors.successText,
   },
-});
+}));

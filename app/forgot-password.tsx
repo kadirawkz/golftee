@@ -11,15 +11,17 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
-import { sendPasswordResetEmail } from "../components/auth";
-import { useResponsiveLayout } from "../components/responsive-layout";
-import { theme } from "../components/theme";
+import { sendPasswordResetEmail } from "../services/auth";
+import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
+import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../components/theme";
 
 function isValidEmail(value: string) {
   return /\S+@\S+\.\S+/.test(value.trim());
 }
 
 export default function ForgotPasswordScreen() {
+  const { colors, resolvedTheme } = useAppTheme();
+  const styles = useThemedStyles(themedStyles);
   const router = useRouter();
   const { horizontalPadding, screenBottomPadding } = useResponsiveLayout();
   const [email, setEmail] = useState("");
@@ -70,11 +72,11 @@ export default function ForgotPasswordScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
-      <StatusBar style="dark" />
+      <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
 
       <View style={styles.authTopBar}>
         <Pressable style={styles.authBackButton} onPress={() => router.replace("/login")} variant="icon">
-          <Ionicons name="arrow-back" size={22} color={theme.colors.primary} />
+          <Ionicons name="arrow-back" size={22} color={colors.primary} />
         </Pressable>
         <Text style={styles.authTopTitle}>{title}</Text>
         <View style={styles.authTopSpacer} />
@@ -104,7 +106,7 @@ export default function ForgotPasswordScreen() {
             <>
               <View style={styles.infoCard}>
                 <View style={styles.infoIconWrap}>
-                  <Ionicons name="mail-open-outline" size={18} color={theme.colors.primary} />
+                  <Ionicons name="mail-open-outline" size={18} color={colors.primary} />
                 </View>
                 <Text style={styles.infoText}>
                   We will send reset instructions to the email used for your GolfTee account.
@@ -114,10 +116,10 @@ export default function ForgotPasswordScreen() {
               <View style={styles.inputShell}>
                 <Text style={[styles.inputLabel, error && styles.inputLabelError]}>EMAIL ADDRESS</Text>
                 <View style={styles.inputRow}>
-                  <Ionicons name="mail-outline" size={18} color={theme.colors.muted} />
+                  <Ionicons name="mail-outline" size={18} color={colors.muted} />
                   <TextInput
                     placeholder="name@example.com"
-                    placeholderTextColor={theme.colors.muted}
+                    placeholderTextColor={colors.muted}
                     style={[styles.inputField, error && styles.inputFieldError]}
                     keyboardType="email-address"
                     autoCapitalize="none"
@@ -149,14 +151,14 @@ export default function ForgotPasswordScreen() {
                 <Text style={styles.primaryButtonText}>
                   {isSubmitting ? "Sending Link..." : "Send Reset Link"}
                 </Text>
-                <Ionicons name="arrow-forward" size={20} color={theme.colors.surface} />
+                <Ionicons name="arrow-forward" size={20} color={colors.surface} />
               </Pressable>
             </>
           ) : (
             <>
               <View style={styles.successCard}>
                 <View style={styles.successIconWrap}>
-                  <Ionicons name="checkmark-circle" size={28} color={theme.colors.successText} />
+                  <Ionicons name="checkmark-circle" size={28} color={colors.successText} />
                 </View>
                 <Text style={styles.successTitle}>Reset Instructions Sent</Text>
                 <Text style={styles.successText}>
@@ -170,7 +172,7 @@ export default function ForgotPasswordScreen() {
 
               <Pressable style={styles.primaryButton} onPress={() => router.replace("/login")} variant="cta">
                 <Text style={styles.primaryButtonText}>Back to Login</Text>
-                <Ionicons name="arrow-forward" size={20} color={theme.colors.surface} />
+                <Ionicons name="arrow-forward" size={20} color={colors.surface} />
               </Pressable>
 
               <Pressable style={styles.secondaryButton} onPress={handleTryAnotherEmail} variant="button">
@@ -184,10 +186,10 @@ export default function ForgotPasswordScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const themedStyles = createThemedStyleSheet((colors) => ({
   screen: {
     flex: 1,
-    backgroundColor: theme.colors.page,
+    backgroundColor: colors.page,
   },
   scroll: {
     flex: 1,
@@ -217,7 +219,7 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.h4.fontSize,
     lineHeight: theme.typography.h4.lineHeight,
     fontWeight: "800",
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   authTopSpacer: {
     width: 34,
@@ -236,22 +238,22 @@ const styles = StyleSheet.create({
     lineHeight: theme.typography.title.lineHeight,
     fontWeight: "900",
     letterSpacing: 0.6,
-    color: theme.colors.text,
+    color: colors.text,
   },
   subtitle: {
     maxWidth: "92%",
     fontSize: theme.typography.body.fontSize,
     lineHeight: 22,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   panel: {
     gap: 14,
   },
   infoCard: {
     borderRadius: 20,
-    backgroundColor: theme.colors.surfaceSoft,
+    backgroundColor: colors.surfaceSoft,
     borderWidth: 1,
-    borderColor: theme.colors.borderSoft,
+    borderColor: colors.borderSoft,
     paddingHorizontal: 14,
     paddingVertical: 14,
     flexDirection: "row",
@@ -264,19 +266,19 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     flexShrink: 0,
   },
   infoText: {
     flex: 1,
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight + 2,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   inputShell: {
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     paddingHorizontal: 16,
     paddingTop: 14,
     paddingBottom: 12,
@@ -291,21 +293,21 @@ const styles = StyleSheet.create({
     lineHeight: theme.typography.label.lineHeight,
     fontWeight: "700",
     letterSpacing: 1.6,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     marginBottom: 8,
   },
   inputLabelError: {
-    color: theme.colors.danger,
+    color: colors.danger,
   },
   inputField: {
     flex: 1,
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
-    color: theme.colors.text,
+    color: colors.text,
     paddingVertical: 0,
   },
   inputFieldError: {
-    color: theme.colors.danger,
+    color: colors.danger,
   },
   errorRow: {
     flexDirection: "row",
@@ -317,23 +319,23 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: theme.colors.danger,
+    backgroundColor: colors.danger,
   },
   errorText: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.danger,
+    color: colors.danger,
     fontWeight: "600",
   },
   primaryButton: {
     height: 58,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
     gap: 10,
-    shadowColor: theme.colors.shadow,
+    shadowColor: colors.shadow,
     shadowOpacity: 0.25,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },
@@ -342,7 +344,7 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
-    color: theme.colors.textOnPrimary,
+    color: colors.textOnPrimary,
     fontWeight: "700",
     letterSpacing: 0.3,
   },
@@ -350,22 +352,22 @@ const styles = StyleSheet.create({
     height: 54,
     borderRadius: theme.radius.pill,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
   },
   secondaryButtonText: {
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "700",
   },
   successCard: {
     borderRadius: 24,
-    backgroundColor: theme.colors.surfaceSoft,
+    backgroundColor: colors.surfaceSoft,
     borderWidth: 1,
-    borderColor: theme.colors.borderSoft,
+    borderColor: colors.borderSoft,
     paddingHorizontal: 18,
     paddingVertical: 20,
     alignItems: "center",
@@ -377,26 +379,26 @@ const styles = StyleSheet.create({
     borderRadius: 29,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.colors.success,
+    backgroundColor: colors.success,
   },
   successTitle: {
     fontSize: theme.typography.h3.fontSize,
     lineHeight: theme.typography.h3.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "800",
   },
   successText: {
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight + 2,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     textAlign: "center",
   },
   successMeta: {
     width: "100%",
     borderRadius: 16,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.borderSoft,
+    borderColor: colors.borderSoft,
     paddingHorizontal: 14,
     paddingVertical: 12,
     marginTop: 4,
@@ -404,7 +406,7 @@ const styles = StyleSheet.create({
   successMetaLabel: {
     fontSize: theme.typography.label.fontSize,
     lineHeight: theme.typography.label.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontWeight: "700",
     letterSpacing: 1.2,
     marginBottom: 4,
@@ -412,7 +414,7 @@ const styles = StyleSheet.create({
   successMetaValue: {
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
-    color: theme.colors.text,
+    color: colors.text,
     fontWeight: "700",
   },
-});
+}));

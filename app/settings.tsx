@@ -15,13 +15,15 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
-import { useResponsiveLayout } from "../components/responsive-layout";
-import { theme } from "../components/theme";
-import { signOut } from "../components/auth";
+import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
+import { createThemedStyleSheet, useThemedStyles, useAppTheme } from "../components/theme";
 import { supabase } from "../lib/supabase";
+import { useAuthSession } from "../services/auth";
 import { useRouter } from "expo-router";
 
 function SectionHeader({ title, caption }: { title: string; caption?: string }) {
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(themedStyles);
   return (
     <View style={styles.sectionHeader}>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -33,6 +35,11 @@ function SectionHeader({ title, caption }: { title: string; caption?: string }) 
 export default function SettingsScreen() {
   const router = useRouter();
   const { horizontalPadding, screenBottomPadding } = useResponsiveLayout();
+  const { themeMode, setThemeMode, colors, resolvedTheme } = useAppTheme();
+  const styles = useThemedStyles(themedStyles);
+
+  const auth = useAuthSession();
+  const userEmail = auth.session?.user?.email;
 
   // Settings State
   const [bookingAlerts, setBookingAlerts] = useState(true);
@@ -42,13 +49,13 @@ export default function SettingsScreen() {
 
   // Modals state
   const [isPasswordModalVisible, setIsPasswordModalVisible] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [passwordStatus, setPasswordStatus] = useState<string | null>(null);
 
   const [isFaqModalVisible, setIsFaqModalVisible] = useState(false);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // Load preferences
   useEffect(() => {
@@ -95,6 +102,10 @@ export default function SettingsScreen() {
 
   // Change Password
   const handleUpdatePassword = async () => {
+    if (!currentPassword) {
+      setPasswordStatus("Please enter your current password.");
+      return;
+    }
     if (!newPassword || newPassword.length < 6) {
       setPasswordStatus("Password must be at least 6 characters.");
       return;
@@ -107,11 +118,28 @@ export default function SettingsScreen() {
     setIsUpdatingPassword(true);
     setPasswordStatus(null);
     try {
+      if (!userEmail) {
+        throw new Error("Unable to identify current user session.");
+      }
+
+      // Verify current password by attempting to sign in
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: userEmail,
+        password: currentPassword,
+      });
+
+      if (signInError) {
+        throw new Error("Incorrect current password.");
+      }
+
+      // Update to new password
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
+
       setPasswordStatus("Password updated securely!");
       setTimeout(() => {
         setIsPasswordModalVisible(false);
+        setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
         setPasswordStatus(null);
@@ -123,23 +151,11 @@ export default function SettingsScreen() {
     }
   };
 
-  // Sign out
-  const handleLogout = async () => {
-    if (isLoggingOut) return;
-    setIsLoggingOut(true);
-    try {
-      await signOut();
-      router.replace("/splash");
-    } catch {
-      Alert.alert("Logout Failed", "Unable to log out right now.");
-    } finally {
-      setIsLoggingOut(false);
-    }
-  };
+
 
   return (
     <SafeAreaView style={styles.screen} edges={["bottom"]}>
-      <StatusBar style="dark" />
+      <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
@@ -150,17 +166,7 @@ export default function SettingsScreen() {
         overScrollMode="never"
         contentInsetAdjustmentBehavior="never"
       >
-        {/* Sync Summary */}
-        <View style={styles.summaryCard}>
-          <View>
-            <Text style={styles.summaryLabel}>PREFERENCES</Text>
-            <Text style={styles.summaryValue}>Preferences Saved</Text>
-          </View>
-          <View style={styles.summaryBadge}>
-            <Ionicons name="shield-checkmark" size={16} color={theme.colors.successText} />
-            <Text style={styles.summaryBadgeText}>Encrypted</Text>
-          </View>
-        </View>
+
 
         {/* Notifications */}
         <View style={styles.section}>
@@ -168,7 +174,7 @@ export default function SettingsScreen() {
           <View style={styles.card}>
             <View style={styles.row}>
               <View style={styles.iconPrimary}>
-                <Ionicons name="notifications-outline" size={18} color={theme.colors.primary} />
+                <Ionicons name="notifications-outline" size={18} color={colors.text} />
               </View>
               <View style={styles.rowCopy}>
                 <Text style={styles.rowTitle}>Booking Alerts</Text>
@@ -177,14 +183,14 @@ export default function SettingsScreen() {
               <Switch
                 value={bookingAlerts}
                 onValueChange={handleToggleBookingAlerts}
-                trackColor={{ false: theme.colors.borderStrong, true: theme.colors.primary }}
-                thumbColor={theme.colors.surface}
+                trackColor={{ false: colors.borderStrong, true: colors.accent }}
+                thumbColor="#FFFFFF"
               />
             </View>
 
             <View style={styles.row}>
               <View style={styles.iconPrimary}>
-                <Ionicons name="megaphone-outline" size={18} color={theme.colors.primary} />
+                <Ionicons name="megaphone-outline" size={18} color={colors.text} />
               </View>
               <View style={styles.rowCopy}>
                 <Text style={styles.rowTitle}>System Notifications</Text>
@@ -193,9 +199,40 @@ export default function SettingsScreen() {
               <Switch
                 value={systemAlerts}
                 onValueChange={handleToggleSystemAlerts}
-                trackColor={{ false: theme.colors.borderStrong, true: theme.colors.primary }}
-                thumbColor={theme.colors.surface}
+                trackColor={{ false: colors.borderStrong, true: colors.accent }}
+                thumbColor="#FFFFFF"
               />
+            </View>
+          </View>
+        </View>
+
+        {/* App Theme Selection */}
+        <View style={styles.section}>
+          <SectionHeader title="App Theme" caption="Toggle between light and dark visual aesthetics." />
+          <View style={styles.card}>
+            <View style={styles.prefSelectorRow}>
+              <Text style={styles.prefLabel}>THEME MODE</Text>
+              <View style={styles.chipGroup}>
+                {(["system", "light", "dark"] as const).map((mode) => {
+                  const active = themeMode === mode;
+                  return (
+                    <Pressable
+                      key={mode}
+                      style={[styles.prefChip, active && styles.prefChipActive]}
+                      onPress={() => void setThemeMode(mode)}
+                      variant="chip"
+                    >
+                      <Text style={[styles.prefChipText, active && styles.prefChipTextActive]}>
+                        {mode === "system"
+                          ? "System"
+                          : mode === "light"
+                          ? "Light Theme"
+                          : "Dark Theme"}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
             </View>
           </View>
         </View>
@@ -225,26 +262,20 @@ export default function SettingsScreen() {
               </View>
             </View>
 
-            <View style={[styles.prefSelectorRow, { borderTopWidth: 1, borderColor: theme.colors.borderSoft }]}>
-              <Text style={styles.prefLabel}>PREFERRED PAYMENT</Text>
-              <View style={styles.chipGroup}>
-                {(["wallet", "card"] as const).map((method) => {
-                  const active = defaultPayment === method;
-                  return (
-                    <Pressable
-                      key={method}
-                      style={[styles.prefChip, active && styles.prefChipActive]}
-                      onPress={() => void handleSelectDefaultPayment(method)}
-                      variant="chip"
-                    >
-                      <Text style={[styles.prefChipText, active && styles.prefChipTextActive]}>
-                        {method === "wallet" ? "Digital Wallet" : "Card"}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
+            <Pressable
+              style={[styles.row, { borderTopWidth: 1, borderColor: colors.borderSoft }]}
+              onPress={() => router.push("/payment-methods")}
+              variant="card"
+            >
+              <View style={styles.iconSecondary}>
+                <Ionicons name="card-outline" size={18} color={colors.text} />
               </View>
-            </View>
+              <View style={styles.rowCopy}>
+                <Text style={styles.rowTitle}>Payment Methods</Text>
+                <Text style={styles.rowDescription}>Manage cards and digital wallets.</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+            </Pressable>
           </View>
         </View>
 
@@ -258,13 +289,13 @@ export default function SettingsScreen() {
               variant="card"
             >
               <View style={styles.iconSecondary}>
-                <Ionicons name="key-outline" size={18} color={theme.colors.accentWarm} />
+                <Ionicons name="key-outline" size={18} color={colors.text} />
               </View>
               <View style={styles.rowCopy}>
                 <Text style={styles.rowTitle}>Change Password</Text>
                 <Text style={styles.rowDescription}>Update Supabase password securely.</Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={theme.colors.muted} />
+              <Ionicons name="chevron-forward" size={18} color={colors.muted} />
             </Pressable>
 
             <Pressable
@@ -273,37 +304,18 @@ export default function SettingsScreen() {
               variant="card"
             >
               <View style={styles.iconSecondary}>
-                <Ionicons name="help-circle-outline" size={18} color={theme.colors.accentWarm} />
+                <Ionicons name="help-circle-outline" size={18} color={colors.text} />
               </View>
               <View style={styles.rowCopy}>
                 <Text style={styles.rowTitle}>FAQs & Information</Text>
                 <Text style={styles.rowDescription}>Booking rules & cancellation policies.</Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={theme.colors.muted} />
+              <Ionicons name="chevron-forward" size={18} color={colors.muted} />
             </Pressable>
           </View>
         </View>
 
-        {/* Danger Zone */}
-        <View style={styles.section}>
-          <SectionHeader title="Danger Zone" />
-          <View style={styles.card}>
-            <Pressable
-              style={styles.row}
-              onPress={() => void handleLogout()}
-              variant="card"
-            >
-              <View style={[styles.iconSecondary, styles.iconDanger]}>
-                <Ionicons name="log-out-outline" size={18} color={theme.colors.surface} />
-              </View>
-              <View style={styles.rowCopy}>
-                <Text style={styles.rowTitle}>Log Out Account</Text>
-                <Text style={styles.rowDescription}>Securely sign out of current session.</Text>
-              </View>
-              {isLoggingOut ? <ActivityIndicator size="small" color={theme.colors.danger} /> : null}
-            </Pressable>
-          </View>
-        </View>
+
       </ScrollView>
 
       {/* Change Password Modal */}
@@ -319,12 +331,25 @@ export default function SettingsScreen() {
             <Text style={styles.modalSubtitle}>Change your sign-in password securely.</Text>
 
             <View style={styles.inputShell}>
+              <Text style={styles.inputLabel}>CURRENT PASSWORD</Text>
+              <TextInput
+                secureTextEntry
+                style={styles.inputField}
+                placeholder="Enter current password"
+                placeholderTextColor={colors.muted}
+                value={currentPassword}
+                onChangeText={setCurrentPassword}
+                autoCapitalize="none"
+              />
+            </View>
+
+            <View style={styles.inputShell}>
               <Text style={styles.inputLabel}>NEW PASSWORD</Text>
               <TextInput
                 secureTextEntry
                 style={styles.inputField}
                 placeholder="Minimum 6 characters"
-                placeholderTextColor={theme.colors.muted}
+                placeholderTextColor={colors.muted}
                 value={newPassword}
                 onChangeText={setNewPassword}
                 autoCapitalize="none"
@@ -337,7 +362,7 @@ export default function SettingsScreen() {
                 secureTextEntry
                 style={styles.inputField}
                 placeholder="Re-enter password"
-                placeholderTextColor={theme.colors.muted}
+                placeholderTextColor={colors.muted}
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
                 autoCapitalize="none"
@@ -351,6 +376,7 @@ export default function SettingsScreen() {
                 style={[styles.modalBtn, styles.modalBtnCancel]}
                 onPress={() => {
                   setIsPasswordModalVisible(false);
+                  setCurrentPassword("");
                   setNewPassword("");
                   setConfirmPassword("");
                   setPasswordStatus(null);
@@ -366,7 +392,7 @@ export default function SettingsScreen() {
                 variant="cta"
               >
                 {isUpdatingPassword ? (
-                  <ActivityIndicator size="small" color={theme.colors.surface} />
+                  <ActivityIndicator size="small" color={colors.background} />
                 ) : (
                   <Text style={styles.modalBtnSaveText}>Save Changes</Text>
                 )}
@@ -392,7 +418,7 @@ export default function SettingsScreen() {
                 onPress={() => setIsFaqModalVisible(false)}
                 variant="icon"
               >
-                <Ionicons name="close" size={24} color={theme.colors.primary} />
+                <Ionicons name="close" size={24} color={colors.text} />
               </Pressable>
             </View>
 
@@ -432,10 +458,10 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const themedStyles = createThemedStyleSheet((colors) => ({
   screen: {
     flex: 1,
-    backgroundColor: theme.colors.page,
+    backgroundColor: colors.page,
   },
   scrollContent: {
     padding: 16,
@@ -444,9 +470,9 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     borderRadius: 20,
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: colors.surfaceSoft,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     paddingHorizontal: 16,
     paddingVertical: 14,
     flexDirection: "row",
@@ -455,17 +481,17 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   summaryLabel: {
-    fontSize: theme.typography.caption.fontSize,
-    lineHeight: theme.typography.caption.lineHeight,
-    color: theme.colors.textSoft,
+    fontSize: 10,
+    lineHeight: 13,
+    color: colors.muted,
     letterSpacing: 1.2,
     fontWeight: "700",
     marginBottom: 4,
   },
   summaryValue: {
-    fontSize: theme.typography.title.fontSize,
-    lineHeight: theme.typography.title.lineHeight,
-    color: theme.colors.primary,
+    fontSize: 16,
+    lineHeight: 22,
+    color: colors.text,
     fontWeight: "800",
   },
   summaryBadge: {
@@ -474,13 +500,13 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 10,
     height: 32,
-    borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.success,
+    borderRadius: 999,
+    backgroundColor: colors.success,
   },
   summaryBadgeText: {
-    fontSize: theme.typography.bodySm.fontSize,
-    lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.successText,
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.successText,
     fontWeight: "700",
   },
   section: {
@@ -490,21 +516,21 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   sectionTitle: {
-    fontSize: theme.typography.h3.fontSize,
-    lineHeight: theme.typography.h3.lineHeight,
-    color: theme.colors.primary,
+    fontSize: 20,
+    lineHeight: 26,
+    color: colors.text,
     fontWeight: "800",
   },
   sectionCaption: {
-    fontSize: theme.typography.bodySm.fontSize,
-    lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.textSoft,
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.muted,
   },
   card: {
     borderRadius: 20,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     overflow: "hidden",
   },
   row: {
@@ -514,13 +540,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 15,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.borderSoft,
+    borderBottomColor: colors.borderSoft,
   },
   iconPrimary: {
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: colors.surfaceSoft,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -528,27 +554,27 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: theme.colors.accentSoft,
+    backgroundColor: colors.surfaceSoft,
     alignItems: "center",
     justifyContent: "center",
   },
   iconDanger: {
-    backgroundColor: theme.colors.danger,
+    backgroundColor: colors.danger,
   },
   rowCopy: {
     flex: 1,
   },
   rowTitle: {
-    fontSize: theme.typography.subtitle.fontSize,
-    lineHeight: theme.typography.subtitle.lineHeight,
-    color: theme.colors.text,
+    fontSize: 15,
+    lineHeight: 22,
+    color: colors.text,
     fontWeight: "700",
     marginBottom: 2,
   },
   rowDescription: {
-    fontSize: theme.typography.bodySm.fontSize,
-    lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.textSoft,
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.muted,
   },
 
   // Booking Defaults styling
@@ -557,10 +583,10 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   prefLabel: {
-    fontSize: theme.typography.label.fontSize,
+    fontSize: 11,
     fontWeight: "700",
     letterSpacing: 1.2,
-    color: theme.colors.textSoft,
+    color: colors.muted,
   },
   chipGroup: {
     flexDirection: "row",
@@ -572,20 +598,20 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surfaceSoft,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceSoft,
   },
   prefChipActive: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
+    backgroundColor: colors.text,
+    borderColor: colors.text,
   },
   prefChipText: {
-    fontSize: theme.typography.bodySm.fontSize,
+    fontSize: 12,
     fontWeight: "600",
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   prefChipTextActive: {
-    color: theme.colors.surface,
+    color: colors.background,
     fontWeight: "700",
   },
 
@@ -599,49 +625,49 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: "100%",
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 24,
     padding: 24,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     gap: 16,
   },
   modalTitle: {
-    fontSize: theme.typography.h3.fontSize,
-    color: theme.colors.primary,
+    fontSize: 20,
+    color: colors.text,
     fontWeight: "800",
     textAlign: "center",
   },
   modalSubtitle: {
-    fontSize: theme.typography.bodySm.fontSize,
-    color: theme.colors.textSoft,
+    fontSize: 12,
+    color: colors.muted,
     textAlign: "center",
     marginBottom: 10,
   },
   inputShell: {
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: theme.colors.surfaceSoft,
+    backgroundColor: colors.surfaceSoft,
   },
   inputLabel: {
-    fontSize: theme.typography.label.fontSize,
+    fontSize: 11,
     fontWeight: "700",
     letterSpacing: 1.4,
-    color: theme.colors.textSoft,
+    color: colors.muted,
     marginBottom: 6,
   },
   inputField: {
-    fontSize: theme.typography.body.fontSize,
-    color: theme.colors.text,
+    fontSize: 14,
+    color: colors.text,
     paddingVertical: 0,
   },
   statusText: {
-    fontSize: theme.typography.bodySm.fontSize,
+    fontSize: 12,
     fontWeight: "600",
-    color: theme.colors.primary,
+    color: colors.text,
     textAlign: "center",
   },
   modalActionsRow: {
@@ -652,27 +678,27 @@ const styles = StyleSheet.create({
   modalBtn: {
     flex: 1,
     height: 48,
-    borderRadius: theme.radius.pill,
+    borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
   },
   modalBtnCancel: {
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surfaceSoft,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceSoft,
   },
   modalBtnCancelText: {
-    fontSize: theme.typography.body.fontSize,
+    fontSize: 14,
     fontWeight: "700",
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   modalBtnSave: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.text,
   },
   modalBtnSaveText: {
-    fontSize: theme.typography.body.fontSize,
+    fontSize: 14,
     fontWeight: "700",
-    color: theme.colors.surface,
+    color: colors.background,
   },
 
   // FAQ Modal
@@ -683,7 +709,7 @@ const styles = StyleSheet.create({
   },
   faqContainer: {
     height: "80%",
-    backgroundColor: theme.colors.page,
+    backgroundColor: colors.page,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     overflow: "hidden",
@@ -693,20 +719,20 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     padding: 20,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderColor: theme.colors.borderSoft,
+    borderColor: colors.borderSoft,
   },
   faqHeaderTitle: {
-    fontSize: theme.typography.h3.fontSize,
-    color: theme.colors.primary,
+    fontSize: 20,
+    color: colors.text,
     fontWeight: "800",
   },
   faqCloseBtn: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: theme.colors.surfaceSoft,
+    backgroundColor: colors.surfaceSoft,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -715,21 +741,21 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   faqCard: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     padding: 16,
     gap: 8,
   },
   faqQuestion: {
-    fontSize: theme.typography.subtitle.fontSize,
+    fontSize: 15,
     fontWeight: "800",
-    color: theme.colors.primary,
+    color: colors.text,
   },
   faqAnswer: {
-    fontSize: theme.typography.bodySm.fontSize,
-    lineHeight: theme.typography.bodySm.lineHeight + 2,
-    color: theme.colors.textSoft,
+    fontSize: 12,
+    lineHeight: 19,
+    color: colors.textSoft,
   },
-});
+}));

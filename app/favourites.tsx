@@ -3,13 +3,15 @@ import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useCourseCatalog } from "../components/course-management";
+import { useCourseCatalog } from "../services/course-management";
 import { FavoriteCoursesSection } from "../components/favorite-courses-section";
-import { toggleFavoriteCourse, useFavoriteCourseState } from "../components/favorites";
-import { useResponsiveLayout } from "../components/responsive-layout";
-import { theme } from "../components/theme";
+import { toggleFavoriteCourse, useFavoriteCourseState } from "../services/favorites";
+import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
+import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../components/theme";
 
 export default function FavouritesScreen() {
+  const { colors, resolvedTheme } = useAppTheme();
+  const styles = useThemedStyles(themedStyles);
   const router = useRouter();
   const courseCatalog = useCourseCatalog();
   const { horizontalPadding, screenBottomPadding, scaleFont, scaleLineHeight } = useResponsiveLayout();
@@ -28,7 +30,7 @@ export default function FavouritesScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={["bottom"]}>
-      <StatusBar style="dark" />
+      <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -74,10 +76,10 @@ export default function FavouritesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const themedStyles = createThemedStyleSheet((colors) => ({
   screen: {
     flex: 1,
-    backgroundColor: theme.colors.page,
+    backgroundColor: colors.page,
   },
   scrollContent: {
     paddingHorizontal: 16,
@@ -88,34 +90,34 @@ const styles = StyleSheet.create({
   heroCard: {
     borderRadius: 22,
     padding: 18,
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: colors.primarySoft,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     gap: 8,
   },
   heroEyebrow: {
     fontSize: theme.typography.label.fontSize,
     lineHeight: theme.typography.label.lineHeight,
     fontWeight: "700",
-    color: theme.colors.accentWarm,
+    color: colors.accentWarm,
     letterSpacing: 2.2,
   },
   heroTitle: {
     fontSize: theme.typography.h1.fontSize,
     lineHeight: theme.typography.h1.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "800",
   },
   heroText: {
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     maxWidth: 360,
   },
   statusText: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontWeight: "600",
   },
-});
+}));

@@ -1,15 +1,17 @@
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
-import { Animated, StyleSheet, Text, View } from "react-native";
+import { Animated, Dimensions, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
-import { useAuthSession } from "../components/auth";
-import { useResponsiveLayout } from "../components/responsive-layout";
-import { theme } from "../components/theme";
+import { useAuthSession } from "../services/auth";
+import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
+import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../components/theme";
 import { supabase } from "../lib/supabase";
+
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const BACKGROUND_IMAGE =
   "https://lh3.googleusercontent.com/aida-public/AB6AXuD_5BKCG8Zh7AAgflRKh9OreYX0em7HY62MIYhAGGTTIV8uyTkkcljbFHcMS5olpcil4zJIsJswq12eK62vnzH-N0iH3K2Y2OeDiQGMn8M73lT-5X5uuCAk4sXAwPlKEiNSjvtRY2w6RBZw5h-wjaTFO-va556Z5PnrkrMcxo3QRySUyL44BeOHTHtTPdAG3iE_Amz5rl9yjAblI-M3oBniJaKNXBcxDa3UQLLkzQh1RvvFH5Vf3GVf0v-9lvOqTncFis60R9HOeC0";
@@ -21,6 +23,8 @@ const HIGHLIGHTS = [
 ];
 
 export default function Index() {
+  const { colors, resolvedTheme } = useAppTheme();
+  const styles = useThemedStyles(themedStyles);
   const router = useRouter();
   const auth = useAuthSession();
   const { scaleFont, scaleLineHeight } = useResponsiveLayout();
@@ -31,6 +35,10 @@ export default function Index() {
   // Automated Highlights Carousel State
   const [slideIndex, setSlideIndex] = useState(0);
   const fadeAnim = useRef(new Animated.Value(1)).current;
+  
+  // Intro slide/fade transition animations
+  const logoTranslateY = useRef(new Animated.Value(SCREEN_HEIGHT / 2 - 200)).current;
+  const contentOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const checkConnection = async () => {
@@ -44,6 +52,22 @@ export default function Index() {
       }
     };
     checkConnection();
+  }, []);
+
+  useEffect(() => {
+    // Run intro animation
+    Animated.parallel([
+      Animated.timing(logoTranslateY, {
+        toValue: 0,
+        duration: 850,
+        useNativeDriver: true,
+      }),
+      Animated.timing(contentOpacity, {
+        toValue: 1,
+        duration: 850,
+        useNativeDriver: true,
+      }),
+    ]).start();
   }, []);
 
   useEffect(() => {
@@ -76,15 +100,18 @@ export default function Index() {
 
   return (
     <View style={styles.screen}>
-      <StatusBar style="light" />
+      <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
 
       <View style={styles.background}>
         <AppImage source={{ uri: BACKGROUND_IMAGE }} style={styles.backgroundImage} />
-        <View style={styles.dimLayer} />
+        <View style={[
+          styles.dimLayer,
+          { backgroundColor: resolvedTheme === "dark" ? "rgba(7, 32, 24, 0.78)" : "rgba(255, 255, 255, 0.88)" }
+        ]} />
 
         <SafeAreaView style={styles.safeArea}>
           {/* Top Bar with DB Connectivity Status */}
-          <View style={styles.topBar}>
+          <Animated.View style={[styles.topBar, { opacity: contentOpacity }]}>
             <View style={styles.statusBadge}>
               <View
                 style={[
@@ -99,10 +126,10 @@ export default function Index() {
                 {dbStatus === "offline" && "Offline / Server Issue"}
               </Text>
             </View>
-          </View>
+          </Animated.View>
 
           {/* Logo & Title branding */}
-          <View style={styles.brandBlock}>
+          <Animated.View style={[styles.brandBlock, { transform: [{ translateY: logoTranslateY }] }]}>
             <View style={styles.logoShell}>
               <AppImage source={require("../assets/images/icon.png")} style={styles.logoImage} />
             </View>
@@ -118,10 +145,10 @@ export default function Index() {
             >
               GolfTee
             </Text>
-          </View>
+          </Animated.View>
 
           {/* Dynamic Highlights Swipe Carousel */}
-          <Animated.View style={[styles.carouselContainer, { opacity: fadeAnim }]}>
+          <Animated.View style={[styles.carouselContainer, { opacity: Animated.multiply(fadeAnim, contentOpacity) }]}>
             <Text style={styles.carouselTitle}>{HIGHLIGHTS[slideIndex].title}</Text>
             <Text style={styles.carouselDesc}>{HIGHLIGHTS[slideIndex].desc}</Text>
             
@@ -137,7 +164,7 @@ export default function Index() {
           </Animated.View>
 
           {/* Call To Actions */}
-          <View style={styles.bottomArea}>
+          <Animated.View style={[styles.bottomArea, { opacity: contentOpacity }]}>
             {auth.initialized && auth.isAuthenticated ? (
               <View style={styles.loggedActionsWrap}>
                 <Pressable
@@ -150,7 +177,7 @@ export default function Index() {
                     <Text style={styles.ctaText}>
                       Continue as {memberName}
                     </Text>
-                    <Ionicons name="arrow-forward" size={18} color={theme.colors.primary} />
+                    <Ionicons name="arrow-forward" size={18} color={colors.surface} />
                   </View>
                 </Pressable>
 
@@ -159,7 +186,7 @@ export default function Index() {
                   onPress={() => router.push("/login")}
                   variant="button"
                 >
-                  <Text style={[styles.ctaText, { color: theme.colors.surface }]}>
+                  <Text style={[styles.ctaText, { color: colors.text }]}>
                     Switch Account
                   </Text>
                 </Pressable>
@@ -173,21 +200,21 @@ export default function Index() {
               >
                 <View style={styles.ctaContent}>
                   <Text style={styles.ctaText}>Get Started</Text>
-                  <Ionicons name="arrow-forward" size={18} color={theme.colors.primary} />
+                  <Ionicons name="arrow-forward" size={18} color={colors.surface} />
                 </View>
               </Pressable>
             )}
-          </View>
+          </Animated.View>
         </SafeAreaView>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const themedStyles = createThemedStyleSheet((colors) => ({
   screen: {
     flex: 1,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.page,
   },
   background: {
     flex: 1,
@@ -197,7 +224,6 @@ const styles = StyleSheet.create({
   },
   dimLayer: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: theme.colors.overlayStrong,
   },
   safeArea: {
     flex: 1,
@@ -213,28 +239,28 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "rgba(255, 255, 255, 0.12)",
+    backgroundColor: colors.surfaceSoft,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: theme.radius.pill,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.08)",
+    borderColor: colors.borderSoft,
   },
   statusDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: theme.colors.muted,
+    backgroundColor: colors.muted,
   },
   dotOnline: {
-    backgroundColor: theme.colors.successStrong,
+    backgroundColor: colors.successStrong,
   },
   dotOffline: {
-    backgroundColor: theme.colors.danger,
+    backgroundColor: colors.danger,
   },
   statusText: {
     fontSize: theme.typography.caption.fontSize,
-    color: theme.colors.textOnPrimaryMuted,
+    color: colors.textSoft,
     fontWeight: "700",
     letterSpacing: 0.5,
   },
@@ -247,16 +273,16 @@ const styles = StyleSheet.create({
     width: 130,
     height: 130,
     borderRadius: 65,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: theme.colors.shadow,
-    shadowOpacity: 0.22,
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.15,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 10 },
     elevation: 12,
     borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.15)",
+    borderColor: colors.border,
   },
   logoImage: {
     width: 130,
@@ -268,11 +294,8 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.displayM.fontSize,
     lineHeight: theme.typography.displayM.lineHeight,
     fontWeight: theme.typography.displayM.fontWeight,
-    color: theme.colors.textOnPrimary,
+    color: colors.text,
     letterSpacing: theme.typography.displayM.letterSpacing,
-    textShadowColor: theme.colors.overlay,
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
   },
   carouselContainer: {
     alignItems: "center",
@@ -282,12 +305,12 @@ const styles = StyleSheet.create({
   carouselTitle: {
     fontSize: theme.typography.h3.fontSize,
     fontWeight: "800",
-    color: theme.colors.textOnPrimary,
+    color: colors.text,
     textAlign: "center",
   },
   carouselDesc: {
     fontSize: theme.typography.bodySm.fontSize,
-    color: theme.colors.textOnPrimarySoft,
+    color: colors.textSoft,
     textAlign: "center",
     lineHeight: 18,
     maxWidth: 280,
@@ -302,10 +325,10 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: "rgba(255, 255, 255, 0.25)",
+    backgroundColor: colors.borderStrong,
   },
   indicatorDotActive: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.primary,
     width: 16,
   },
   bottomArea: {
@@ -322,8 +345,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   primaryCta: {
-    backgroundColor: theme.colors.surface,
-    shadowColor: theme.colors.shadow,
+    backgroundColor: colors.primary,
+    shadowColor: colors.shadow,
     shadowOpacity: 0.2,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 6 },
@@ -332,7 +355,7 @@ const styles = StyleSheet.create({
   secondaryCta: {
     backgroundColor: "transparent",
     borderWidth: 1.5,
-    borderColor: "rgba(255, 255, 255, 0.4)",
+    borderColor: colors.borderStrong,
   },
   ctaContent: {
     flexDirection: "row",
@@ -347,7 +370,7 @@ const styles = StyleSheet.create({
   ctaText: {
     fontSize: theme.typography.title.fontSize,
     fontWeight: "700",
-    color: theme.colors.primary,
+    color: colors.surface,
     letterSpacing: 0.2,
   },
-});
+}));

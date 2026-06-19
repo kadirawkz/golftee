@@ -1,27 +1,45 @@
-import "../components/ignore-warnings";
+import "../utils/ignore-warnings";
 import { Stack, usePathname, useRouter } from "expo-router";
+import * as NavigationBar from "expo-navigation-bar";
 import * as SystemUI from "expo-system-ui";
 import { useEffect, useRef, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
 import { AppBottomTabs } from "../components/app-bottom-tabs";
-import { ensureAuthReady, useAuthSession } from "../components/auth";
-import { refreshCourseCatalog } from "../components/course-management";
-import { theme } from "../components/theme";
+import { ensureAuthReady, useAuthSession } from "../services/auth";
+import { refreshCourseCatalog } from "../services/course-management";
+import { theme, ThemeProvider, useAppTheme } from "../components/theme";
 
 export default function RootLayout() {
+  return (
+    <ThemeProvider>
+      <RootLayoutContent />
+    </ThemeProvider>
+  );
+}
+
+function RootLayoutContent() {
   const router = useRouter();
   const pathname = usePathname();
   const auth = useAuthSession();
+  const { colors, resolvedTheme } = useAppTheme();
   const [isReady, setIsReady] = useState(false);
   const routerRef = useRef(router);
-  const systemBackground = theme.system.getBackground(pathname);
+  const systemBackground = theme.system.getBackground(pathname, colors);
 
   routerRef.current = router;
 
   useEffect(() => {
     void SystemUI.setBackgroundColorAsync(systemBackground);
   }, [systemBackground]);
+
+  useEffect(() => {
+    if (Platform.OS === "android") {
+      const buttonStyle = resolvedTheme === "dark" ? "light" : "dark";
+      void NavigationBar.setButtonStyleAsync(buttonStyle);
+    }
+  }, [resolvedTheme]);
 
   useEffect(() => {
     void ensureAuthReady();
@@ -70,7 +88,7 @@ export default function RootLayout() {
   }
 
   const stack = (
-    <Stack screenOptions={({ route }) => theme.motion.getScreenOptions(route.name)}>
+    <Stack screenOptions={({ route }) => theme.motion.getScreenOptions(route.name, colors)}>
       <Stack.Screen name="index" />
       <Stack.Screen name="launch" />
       <Stack.Screen name="home" />
@@ -85,6 +103,7 @@ export default function RootLayout() {
       <Stack.Screen name="manage-booking" />
       <Stack.Screen name="tee-time-booking" />
       <Stack.Screen name="booking-checkout" />
+      <Stack.Screen name="payment-methods" />
       <Stack.Screen name="notifications" />
       <Stack.Screen name="splash" />
       <Stack.Screen name="login" />
@@ -95,6 +114,7 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
+      <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
       <View style={[styles.root, { backgroundColor: systemBackground }]}>
         <AppBottomTabs>{stack}</AppBottomTabs>
       </View>

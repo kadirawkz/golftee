@@ -17,16 +17,19 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
-import { signOut, updateProfile, useAuthSession } from "../components/auth";
+import { signOut, updateProfile, useAuthSession } from "../services/auth";
 import {
   useBookingState,
-} from "../components/bookings";
-import { useResponsiveLayout } from "../components/responsive-layout";
-import { theme } from "../components/theme";
+} from "../services/bookings";
+import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
+import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../components/theme";
+import { SUPPORT } from "../constants/support";
 
 
 
 function Toast({ message, visible, onHide }: { message: string; visible: boolean; onHide: () => void }) {
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(themedStyles);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -53,13 +56,15 @@ function Toast({ message, visible, onHide }: { message: string; visible: boolean
 
   return (
     <Animated.View style={[styles.toastContainer, { opacity: fadeAnim }]}>
-      <Ionicons name="checkmark-circle" size={16} color={theme.colors.successText} />
+      <Ionicons name="checkmark-circle" size={16} color={colors.successText} />
       <Text style={styles.toastText}>{message}</Text>
     </Animated.View>
   );
 }
 
 export default function ProfileScreen() {
+  const { colors, resolvedTheme } = useAppTheme();
+  const styles = useThemedStyles(themedStyles);
   const router = useRouter();
   const auth = useAuthSession();
   const bookingState = useBookingState();
@@ -182,18 +187,19 @@ export default function ProfileScreen() {
   }, [isLoggingOut, router]);
   // Native calling and emailing triggers
   const handleCallConcierge = () => {
-    Linking.openURL("tel:+15551234567").catch(() => showToast("Device cannot place telephone calls"));
+    Linking.openURL(SUPPORT.CONCIERGE_PHONE).catch(() => showToast("Device cannot place telephone calls"));
   };
 
   const handleEmailSupport = () => {
-    Linking.openURL("mailto:support@golftee.com?subject=GolfTee%20Support%20Request").catch(() =>
+    const subject = encodeURIComponent(SUPPORT.SUPPORT_EMAIL_SUBJECT);
+    Linking.openURL(`mailto:${SUPPORT.SUPPORT_EMAIL}?subject=${subject}`).catch(() =>
       showToast("No email application found")
     );
   };
 
   return (
     <SafeAreaView style={styles.screen} edges={["bottom"]}>
-      <StatusBar style="dark" />
+      <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -234,7 +240,7 @@ export default function ProfileScreen() {
               onPress={() => router.push("/account")}
               variant="icon"
             >
-              <Ionicons name="create-outline" size={22} color={theme.colors.primary} />
+              <Ionicons name="create-outline" size={22} color={colors.primary} />
             </Pressable>
           </View>
         </View>
@@ -249,7 +255,7 @@ export default function ProfileScreen() {
             <Text style={styles.statLabel}>HANDICAP</Text>
             <View style={styles.statValueRow}>
               <Text style={styles.statValue}>{handicapValue}</Text>
-              <Ionicons name="pencil" size={10} color={theme.colors.primary} style={styles.miniPencil} />
+              <Ionicons name="pencil" size={10} color={colors.primary} style={styles.miniPencil} />
             </View>
           </Pressable>
           <View style={styles.statDivider} />
@@ -274,7 +280,7 @@ export default function ProfileScreen() {
                 onPress={() => handleUpdateHandicap("decrement")}
                 variant="chip"
               >
-                <Ionicons name="remove" size={18} color={theme.colors.primary} />
+                <Ionicons name="remove" size={18} color={colors.primary} />
               </Pressable>
               <TextInput
                 style={styles.handicapInput}
@@ -287,7 +293,7 @@ export default function ProfileScreen() {
                 onPress={() => handleUpdateHandicap("increment")}
                 variant="chip"
               >
-                <Ionicons name="add" size={18} color={theme.colors.primary} />
+                <Ionicons name="add" size={18} color={colors.primary} />
               </Pressable>
             </View>
             <View style={styles.adjusterActions}>
@@ -318,32 +324,32 @@ export default function ProfileScreen() {
         <View style={styles.metricsDashboardWrap}>
           <View style={styles.dashboardHeader}>
             <View style={styles.dashboardTitleRow}>
-              <Ionicons name="analytics" size={18} color={theme.colors.primary} />
+              <Ionicons name="analytics" size={18} color={colors.primary} />
               <Text style={styles.dashboardTitle}>Performance Stats</Text>
             </View>
             <Pressable style={styles.metricsEditBtn} onPress={() => setIsEditingMetrics(true)} variant="chip">
-              <Ionicons name="create-outline" size={16} color={theme.colors.primary} />
+              <Ionicons name="create-outline" size={16} color={colors.primary} />
               <Text style={styles.metricsEditBtnText}>Edit</Text>
             </Pressable>
           </View>
           <View style={styles.metricsGrid}>
             <View style={styles.metricCard}>
-              <View style={[styles.metricIconWrap, { backgroundColor: `${theme.colors.primary}12` }]}>
-                <Ionicons name="speedometer-outline" size={18} color={theme.colors.primary} />
+              <View style={[styles.metricIconWrap, { backgroundColor: `${colors.primary}12` }]}>
+                <Ionicons name="speedometer-outline" size={18} color={colors.primary} />
               </View>
               <Text style={styles.metricValText}>{longestDrive} yds</Text>
               <Text style={styles.metricLabelText}>Longest Drive</Text>
             </View>
             <View style={styles.metricCard}>
-              <View style={[styles.metricIconWrap, { backgroundColor: `${theme.colors.accentWarm}12` }]}>
-                <Ionicons name="disc-outline" size={18} color={theme.colors.accentWarm} />
+              <View style={[styles.metricIconWrap, { backgroundColor: `${colors.accentWarm}12` }]}>
+                <Ionicons name="disc-outline" size={18} color={colors.accentWarm} />
               </View>
               <Text style={styles.metricValText}>{girPercentage}%</Text>
               <Text style={styles.metricLabelText}>GIR Ratio</Text>
             </View>
             <View style={styles.metricCard}>
-              <View style={[styles.metricIconWrap, { backgroundColor: `${theme.colors.primary}12` }]}>
-                <Ionicons name="flag-outline" size={18} color={theme.colors.primary} />
+              <View style={[styles.metricIconWrap, { backgroundColor: `${colors.primary}12` }]}>
+                <Ionicons name="flag-outline" size={18} color={colors.primary} />
               </View>
               <Text style={styles.metricValText}>{puttingAverage}</Text>
               <Text style={styles.metricLabelText}>Putting Avg</Text>
@@ -353,48 +359,51 @@ export default function ProfileScreen() {
 
 
 
-        {/* 2X2 QUICK ACTION GRID */}
+        {/* QUICK ACTIONS LIST */}
         <Text style={styles.actionGridLabel}>ACCOUNT QUICK INTERACTIONS</Text>
-        <View style={styles.actionGridContainer}>
-          <View style={styles.actionGridRow}>
-            {/* Tile 1: Club Concierge */}
-            <Pressable style={[styles.gridTile, { backgroundColor: `${theme.colors.primarySoft}` }]} onPress={handleCallConcierge} variant="card">
-              <View style={[styles.tileIconWrap, { backgroundColor: theme.colors.primary }]}>
-                <Ionicons name="call" size={18} color={theme.colors.surface} />
+        <View style={styles.actionListContainer}>
+          {/* Item 1: Club Concierge */}
+          <Pressable style={styles.actionListItem} onPress={handleCallConcierge} variant="card">
+            <View style={styles.actionListLeft}>
+              <View style={[styles.actionListIconWrap, { backgroundColor: colors.primarySoft }]}>
+                <Ionicons name="call" size={18} color={colors.primary} />
               </View>
-              <Text style={styles.tileTitle}>Club Concierge</Text>
-              <Text style={styles.tileSubtitle}>Priority support dialer</Text>
-            </Pressable>
+              <View>
+                <Text style={styles.actionListTitle}>Club Concierge</Text>
+                <Text style={styles.actionListSubtitle}>Priority support dialer</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+          </Pressable>
 
-            {/* Tile 2: Support Email */}
-            <Pressable style={[styles.gridTile, { backgroundColor: `${theme.colors.accentSoft}50` }]} onPress={handleEmailSupport} variant="card">
-              <View style={[styles.tileIconWrap, { backgroundColor: theme.colors.accentWarm }]}>
-                <Ionicons name="mail" size={18} color={theme.colors.surface} />
+          {/* Item 2: Support Email */}
+          <Pressable style={styles.actionListItem} onPress={handleEmailSupport} variant="card">
+            <View style={styles.actionListLeft}>
+              <View style={[styles.actionListIconWrap, { backgroundColor: `${colors.accentSoft}70` }]}>
+                <Ionicons name="mail" size={18} color={colors.accentWarm} />
               </View>
-              <Text style={styles.tileTitle}>Support Desk</Text>
-              <Text style={styles.tileSubtitle}>Inquiries & assistance</Text>
-            </Pressable>
-          </View>
+              <View>
+                <Text style={styles.actionListTitle}>Support Desk</Text>
+                <Text style={styles.actionListSubtitle}>Inquiries & assistance</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+          </Pressable>
 
-          <View style={styles.actionGridRow}>
-            {/* Tile 3: Favorite Courses */}
-            <Pressable style={[styles.gridTile, { backgroundColor: `${theme.colors.primarySoft}` }]} onPress={() => router.push("/favourites")} variant="card">
-              <View style={[styles.tileIconWrap, { backgroundColor: theme.colors.primary }]}>
-                <Ionicons name="heart" size={18} color={theme.colors.surface} />
-              </View>
-              <Text style={styles.tileTitle}>Saved Courses</Text>
-              <Text style={styles.tileSubtitle}>View favorited courses</Text>
-            </Pressable>
 
-            {/* Tile 4: App Settings */}
-            <Pressable style={[styles.gridTile, { backgroundColor: `${theme.colors.primarySoft}` }]} onPress={() => router.push("/settings")} variant="card">
-              <View style={[styles.tileIconWrap, { backgroundColor: theme.colors.primary }]}>
-                <Ionicons name="settings" size={18} color={theme.colors.surface} />
+          {/* Item 4: App Settings */}
+          <Pressable style={[styles.actionListItem, { borderBottomWidth: 0 }]} onPress={() => router.push("/settings")} variant="card">
+            <View style={styles.actionListLeft}>
+              <View style={[styles.actionListIconWrap, { backgroundColor: colors.primarySoft }]}>
+                <Ionicons name="settings" size={18} color={colors.primary} />
               </View>
-              <Text style={styles.tileTitle}>App Settings</Text>
-              <Text style={styles.tileSubtitle}>Alerts & preferences</Text>
-            </Pressable>
-          </View>
+              <View>
+                <Text style={styles.actionListTitle}>App Settings</Text>
+                <Text style={styles.actionListSubtitle}>Alerts & preferences</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+          </Pressable>
         </View>
 
 
@@ -403,7 +412,7 @@ export default function ProfileScreen() {
         <View style={styles.logoutBtnContainer}>
           {logoutError ? <Text style={styles.actionErrorText}>{logoutError}</Text> : null}
           <Pressable style={styles.logoutButton} onPress={() => void handleLogout()} disabled={isLoggingOut} variant="button">
-            <Ionicons name="log-out-outline" size={18} color={theme.colors.danger} />
+            <Ionicons name="log-out-outline" size={18} color={colors.danger} />
             <Text style={styles.logoutButtonText}>{isLoggingOut ? "LOGGING OUT..." : "LOG OUT ACCOUNT"}</Text>
           </Pressable>
         </View>
@@ -474,10 +483,10 @@ export default function ProfileScreen() {
       <Toast message={toastMessage} visible={toastVisible} onHide={() => setToastVisible(false)} />
     </SafeAreaView>
   );
-}const styles = StyleSheet.create({
+}const themedStyles = createThemedStyleSheet((colors) => ({
   screen: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: colors.background,
   },
   scrollContent: {
     paddingTop: 8,
@@ -486,9 +495,9 @@ export default function ProfileScreen() {
   profileHeaderCard: {
     paddingHorizontal: 16,
     paddingVertical: 18,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderColor: theme.colors.borderSoft,
+    borderColor: colors.borderSoft,
     marginBottom: 16,
   },
   headerTopRow: {
@@ -500,7 +509,7 @@ export default function ProfileScreen() {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: theme.colors.surfaceSoft,
+    backgroundColor: colors.surfaceSoft,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -512,7 +521,7 @@ export default function ProfileScreen() {
     height: 68,
     borderRadius: 34,
     borderWidth: 2,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     overflow: "hidden",
   },
   avatarImage: {
@@ -522,12 +531,12 @@ export default function ProfileScreen() {
   avatarInitialContainer: {
     width: "100%",
     height: "100%",
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
   },
   avatarInitialText: {
-    color: theme.colors.surface,
+    color: colors.surface,
     fontSize: theme.typography.h1.fontSize,
     lineHeight: theme.typography.h1.lineHeight,
     fontWeight: theme.typography.h1.fontWeight,
@@ -540,9 +549,9 @@ export default function ProfileScreen() {
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     borderWidth: 1.5,
-    borderColor: theme.colors.surface,
+    borderColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -561,18 +570,18 @@ export default function ProfileScreen() {
     lineHeight: theme.typography.overline.lineHeight,
     fontWeight: theme.typography.overline.fontWeight,
     letterSpacing: theme.typography.overline.letterSpacing,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   passTierBadge: {
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: colors.primarySoft,
     borderWidth: 1,
-    borderColor: theme.colors.borderSoft,
+    borderColor: colors.borderSoft,
   },
   passTierText: {
-    color: theme.colors.primary,
+    color: colors.primary,
     fontSize: theme.typography.overline.fontSize,
     lineHeight: theme.typography.overline.lineHeight,
     fontWeight: theme.typography.overline.fontWeight,
@@ -583,7 +592,7 @@ export default function ProfileScreen() {
     lineHeight: theme.typography.h2.lineHeight,
     fontWeight: theme.typography.h2.fontWeight,
     letterSpacing: theme.typography.h2.letterSpacing,
-    color: theme.colors.primary,
+    color: colors.primary,
     marginBottom: 2,
   },
   headerSinceText: {
@@ -591,14 +600,14 @@ export default function ProfileScreen() {
     lineHeight: theme.typography.caption.lineHeight,
     fontWeight: theme.typography.caption.fontWeight,
     letterSpacing: theme.typography.caption.letterSpacing,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   statsPill: {
     marginHorizontal: 16,
     borderRadius: 16,
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: colors.primarySoft,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     paddingVertical: 12,
     paddingHorizontal: 8,
     flexDirection: "row",
@@ -616,7 +625,7 @@ export default function ProfileScreen() {
     lineHeight: theme.typography.caption.lineHeight,
     fontWeight: theme.typography.caption.fontWeight,
     letterSpacing: theme.typography.caption.letterSpacing,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   statValueRow: {
     flexDirection: "row",
@@ -631,21 +640,21 @@ export default function ProfileScreen() {
     lineHeight: theme.typography.h3.lineHeight,
     fontWeight: theme.typography.h3.fontWeight,
     letterSpacing: theme.typography.h3.letterSpacing,
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   statDivider: {
     width: 1,
     height: 26,
-    backgroundColor: theme.colors.border,
+    backgroundColor: colors.border,
   },
   handicapAdjusterWrap: {
     marginHorizontal: 16,
     marginTop: -8,
     marginBottom: 20,
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: colors.primarySoft,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     padding: 12,
     alignItems: "center",
     gap: 10,
@@ -654,7 +663,7 @@ export default function ProfileScreen() {
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
     fontWeight: theme.typography.title.fontWeight,
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   adjusterRow: {
     flexDirection: "row",
@@ -666,8 +675,8 @@ export default function ProfileScreen() {
     height: 36,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -675,7 +684,7 @@ export default function ProfileScreen() {
     fontSize: theme.typography.h2.fontSize,
     lineHeight: theme.typography.h2.lineHeight,
     fontWeight: theme.typography.h2.fontWeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     width: 60,
     textAlign: "center",
   },
@@ -693,34 +702,34 @@ export default function ProfileScreen() {
   btnCancel: {
     backgroundColor: "transparent",
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
   },
   btnCancelText: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
     fontWeight: "600",
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   btnSave: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     minWidth: 70,
   },
   btnSaveText: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
     fontWeight: "700",
-    color: theme.colors.surface,
+    color: colors.surface,
   },
   metricsDashboardWrap: {
     marginHorizontal: 16,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: theme.colors.borderSoft,
+    borderColor: colors.borderSoft,
     padding: 14,
     gap: 12,
     marginBottom: 20,
-    shadowColor: theme.colors.shadow,
+    shadowColor: colors.shadow,
     shadowOpacity: 0.04,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
@@ -740,7 +749,7 @@ export default function ProfileScreen() {
     fontSize: theme.typography.title.fontSize,
     lineHeight: theme.typography.title.lineHeight,
     fontWeight: theme.typography.title.fontWeight,
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   metricsEditBtn: {
     flexDirection: "row",
@@ -749,13 +758,13 @@ export default function ProfileScreen() {
     paddingHorizontal: 10,
     height: 28,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: colors.primarySoft,
   },
   metricsEditBtnText: {
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
     fontWeight: "700",
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   metricsGrid: {
     flexDirection: "row",
@@ -763,9 +772,9 @@ export default function ProfileScreen() {
   },
   metricCard: {
     flex: 1,
-    backgroundColor: theme.colors.surfaceSoft,
+    backgroundColor: colors.surfaceSoft,
     borderWidth: 1,
-    borderColor: theme.colors.borderSoft,
+    borderColor: colors.borderSoft,
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 6,
@@ -783,14 +792,14 @@ export default function ProfileScreen() {
     fontSize: theme.typography.h4.fontSize,
     lineHeight: theme.typography.h4.lineHeight,
     fontWeight: theme.typography.h4.fontWeight,
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   metricLabelText: {
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
     fontWeight: theme.typography.caption.fontWeight,
     letterSpacing: 0.3,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   sectionHeader: {
     flexDirection: "row",
@@ -807,22 +816,22 @@ export default function ProfileScreen() {
     paddingHorizontal: 11,
     height: 34,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1.5,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
   },
   viewAllText: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
     fontWeight: "700",
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   sectionTitle: {
     fontSize: theme.typography.h3.fontSize,
     lineHeight: theme.typography.h3.lineHeight,
     fontWeight: theme.typography.h3.fontWeight,
     letterSpacing: theme.typography.h3.letterSpacing,
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   previewRow: {
     paddingHorizontal: 16,
@@ -833,10 +842,10 @@ export default function ProfileScreen() {
     width: 300,
     borderRadius: 16,
     overflow: "hidden",
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    shadowColor: theme.colors.shadow,
+    borderColor: colors.border,
+    shadowColor: colors.shadow,
     shadowOpacity: 0.05,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
@@ -852,7 +861,7 @@ export default function ProfileScreen() {
   },
   previewOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: theme.colors.overlayDark,
+    backgroundColor: colors.overlayDark,
   },
   confirmedPill: {
     position: "absolute",
@@ -870,14 +879,14 @@ export default function ProfileScreen() {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: theme.colors.successStrong,
+    backgroundColor: colors.successStrong,
   },
   confirmedText: {
     fontSize: theme.typography.overline.fontSize,
     lineHeight: theme.typography.overline.lineHeight,
     fontWeight: theme.typography.overline.fontWeight,
     letterSpacing: 0.8,
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   previewTextWrap: {
     position: "absolute",
@@ -889,7 +898,7 @@ export default function ProfileScreen() {
     fontSize: theme.typography.title.fontSize,
     lineHeight: theme.typography.title.lineHeight,
     fontWeight: theme.typography.title.fontWeight,
-    color: theme.colors.surface,
+    color: colors.surface,
   },
   previewLocationRow: {
     flexDirection: "row",
@@ -900,7 +909,7 @@ export default function ProfileScreen() {
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
     fontWeight: theme.typography.caption.fontWeight,
-    color: theme.colors.textOnPrimarySoft,
+    color: colors.textOnPrimarySoft,
   },
   previewMetaWrap: {
     flexDirection: "row",
@@ -921,19 +930,19 @@ export default function ProfileScreen() {
     lineHeight: theme.typography.overline.lineHeight,
     fontWeight: theme.typography.overline.fontWeight,
     letterSpacing: 0.8,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   metaValue: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
     fontWeight: "700",
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   qrWrap: {
     alignItems: "center",
     justifyContent: "center",
     borderLeftWidth: 1,
-    borderColor: theme.colors.borderSoft,
+    borderColor: colors.borderSoft,
     paddingLeft: 12,
   },
   qrCodeText: {
@@ -941,15 +950,15 @@ export default function ProfileScreen() {
     fontSize: theme.typography.overline.fontSize - 1,
     lineHeight: theme.typography.overline.lineHeight,
     fontWeight: "700",
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     letterSpacing: 0.5,
   },
   emptyBookingsCard: {
     marginHorizontal: 16,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: theme.colors.borderSoft,
-    backgroundColor: theme.colors.surfaceSoft,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surfaceSoft,
     paddingVertical: 20,
     paddingHorizontal: 16,
     alignItems: "center",
@@ -960,7 +969,7 @@ export default function ProfileScreen() {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
     fontWeight: "500",
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     textAlign: "center",
   },
   actionGridLabel: {
@@ -968,46 +977,51 @@ export default function ProfileScreen() {
     lineHeight: theme.typography.overline.lineHeight,
     fontWeight: theme.typography.overline.fontWeight,
     letterSpacing: theme.typography.overline.letterSpacing,
-    color: theme.colors.muted,
+    color: colors.muted,
     marginHorizontal: 16,
     marginTop: 24,
     marginBottom: 10,
   },
-  actionGridContainer: {
+  actionListContainer: {
     marginHorizontal: 16,
-    gap: 10,
-    marginBottom: 26,
-  },
-  actionGridRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  gridTile: {
-    flex: 1,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: theme.colors.borderSoft,
-    padding: 14,
-    gap: 8,
+    borderColor: colors.borderSoft,
+    overflow: "hidden",
+    marginBottom: 26,
   },
-  tileIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+  actionListItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderSoft,
+  },
+  actionListLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  actionListIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
   },
-  tileTitle: {
-    fontSize: theme.typography.title.fontSize,
-    lineHeight: theme.typography.title.lineHeight,
-    fontWeight: theme.typography.title.fontWeight,
-    color: theme.colors.primary,
+  actionListTitle: {
+    fontSize: theme.typography.body.fontSize,
+    lineHeight: theme.typography.body.lineHeight,
+    fontWeight: "700",
+    color: colors.primary,
   },
-  tileSubtitle: {
+  actionListSubtitle: {
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
-    fontWeight: "500",
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   historySection: {
     paddingHorizontal: 16,
@@ -1019,9 +1033,9 @@ export default function ProfileScreen() {
   },
   historyItem: {
     borderRadius: 14,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.borderSoft,
+    borderColor: colors.borderSoft,
     padding: 10,
     flexDirection: "row",
     alignItems: "center",
@@ -1039,7 +1053,7 @@ export default function ProfileScreen() {
     height: 40,
     borderRadius: 20,
     overflow: "hidden",
-    backgroundColor: theme.colors.surfaceSoft,
+    backgroundColor: colors.surfaceSoft,
   },
   historyThumbImage: {
     width: "100%",
@@ -1049,13 +1063,13 @@ export default function ProfileScreen() {
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
     fontWeight: theme.typography.title.fontWeight,
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   historyMeta: {
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
     fontWeight: theme.typography.caption.fontWeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   historyRight: {
     alignItems: "flex-end",
@@ -1064,22 +1078,22 @@ export default function ProfileScreen() {
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
     fontWeight: "700",
-    color: theme.colors.accentWarm,
+    color: colors.accentWarm,
   },
   historyStatus: {
     fontSize: theme.typography.overline.fontSize,
     lineHeight: theme.typography.overline.lineHeight,
     fontWeight: theme.typography.overline.fontWeight,
     letterSpacing: theme.typography.overline.letterSpacing,
-    color: theme.colors.successText,
+    color: colors.successText,
   },
   loadButton: {
     marginTop: 4,
     height: 48,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surfaceSoft,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceSoft,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1087,7 +1101,7 @@ export default function ProfileScreen() {
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
     fontWeight: "700",
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   logoutBtnContainer: {
     paddingHorizontal: 16,
@@ -1099,25 +1113,22 @@ export default function ProfileScreen() {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    borderWidth: 1.5,
-    borderColor: theme.colors.danger,
-    borderRadius: theme.radius.pill,
-    width: "100%",
-    height: 48,
-    backgroundColor: theme.colors.surface,
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    alignSelf: "center",
   },
   logoutButtonText: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
     fontWeight: "700",
-    color: theme.colors.danger,
-    letterSpacing: 1,
+    color: colors.danger,
+    letterSpacing: 0.5,
   },
   actionErrorText: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.danger,
+    color: colors.danger,
     fontWeight: "600",
   },
   modalBg: {
@@ -1130,11 +1141,11 @@ export default function ProfileScreen() {
   modalContent: {
     width: "100%",
     maxWidth: 340,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 20,
     padding: 20,
     gap: 14,
-    shadowColor: theme.colors.shadow,
+    shadowColor: colors.shadow,
     shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 6,
@@ -1143,7 +1154,7 @@ export default function ProfileScreen() {
     fontSize: theme.typography.h3.fontSize,
     lineHeight: theme.typography.h3.lineHeight,
     fontWeight: "800",
-    color: theme.colors.primary,
+    color: colors.primary,
     marginBottom: 4,
   },
   metricFormGroup: {
@@ -1151,13 +1162,13 @@ export default function ProfileScreen() {
   },
   metricInput: {
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     borderRadius: 10,
     height: 40,
     paddingHorizontal: 12,
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
-    color: theme.colors.text,
+    color: colors.text,
   },
   modalActionsRow: {
     flexDirection: "row",
@@ -1173,35 +1184,35 @@ export default function ProfileScreen() {
   },
   modalBtnCancel: {
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
   },
   modalBtnCancelText: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
     fontWeight: "700",
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   modalBtnSave: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
   },
   modalBtnSaveText: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
     fontWeight: "700",
-    color: theme.colors.surface,
+    color: colors.surface,
   },
   toastContainer: {
     position: "absolute",
     bottom: 110,
     alignSelf: "center",
-    backgroundColor: theme.colors.success,
+    backgroundColor: colors.success,
     borderRadius: theme.radius.pill,
     paddingHorizontal: 16,
     paddingVertical: 10,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    shadowColor: theme.colors.shadow,
+    shadowColor: colors.shadow,
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
@@ -1210,6 +1221,6 @@ export default function ProfileScreen() {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
     fontWeight: "700",
-    color: theme.colors.successText,
+    color: colors.successText,
   },
-});
+}));

@@ -9,12 +9,12 @@ import { InteractionManager, Platform, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
-import { isEditableBooking, useBookingState } from "../components/bookings";
-import { getColomboDateKey, parseDateKeyToDate } from "../components/colombo-time";
-import { getAvailableTeeSlots, getManagedCourseById, getNextBookableTeeSlot, type TeeSlot } from "../components/course-management";
-import { useResponsiveLayout } from "../components/responsive-layout";
-import { theme } from "../components/theme";
-import { DailyWeatherForecast, getFourteenDayForecast, getWeatherCodeIconName } from "../components/weather";
+import { isEditableBooking, useBookingState } from "../services/bookings";
+import { getColomboDateKey, parseDateKeyToDate } from "../utils/colombo-time";
+import { getAvailableTeeSlots, getManagedCourseById, getNextBookableTeeSlot, type TeeSlot } from "../services/course-management";
+import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
+import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../components/theme";
+import { DailyWeatherForecast, getFourteenDayForecast, getWeatherCodeIconName } from "../services/weather";
 import { getCourseImage } from "../lib/image-mapping";
 
 const SERVICE_FEE = 12.5;
@@ -64,10 +64,17 @@ function formatTeeTimeLabel(value: string) {
 }
 
 export default function TeeTimeBookingScreen() {
+  const { colors, resolvedTheme } = useAppTheme();
+  const styles = useThemedStyles(themedStyles);
   const router = useRouter();
   const { horizontalPadding, screenBottomPadding } = useResponsiveLayout();
-  const { id, bookingId } = useLocalSearchParams<{ id?: string | string[]; bookingId?: string | string[] }>();
-  const courseId = Array.isArray(id) ? id[0] : id;
+  const { id, courseId: paramCourseId, bookingId } = useLocalSearchParams<{
+    id?: string | string[];
+    courseId?: string | string[];
+    bookingId?: string | string[];
+  }>();
+  const rawCourseId = id || paramCourseId;
+  const courseId = Array.isArray(rawCourseId) ? rawCourseId[0] : rawCourseId;
   const resolvedBookingId = Array.isArray(bookingId) ? bookingId[0] : bookingId;
   const course = getManagedCourseById(courseId);
   const bookingState = useBookingState();
@@ -590,7 +597,7 @@ export default function TeeTimeBookingScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={["bottom"]}>
-      <StatusBar style="dark" />
+      <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
@@ -605,11 +612,10 @@ export default function TeeTimeBookingScreen() {
           <View style={styles.heroOverlay} />
 
           <View style={styles.heroContent}>
-            <Text style={styles.heroKicker}>BOOK TEE TIME</Text>
             <Text style={styles.heroTitle}>{course.title}</Text>
 
             <View style={styles.heroLocationRow}>
-              <Ionicons name="location" size={14} color={theme.colors.accentSoft} />
+              <Ionicons name="location" size={14} color="rgba(255, 255, 255, 0.8)" />
               <Text style={styles.heroLocation}>{course.location}</Text>
             </View>
           </View>
@@ -647,7 +653,7 @@ export default function TeeTimeBookingScreen() {
                     <Ionicons
                       name={getWeatherCodeIconName(day.weatherCode)}
                       size={20}
-                      color={theme.colors.accentWarm}
+                      color={colors.accentWarm}
                     />
                   </View>
                   <Text style={styles.weatherTemp}>{`${day.tempMax}\u00B0`}</Text>
@@ -671,7 +677,7 @@ export default function TeeTimeBookingScreen() {
                 disabled={!canEditExistingBooking}
                 variant="chip"
               >
-                <Ionicons name="calendar-outline" size={14} color={theme.colors.primary} />
+                <Ionicons name="calendar-outline" size={14} color={colors.primary} />
                 <Text style={styles.calendarQuickButtonText}>Calendar</Text>
               </Pressable>
             </View>
@@ -744,7 +750,7 @@ export default function TeeTimeBookingScreen() {
                   <Ionicons
                     name={iconName as "person" | "people" | "people-circle"}
                     size={16}
-                    color={active ? theme.colors.accentWarm : theme.colors.text}
+                    color={active ? colors.accentWarm : colors.text}
                   />
                   <Text style={[styles.playerChipText, active && styles.playerChipTextActive]}>{count}</Text>
                 </Pressable>
@@ -843,7 +849,7 @@ export default function TeeTimeBookingScreen() {
 
             <View style={styles.summaryMetaItem}>
               <View style={styles.summaryIconWrap}>
-                <Ionicons name="calendar" size={18} color={theme.colors.accentSoft} />
+                <Ionicons name="calendar" size={18} color={colors.accentSoft} />
               </View>
               <View>
                 <Text style={styles.summaryLabel}>DATE & TIME</Text>
@@ -853,7 +859,7 @@ export default function TeeTimeBookingScreen() {
 
             <View style={styles.summaryMetaItem}>
               <View style={styles.summaryIconWrap}>
-                <Ionicons name="person" size={18} color={theme.colors.accentSoft} />
+                <Ionicons name="person" size={18} color={colors.accentSoft} />
               </View>
               <View>
                 <Text style={styles.summaryLabel}>PARTY SIZE</Text>
@@ -902,10 +908,10 @@ export default function TeeTimeBookingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const themedStyles = createThemedStyleSheet((colors) => ({
   screen: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: colors.background,
   },
   scrollContent: {
     paddingHorizontal: 16,
@@ -925,7 +931,7 @@ const styles = StyleSheet.create({
   },
   heroOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: theme.colors.overlayStrong,
+    backgroundColor: colors.overlayStrong,
   },
   heroContent: {
     position: "absolute",
@@ -934,7 +940,7 @@ const styles = StyleSheet.create({
     bottom: 18,
   },
   heroKicker: {
-    color: theme.colors.accentSoft,
+    color: "#D8AB5C",
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
     letterSpacing: 1.2,
@@ -942,9 +948,9 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   heroTitle: {
-    color: theme.colors.surface,
-    fontSize: theme.typography.h1.fontSize,
-    lineHeight: theme.typography.h1.lineHeight,
+    color: "#FFFFFF",
+    fontSize: theme.typography.h2.fontSize,
+    lineHeight: theme.typography.h2.lineHeight,
     fontWeight: "800",
     marginBottom: 6,
   },
@@ -954,17 +960,17 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   heroLocation: {
-    color: theme.colors.accentSoft,
+    color: "rgba(255, 255, 255, 0.8)",
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
     fontWeight: "500",
   },
   section: {
     gap: 10,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     padding: 12,
   },
   sectionHeader: {
@@ -978,20 +984,20 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sectionTitle: {
-    color: theme.colors.text,
+    color: colors.text,
     fontSize: theme.typography.title.fontSize,
     lineHeight: theme.typography.title.lineHeight,
     fontWeight: "700",
   },
   sectionMeta: {
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontSize: theme.typography.label.fontSize,
     lineHeight: theme.typography.label.lineHeight,
     letterSpacing: 1,
     fontWeight: "700",
   },
   weatherStateText: {
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
     fontWeight: "500",
@@ -1004,19 +1010,19 @@ const styles = StyleSheet.create({
     width: 78,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surfaceTint,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceTint,
     paddingVertical: 10,
     paddingHorizontal: 8,
     alignItems: "center",
     gap: 4,
   },
   weatherCardActive: {
-    borderColor: theme.colors.primary,
-    backgroundColor: theme.colors.primarySoft,
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
   },
   weatherDate: {
-    color: theme.colors.text,
+    color: colors.text,
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
     fontWeight: "700",
@@ -1027,16 +1033,16 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: colors.primarySoft,
   },
   weatherTemp: {
-    color: theme.colors.primary,
+    color: colors.primary,
     fontSize: theme.typography.title.fontSize,
     lineHeight: theme.typography.title.lineHeight,
     fontWeight: "800",
   },
   weatherMinTemp: {
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
     fontWeight: "600",
@@ -1044,16 +1050,16 @@ const styles = StyleSheet.create({
   calendarQuickButton: {
     height: 28,
     borderRadius: 999,
-    backgroundColor: theme.colors.surfaceTint,
+    backgroundColor: colors.surfaceTint,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     paddingHorizontal: 9,
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
   },
   calendarQuickButtonText: {
-    color: theme.colors.primary,
+    color: colors.primary,
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
     fontWeight: "700",
@@ -1061,21 +1067,21 @@ const styles = StyleSheet.create({
   },
   inlinePickerWrap: {
     borderRadius: 12,
-    backgroundColor: theme.colors.surfaceTint,
+    backgroundColor: colors.surfaceTint,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     overflow: "hidden",
   },
   inlinePickerDoneButton: {
     height: 36,
     borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
+    borderTopColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
   },
   inlinePickerDoneButtonText: {
-    color: theme.colors.primary,
+    color: colors.primary,
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
     fontWeight: "700",
@@ -1088,35 +1094,35 @@ const styles = StyleSheet.create({
     width: 62,
     height: 70,
     borderRadius: 12,
-    backgroundColor: theme.colors.surfaceTint,
+    backgroundColor: colors.surfaceTint,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
     gap: 4,
   },
   dateChipActive: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   dateChipDay: {
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
     letterSpacing: 1,
     fontWeight: "800",
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   dateChipDayActive: {
-    color: theme.colors.textOnPrimaryMuted,
+    color: colors.textOnPrimaryMuted,
   },
   dateChipDate: {
-    color: theme.colors.text,
+    color: colors.text,
     fontSize: theme.typography.h2.fontSize,
     lineHeight: theme.typography.h2.lineHeight,
     fontWeight: "900",
   },
   dateChipDateActive: {
-    color: theme.colors.surface,
+    color: colors.surface,
   },
   playersRow: {
     flexDirection: "row",
@@ -1127,48 +1133,48 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: theme.radius.pill,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
     gap: 8,
   },
   playerChipActive: {
-    backgroundColor: theme.colors.accentSoft,
-    borderColor: theme.colors.accentSoft,
+    backgroundColor: colors.accentSoft,
+    borderColor: colors.accentSoft,
   },
   playerChipText: {
-    color: theme.colors.text,
+    color: colors.text,
     fontSize: theme.typography.h3.fontSize,
     lineHeight: theme.typography.h3.lineHeight,
     fontWeight: "800",
   },
   playerChipTextActive: {
-    color: theme.colors.accentWarm,
+    color: colors.accentWarm,
   },
   periodRow: {
     flexDirection: "row",
     gap: 8,
   },
   periodPill: {
-    backgroundColor: theme.colors.surfaceTint,
+    backgroundColor: colors.surfaceTint,
     borderRadius: 999,
     paddingHorizontal: 11,
     paddingVertical: 6,
   },
   periodPillActive: {
-    backgroundColor: theme.colors.success,
+    backgroundColor: colors.success,
   },
   periodText: {
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
     letterSpacing: 1.2,
     fontWeight: "800",
   },
   periodTextActive: {
-    color: theme.colors.successText,
+    color: colors.successText,
   },
   timeGrid: {
     marginTop: 8,
@@ -1181,15 +1187,15 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: theme.radius.pill,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
   },
   timeChipActive: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
-    shadowColor: theme.colors.shadow,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+    shadowColor: colors.shadow,
     shadowOpacity: 0.16,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
@@ -1199,48 +1205,48 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   timeChipBooked: {
-    backgroundColor: theme.colors.surfaceSoft,
-    borderColor: theme.colors.borderStrong,
+    backgroundColor: colors.surfaceSoft,
+    borderColor: colors.borderStrong,
     opacity: 1,
   },
   timeChipText: {
-    color: theme.colors.text,
+    color: colors.text,
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
     fontWeight: "700",
   },
   timeChipTextActive: {
-    color: theme.colors.surface,
+    color: colors.surface,
   },
   timeChipTextDisabled: {
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   timeChipTextBooked: {
-    color: theme.colors.muted,
+    color: colors.muted,
   },
   timeChipStrike: {
     position: "absolute",
     left: 10,
     right: 10,
     height: 2,
-    backgroundColor: theme.colors.muted,
+    backgroundColor: colors.muted,
     transform: [{ rotate: "-8deg" }],
   },
   summaryCard: {
     marginTop: 2,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    shadowColor: theme.colors.shadow,
+    borderColor: colors.border,
+    shadowColor: colors.shadow,
     shadowOpacity: 0.05,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
   },
   summaryTitle: {
-    color: theme.colors.text,
+    color: colors.text,
     fontSize: theme.typography.title.fontSize,
     lineHeight: theme.typography.title.lineHeight,
     fontWeight: "700",
@@ -1258,17 +1264,17 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
   },
   summaryLabel: {
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontSize: theme.typography.label.fontSize,
     lineHeight: theme.typography.label.lineHeight,
     fontWeight: "700",
     letterSpacing: 1.2,
   },
   summaryValue: {
-    color: theme.colors.text,
+    color: colors.text,
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
     fontWeight: "700",
@@ -1277,7 +1283,7 @@ const styles = StyleSheet.create({
   pricingSection: {
     marginTop: 8,
     borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
+    borderTopColor: colors.border,
     paddingTop: 14,
     gap: 8,
   },
@@ -1287,12 +1293,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   pricingName: {
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
   },
   pricingAmount: {
-    color: theme.colors.text,
+    color: colors.text,
     fontSize: theme.typography.h3.fontSize,
     lineHeight: theme.typography.h3.lineHeight,
     fontWeight: "800",
@@ -1301,13 +1307,13 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   totalLabel: {
-    color: theme.colors.text,
+    color: colors.text,
     fontSize: theme.typography.title.fontSize,
     lineHeight: theme.typography.title.lineHeight,
     fontWeight: "800",
   },
   totalAmount: {
-    color: theme.colors.primary,
+    color: colors.primary,
     fontSize: theme.typography.h1.fontSize,
     lineHeight: theme.typography.h1.lineHeight,
     fontWeight: "900",
@@ -1316,10 +1322,10 @@ const styles = StyleSheet.create({
     marginTop: 16,
     height: 54,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: theme.colors.shadow,
+    shadowColor: colors.shadow,
     shadowOpacity: 0.14,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
@@ -1329,7 +1335,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   confirmButtonText: {
-    color: theme.colors.surface,
+    color: colors.surface,
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
     fontWeight: "800",
@@ -1337,10 +1343,10 @@ const styles = StyleSheet.create({
   policyText: {
     marginTop: 14,
     textAlign: "center",
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight + 4,
     fontWeight: "500",
     paddingHorizontal: 8,
   },
-});
+}));

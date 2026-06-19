@@ -162,6 +162,9 @@ async function bootstrapAuth() {
   const { data, error } = await supabase.auth.getSession();
 
   if (error) {
+    try {
+      await supabase.auth.signOut();
+    } catch {}
     updateSnapshot({
       initialized: true,
       isAuthenticated: false,
@@ -234,7 +237,7 @@ export async function signInWithEmail({
   try {
     const username = data.session?.user?.user_metadata?.username ?? data.session?.user?.email ?? "Golfer";
     void addNotification(
-      "updates",
+      "account",
       "Secure Login",
       `Successful login detected for user ${username}.`,
       "shield-checkmark",
@@ -414,7 +417,7 @@ export async function updateProfile(profileUpdate: ProfileUpdate) {
       icon = "golf";
     }
 
-    void addNotification("updates", title, message, icon, {
+    void addNotification("account", title, message, icon, {
       actionText: "View Profile",
       route: "/profile",
     });

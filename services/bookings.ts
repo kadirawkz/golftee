@@ -4,7 +4,7 @@ import * as Notifications from "expo-notifications";
 import { useEffect, useSyncExternalStore } from "react";
 import type { TeeTimeBookingRow } from "../lib/database.types";
 import { assertSupabaseConfigured, supabase } from "../lib/supabase";
-import { getColomboDateKey, getColomboMinutes } from "./colombo-time";
+import { getColomboDateKey, getColomboMinutes } from "../utils/colombo-time";
 import { ensureAuthReady, useAuthSession } from "./auth";
 import { getManagedCourseById } from "./course-management";
 import { addNotification } from "./notifications";

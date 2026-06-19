@@ -52,10 +52,16 @@ create table if not exists public.golf_courses (
   longitude double precision not null,
   sort_order integer not null default 0,
   is_active boolean not null default true,
+  is_getaway boolean not null default false,
   updated_at timestamptz not null default timezone('utc', now()),
   constraint golf_courses_price_valid check (price >= 0),
   constraint golf_courses_rating_valid check (rating >= 0 and rating <= 5)
 );
+
+-- Idempotent column additions: safe to run on existing databases
+-- (CREATE TABLE IF NOT EXISTS won't add new columns to an already-existing table)
+alter table public.golf_courses
+  add column if not exists is_getaway boolean not null default false;
 
 create table if not exists public.course_tee_slot_templates (
   id uuid primary key default gen_random_uuid(),
@@ -99,6 +105,7 @@ create table if not exists public.course_detail_items (
 create table if not exists public.course_reviews (
   id uuid primary key default gen_random_uuid(),
   course_id text not null references public.golf_courses (id) on delete cascade,
+  user_id uuid references auth.users (id) on delete cascade,
   author_name text not null,
   author_badge text not null,
   rating integer not null,
@@ -110,6 +117,10 @@ create table if not exists public.course_reviews (
   updated_at timestamptz not null default timezone('utc', now()),
   constraint course_reviews_rating_valid check (rating between 1 and 5)
 );
+
+-- Idempotent column addition for existing deployments
+ALTER TABLE public.course_reviews
+  ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE;
 
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
@@ -277,12 +288,19 @@ declare
   computed_caddy_fee numeric(10, 2);
   computed_taxes numeric(10, 2);
   saved_booking public.tee_time_bookings;
+  user_discount_percent numeric := 0;
 begin
   current_user_id := auth.uid();
 
   if current_user_id is null then
     raise exception 'You need to be signed in to manage a booking.';
   end if;
+
+  select coalesce(tier.discount_percent, 0)
+  into user_discount_percent
+  from public.profiles prof
+  left join public.membership_tiers tier on prof.tier_id = tier.id
+  where prof.id = current_user_id;
 
   colombo_now := timezone('Asia/Colombo', now());
 
@@ -365,7 +383,7 @@ begin
     raise exception 'This tee slot only supports up to % players.', slot_template.max_players;
   end if;
 
-  computed_green_fee := round((course_record.price * normalized_players)::numeric, 2);
+  computed_green_fee := round((course_record.price * normalized_players * (1.0 - (user_discount_percent / 100.0)))::numeric, 2);
   computed_caddy_fee := round((normalized_players * 7.50)::numeric, 2);
   computed_taxes := round((computed_green_fee * 0.0845)::numeric, 2);
 
@@ -767,7 +785,20 @@ drop policy if exists "Course reviews are insertable by authenticated users" on 
 create policy "Course reviews are insertable by authenticated users"
 on public.course_reviews
 for insert
-with check (auth.role() = 'authenticated');
+with check (auth.role() = 'authenticated' and auth.uid() = user_id);
+
+drop policy if exists "Course reviews are updatable by the owner" on public.course_reviews;
+create policy "Course reviews are updatable by the owner"
+on public.course_reviews
+for update
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists "Course reviews are deletable by the owner" on public.course_reviews;
+create policy "Course reviews are deletable by the owner"
+on public.course_reviews
+for delete
+using (auth.uid() = user_id);
 
 
 drop policy if exists "Bookings are viewable by the owner" on public.tee_time_bookings;
@@ -790,16 +821,85 @@ using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
 -- Grant access to public tables for Data API
-grant select, insert, update, delete on table public.locations to anon, authenticated, service_role;
-grant select, insert, update, delete on table public.course_styles to anon, authenticated, service_role;
-grant select, insert, update, delete on table public.membership_tiers to anon, authenticated, service_role;
-grant select, insert, update, delete on table public.golf_courses to anon, authenticated, service_role;
-grant select, insert, update, delete on table public.course_tee_slot_templates to anon, authenticated, service_role;
-grant select, insert, update, delete on table public.course_content to anon, authenticated, service_role;
-grant select, insert, update, delete on table public.course_detail_items to anon, authenticated, service_role;
-grant select, insert, update, delete on table public.course_reviews to anon, authenticated, service_role;
-grant select, insert, update, delete on table public.profiles to anon, authenticated, service_role;
-grant select, insert, update, delete on table public.favorite_courses to anon, authenticated, service_role;
-grant select, insert, update, delete on table public.tee_time_bookings to anon, authenticated, service_role;
+grant select on table public.locations to anon, authenticated;
+grant select, insert, update, delete on table public.locations to service_role;
 
-revoke insert, update on public.tee_time_bookings from authenticated;
+grant select on table public.course_styles to anon, authenticated;
+grant select, insert, update, delete on table public.course_styles to service_role;
+
+grant select on table public.membership_tiers to anon, authenticated;
+grant select, insert, update, delete on table public.membership_tiers to service_role;
+
+grant select on table public.golf_courses to anon, authenticated;
+grant select, insert, update, delete on table public.golf_courses to service_role;
+
+grant select on table public.course_tee_slot_templates to anon, authenticated;
+grant select, insert, update, delete on table public.course_tee_slot_templates to service_role;
+
+grant select on table public.course_content to anon, authenticated;
+grant select, insert, update, delete on table public.course_content to service_role;
+
+grant select on table public.course_detail_items to anon, authenticated;
+grant select, insert, update, delete on table public.course_detail_items to service_role;
+
+grant select, insert on table public.course_reviews to authenticated;
+grant select, insert, update, delete on table public.course_reviews to service_role;
+
+grant select, insert, update on table public.profiles to authenticated;
+grant select, insert, update, delete on table public.profiles to service_role;
+
+grant select, insert, delete on table public.favorite_courses to authenticated;
+grant select, insert, update, delete on table public.favorite_courses to service_role;
+
+grant select on table public.tee_time_bookings to authenticated;
+grant select, insert, update, delete on table public.tee_time_bookings to service_role;
+
+-- Create Notifications Table
+create table if not exists public.notifications (
+  id text primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  type text not null,
+  title text not null,
+  message text not null,
+  occurred_at timestamp with time zone not null default timezone('utc'::text, now()),
+  read boolean not null default false,
+  icon text not null,
+  action_text text,
+  route text,
+  route_params jsonb,
+  created_at timestamp with time zone not null default timezone('utc'::text, now())
+);
+
+-- Enable RLS
+alter table public.notifications enable row level security;
+
+-- Policies
+drop policy if exists "Users can view their own notifications" on public.notifications;
+create policy "Users can view their own notifications"
+  on public.notifications for select
+  to authenticated
+  using (auth.uid() = user_id);
+
+drop policy if exists "Users can insert their own notifications" on public.notifications;
+create policy "Users can insert their own notifications"
+  on public.notifications for insert
+  to authenticated
+  with check (auth.uid() = user_id);
+
+drop policy if exists "Users can update their own notifications" on public.notifications;
+create policy "Users can update their own notifications"
+  on public.notifications for update
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "Users can delete their own notifications" on public.notifications;
+create policy "Users can delete their own notifications"
+  on public.notifications for delete
+  to authenticated
+  using (auth.uid() = user_id);
+
+-- Grants
+grant select, insert, update, delete on table public.notifications to authenticated;
+grant select, insert, update, delete on table public.notifications to service_role;
+

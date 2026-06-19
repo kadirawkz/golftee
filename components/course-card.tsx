@@ -3,7 +3,7 @@ import { StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { AnimatedPressable as Pressable } from "./animated-pressable";
 import { AppImage } from "./app-image";
 import { getCourseImage } from "../lib/image-mapping";
-import { theme } from "./theme";
+import { createThemedStyleSheet, useThemedStyles, useAppTheme } from "./theme";
 
 type CourseCardProps = {
   title: string;
@@ -38,15 +38,21 @@ export function CourseCard({
   compactActionLabel,
   onPressCompactAction,
   compactActionIcon = "arrow-forward",
-  compactActionIconColor = theme.colors.primary,
+  compactActionIconColor,
 }: CourseCardProps) {
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(themedStyles);
   const isSmallCompact = variant === "compact" && size === "small";
+
+  const resolvedActionIconColor = compactActionIconColor ?? colors.text;
+
   const baseCardStyles = [
     styles.cardBase,
     variant === "featured" ? styles.featuredCard : styles.compactCard,
     isSmallCompact && styles.compactCardSmall,
     cardStyle,
   ];
+
   const cardContent = (
     <>
       {variant === "featured" ? (
@@ -59,7 +65,7 @@ export function CourseCard({
                 <Text style={styles.featuredStyleText}>{styleLabel}</Text>
               </View>
               <View style={styles.featuredRatingChip}>
-                <Ionicons name="star" size={11} color={theme.colors.accentWarm} />
+                <Ionicons name="star" size={11} color={colors.accentWarm} />
                 <Text style={styles.featuredRatingText}>{rating}</Text>
               </View>
             </View>
@@ -69,22 +75,17 @@ export function CourseCard({
             <Text style={styles.featuredTitle} numberOfLines={2}>
               {title}
             </Text>
-            <View style={styles.locationRow}>
-              <Ionicons name="location-outline" size={14} color={theme.colors.textSoft} />
-              <Text style={styles.locationText} numberOfLines={1}>
-                {location}
-              </Text>
-            </View>
-
             <View style={styles.featuredFooter}>
-              <View>
-                <Text style={styles.priceLabel}>STARTING AT</Text>
-                <Text style={styles.priceText}>{price}</Text>
+              <View style={[styles.locationRow, { flex: 1, marginRight: 16 }]}>
+                <Ionicons name="location-outline" size={14} color={colors.textSoft} />
+                <Text style={styles.locationText} numberOfLines={1}>
+                  {location}
+                </Text>
               </View>
 
-              <View style={styles.featuredAction}>
-                <Text style={styles.featuredActionText}>View Details</Text>
-                <Ionicons name="arrow-forward" size={16} color={theme.colors.primary} />
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={styles.priceLabel}>STARTING AT</Text>
+                <Text style={styles.priceText}>{price}</Text>
               </View>
             </View>
           </View>
@@ -99,7 +100,7 @@ export function CourseCard({
                   {title}
                 </Text>
                 <View style={styles.locationRow}>
-                  <Ionicons name="location-outline" size={isSmallCompact ? 12 : 13} color={theme.colors.textSoft} />
+                  <Ionicons name="location-outline" size={isSmallCompact ? 12 : 13} color={colors.textSoft} />
                   <Text style={[styles.locationText, isSmallCompact && styles.locationTextSmall]} numberOfLines={1}>
                     {location}
                   </Text>
@@ -107,7 +108,7 @@ export function CourseCard({
               </View>
 
               <View style={[styles.compactRatingChip, isSmallCompact && styles.compactRatingChipSmall]}>
-                <Ionicons name="star" size={isSmallCompact ? 9 : 10} color={theme.colors.accentWarm} />
+                <Ionicons name="star" size={isSmallCompact ? 9 : 10} color={colors.accentWarm} />
                 <Text style={[styles.compactRatingText, isSmallCompact && styles.compactRatingTextSmall]}>{rating}</Text>
               </View>
             </View>
@@ -144,11 +145,14 @@ export function CourseCard({
                   style={[styles.compactActionButton, isSmallCompact && styles.compactActionButtonSmall]}
                   onPress={onPressCompactAction}
                   variant="chip"
+                  accessibilityRole="button"
+                  accessibilityLabel={compactActionLabel}
+                  accessibilityHint={`Triggers action for ${title}`}
                 >
                   <Text style={styles.compactActionText} numberOfLines={1}>
                     {compactActionLabel}
                   </Text>
-                  <Ionicons name={compactActionIcon} size={14} color={compactActionIconColor} />
+                  <Ionicons name={compactActionIcon} size={14} color={resolvedActionIconColor} />
                 </Pressable>
               ) : null}
             </View>
@@ -160,7 +164,14 @@ export function CourseCard({
 
   if (onPress) {
     return (
-      <Pressable style={baseCardStyles} onPress={onPress} variant="card">
+      <Pressable
+        style={baseCardStyles}
+        onPress={onPress}
+        variant="card"
+        accessibilityRole="button"
+        accessibilityLabel={`${title}, located in ${location}. Rating: ${rating} stars. Price: starting at ${price}`}
+        accessibilityHint="Double tap to open course details page"
+      >
         {cardContent}
       </Pressable>
     );
@@ -169,14 +180,14 @@ export function CourseCard({
   return <View style={baseCardStyles}>{cardContent}</View>;
 }
 
-const styles = StyleSheet.create({
+const themedStyles = createThemedStyleSheet((colors) => ({
   cardBase: {
     borderRadius: 18,
     overflow: "hidden",
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    shadowColor: theme.colors.shadow,
+    borderColor: colors.border,
+    shadowColor: colors.shadow,
     shadowOpacity: 0.08,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 6 },
@@ -203,7 +214,7 @@ const styles = StyleSheet.create({
   },
   imageOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: theme.colors.overlaySoft,
+    backgroundColor: colors.overlaySoft,
   },
   featuredChipRow: {
     position: "absolute",
@@ -215,15 +226,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   featuredStyleChip: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.background,
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
   featuredStyleText: {
-    color: theme.colors.surface,
-    fontSize: theme.typography.label.fontSize,
-    lineHeight: theme.typography.label.lineHeight,
+    color: colors.text,
+    fontSize: 11,
+    lineHeight: 14,
     fontWeight: "700",
     letterSpacing: 0.8,
   },
@@ -231,16 +242,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 999,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
   featuredRatingText: {
-    fontSize: theme.typography.label.fontSize,
-    lineHeight: theme.typography.label.lineHeight,
+    fontSize: 11,
+    lineHeight: 14,
     fontWeight: "700",
-    color: theme.colors.text,
+    color: colors.text,
   },
   featuredBody: {
     paddingHorizontal: 14,
@@ -248,10 +259,10 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   featuredTitle: {
-    fontSize: theme.typography.h3.fontSize,
-    lineHeight: theme.typography.h3.lineHeight,
+    fontSize: 20,
+    lineHeight: 26,
     fontWeight: "800",
-    color: theme.colors.text,
+    color: colors.text,
   },
   locationRow: {
     flexDirection: "row",
@@ -260,44 +271,39 @@ const styles = StyleSheet.create({
   },
   locationText: {
     flex: 1,
-    fontSize: theme.typography.bodySm.fontSize,
-    lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.textSoft,
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.textSoft,
   },
   featuredFooter: {
     flexDirection: "row",
-    alignItems: "flex-end",
+    alignItems: "center",
     justifyContent: "space-between",
     marginTop: 4,
   },
   priceLabel: {
-    fontSize: theme.typography.caption.fontSize,
-    lineHeight: theme.typography.caption.lineHeight,
+    fontSize: 10,
+    lineHeight: 13,
     fontWeight: "700",
     letterSpacing: 1.2,
-    color: theme.colors.muted,
+    color: colors.muted,
     marginBottom: 2,
   },
   priceText: {
-    fontSize: theme.typography.h3.fontSize,
-    lineHeight: theme.typography.h3.lineHeight,
+    fontSize: 20,
+    lineHeight: 26,
     fontWeight: "800",
-    color: theme.colors.accentWarm,
+    color: colors.accentWarm,
   },
   featuredAction: {
-    flexDirection: "row",
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: "center",
-    gap: 5,
-    backgroundColor: theme.colors.primarySoft,
-    borderRadius: 999,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
-  },
-  featuredActionText: {
-    fontSize: theme.typography.bodySm.fontSize,
-    lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.primary,
-    fontWeight: "700",
+    justifyContent: "center",
+    backgroundColor: colors.surfaceSoft,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   compactImage: {
     width: 108,
@@ -330,25 +336,25 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   compactTitle: {
-    fontSize: theme.typography.title.fontSize,
-    lineHeight: theme.typography.title.lineHeight,
-    color: theme.colors.text,
+    fontSize: 16,
+    lineHeight: 22,
+    color: colors.text,
     fontWeight: "800",
   },
   compactTitleSmall: {
-    fontSize: theme.typography.body.fontSize,
-    lineHeight: theme.typography.body.lineHeight,
+    fontSize: 14,
+    lineHeight: 21,
   },
   compactRatingChip: {
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 999,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     flexShrink: 0,
   },
   compactRatingChipSmall: {
@@ -356,14 +362,14 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   compactRatingText: {
-    fontSize: theme.typography.label.fontSize,
-    lineHeight: theme.typography.label.lineHeight,
+    fontSize: 11,
+    lineHeight: 14,
     fontWeight: "700",
-    color: theme.colors.text,
+    color: colors.text,
   },
   compactRatingTextSmall: {
-    fontSize: theme.typography.caption.fontSize,
-    lineHeight: theme.typography.caption.lineHeight,
+    fontSize: 10,
+    lineHeight: 13,
   },
   compactFooter: {
     gap: 8,
@@ -389,14 +395,14 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   toneChipGold: {
-    backgroundColor: theme.colors.accentSoft,
+    backgroundColor: colors.surfaceSoft,
   },
   toneChipGreen: {
-    backgroundColor: theme.colors.success,
+    backgroundColor: colors.surfaceSoft,
   },
   toneChipText: {
-    fontSize: theme.typography.caption.fontSize,
-    lineHeight: theme.typography.caption.lineHeight,
+    fontSize: 10,
+    lineHeight: 13,
     fontWeight: "800",
     letterSpacing: 0.7,
   },
@@ -404,24 +410,24 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   toneChipTextGold: {
-    color: theme.colors.accentWarm,
+    color: colors.accentWarm,
   },
   toneChipTextGreen: {
-    color: theme.colors.successText,
+    color: colors.successText,
   },
   compactPriceGroup: {
     alignItems: "flex-end",
     flexShrink: 0,
   },
   compactPriceText: {
-    fontSize: theme.typography.subtitle.fontSize,
-    lineHeight: theme.typography.subtitle.lineHeight,
+    fontSize: 15,
+    lineHeight: 22,
     fontWeight: "800",
-    color: theme.colors.accentWarm,
+    color: colors.accentWarm,
   },
   compactPriceTextSmall: {
-    fontSize: theme.typography.body.fontSize,
-    lineHeight: theme.typography.body.lineHeight,
+    fontSize: 14,
+    lineHeight: 21,
   },
   compactActionButton: {
     flexDirection: "row",
@@ -431,24 +437,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     minHeight: 36,
     paddingVertical: 7,
-    borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.primarySoft,
+    borderRadius: 999,
+    backgroundColor: colors.surfaceSoft,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     alignSelf: "stretch",
   },
   compactActionButtonSmall: {
     minHeight: 34,
   },
   compactActionText: {
-    fontSize: theme.typography.bodySm.fontSize,
-    lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.primary,
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.text,
     fontWeight: "700",
     flexShrink: 1,
   },
   locationTextSmall: {
-    fontSize: theme.typography.caption.fontSize,
-    lineHeight: theme.typography.caption.lineHeight,
+    fontSize: 10,
+    lineHeight: 13,
   },
-});
+}));

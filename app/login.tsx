@@ -12,12 +12,14 @@ import {
 } from "react-native";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { getAuthConfigurationError, signInWithEmail } from "../components/auth";
-import { theme } from "../components/theme";
+import { getAuthConfigurationError, signInWithEmail } from "../services/auth";
+import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../components/theme";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function LoginScreen() {
+  const { colors, resolvedTheme } = useAppTheme();
+  const styles = useThemedStyles(themedStyles);
   const router = useRouter();
   const { width } = useWindowDimensions();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -93,11 +95,18 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
-      <StatusBar style="dark" />
+      <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
 
       <View style={styles.authTopBar}>
-        <Pressable style={styles.authBackButton} onPress={() => router.replace("/splash")} variant="icon">
-          <Ionicons name="arrow-back" size={22} color={theme.colors.primary} />
+        <Pressable
+          style={styles.authBackButton}
+          onPress={() => router.replace("/splash")}
+          variant="icon"
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          accessibilityHint="Navigates to the splash screen"
+        >
+          <Ionicons name="arrow-back" size={22} color={colors.primary} />
         </Pressable>
         <Text style={styles.authTopTitle}>Sign In</Text>
         <View style={styles.authTopSpacer} />
@@ -134,10 +143,10 @@ export default function LoginScreen() {
                   EMAIL ADDRESS
                 </Text>
                 <View style={styles.inputRow}>
-                  <Ionicons name="mail-outline" size={18} color={errors.email ? theme.colors.danger : theme.colors.muted} />
+                  <Ionicons name="mail-outline" size={18} color={errors.email ? colors.danger : colors.muted} />
                   <TextInput
                     placeholder="name@example.com"
-                    placeholderTextColor={theme.colors.muted}
+                    placeholderTextColor={colors.muted}
                     style={[styles.inputField, errors.email && styles.inputFieldError]}
                     keyboardType="email-address"
                     autoCapitalize="none"
@@ -149,6 +158,8 @@ export default function LoginScreen() {
                       if (authNotice) setAuthNotice(null);
                     }}
                     editable={!isSubmitting}
+                    accessibilityLabel="Email Address input"
+                    accessibilityHint="Enter your email address"
                   />
                 </View>
               </View>
@@ -159,10 +170,10 @@ export default function LoginScreen() {
                   PASSWORD
                 </Text>
                 <View style={styles.inputRow}>
-                  <Ionicons name="lock-closed-outline" size={18} color={errors.password ? theme.colors.danger : theme.colors.muted} />
+                  <Ionicons name="lock-closed-outline" size={18} color={errors.password ? colors.danger : colors.muted} />
                   <TextInput
                     placeholder="Enter your password"
-                    placeholderTextColor={theme.colors.muted}
+                    placeholderTextColor={colors.muted}
                     style={[styles.inputField, errors.password && styles.inputFieldError]}
                     secureTextEntry
                     value={password}
@@ -172,6 +183,8 @@ export default function LoginScreen() {
                       if (authNotice) setAuthNotice(null);
                     }}
                     editable={!isSubmitting}
+                    accessibilityLabel="Password input"
+                    accessibilityHint="Enter your password"
                   />
                 </View>
               </View>
@@ -190,14 +203,24 @@ export default function LoginScreen() {
                 onPress={() => setRememberMe((v) => !v)}
                 variant="chip"
                 disabled={isSubmitting}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: rememberMe }}
+                accessibilityLabel="Keep me signed in checkbox"
               >
                 <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
-                  {rememberMe ? <Ionicons name="checkmark" size={14} color={theme.colors.surface} /> : null}
+                  {rememberMe ? <Ionicons name="checkmark" size={14} color={colors.surface} /> : null}
                 </View>
                 <Text style={styles.rememberText}>Keep me signed in</Text>
               </Pressable>
 
-              <Pressable onPress={() => router.push("/forgot-password")} variant="chip" disabled={isSubmitting}>
+              <Pressable
+                onPress={() => router.push("/forgot-password")}
+                variant="chip"
+                disabled={isSubmitting}
+                accessibilityRole="link"
+                accessibilityLabel="Forgot password link"
+                accessibilityHint="Navigates to the forgot password screen"
+              >
                 <Text style={styles.forgotText}>Forgot password?</Text>
               </Pressable>
             </View>
@@ -207,17 +230,28 @@ export default function LoginScreen() {
               onPress={() => void handleLogin()}
               disabled={isSubmitting || Boolean(supabaseConfigurationError)}
               variant="cta"
+              accessibilityRole="button"
+              accessibilityState={{ disabled: isSubmitting }}
+              accessibilityLabel={isSubmitting ? "Signing In" : "Login to GolfTee"}
+              accessibilityHint="Triggers email authentication login"
             >
               <Text style={styles.loginButtonText}>
                 {isSubmitting ? "Signing In..." : "Login to GolfTee"}
               </Text>
-              <Ionicons name="arrow-forward" size={20} color={theme.colors.surface} />
+              <Ionicons name="arrow-forward" size={20} color={colors.surface} />
             </Pressable>
 
             {/* Separator to register */}
             <View style={styles.registerPrompt}>
               <Text style={styles.registerPromptText}>{"Don't have an account? "}</Text>
-              <Pressable onPress={() => router.replace("/signup")} variant="chip" disabled={isSubmitting}>
+              <Pressable
+                onPress={() => router.replace("/signup")}
+                variant="chip"
+                disabled={isSubmitting}
+                accessibilityRole="link"
+                accessibilityLabel="Sign Up link"
+                accessibilityHint="Navigates to the account signup screen"
+              >
                 <Text style={styles.registerLinkText}>Sign Up</Text>
               </Pressable>
             </View>
@@ -236,6 +270,9 @@ export default function LoginScreen() {
                 }}
                 variant="button"
                 disabled={isSubmitting}
+                accessibilityRole="button"
+                accessibilityLabel="Continue with Google"
+                accessibilityHint="Launches Google credentials sign in"
               >
                 <Ionicons name="logo-google" size={20} color="#DB4437" />
                 <Text style={styles.socialButtonText}>Continue with Google</Text>
@@ -248,8 +285,11 @@ export default function LoginScreen() {
                 }}
                 variant="button"
                 disabled={isSubmitting}
+                accessibilityRole="button"
+                accessibilityLabel="Continue with Apple"
+                accessibilityHint="Launches Apple credentials sign in"
               >
-                <Ionicons name="logo-apple" size={20} color={theme.colors.inverse} />
+                <Ionicons name="logo-apple" size={20} color={colors.inverse} />
                 <Text style={styles.socialButtonText}>Continue with Apple</Text>
               </Pressable>
             </View>
@@ -260,10 +300,10 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const themedStyles = createThemedStyleSheet((colors) => ({
   screen: {
     flex: 1,
-    backgroundColor: theme.colors.page,
+    backgroundColor: colors.page,
   },
   scroll: {
     flex: 1,
@@ -296,7 +336,7 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.h4.fontSize,
     lineHeight: theme.typography.h4.lineHeight,
     fontWeight: "800",
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   authTopSpacer: {
     width: 34,
@@ -315,14 +355,14 @@ const styles = StyleSheet.create({
     lineHeight: theme.typography.title.lineHeight,
     fontWeight: "900",
     letterSpacing: 0.6,
-    color: theme.colors.text,
+    color: colors.text,
   },
   subtitle: {
     maxWidth: "92%",
     fontSize: theme.typography.body.fontSize,
     lineHeight: 22,
     fontWeight: "400",
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   subtitleCompact: {
     maxWidth: "100%",
@@ -339,14 +379,14 @@ const styles = StyleSheet.create({
   inputShell: {
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     paddingHorizontal: 16,
     paddingTop: 14,
     paddingBottom: 12,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
   },
   inputShellError: {
-    borderColor: theme.colors.danger,
+    borderColor: colors.danger,
   },
   inputRow: {
     flexDirection: "row",
@@ -358,21 +398,21 @@ const styles = StyleSheet.create({
     lineHeight: theme.typography.label.lineHeight,
     fontWeight: "700",
     letterSpacing: 1.6,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     marginBottom: 8,
   },
   inputLabelError: {
-    color: theme.colors.danger,
+    color: colors.danger,
   },
   inputField: {
     flex: 1,
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
-    color: theme.colors.text,
+    color: colors.text,
     paddingVertical: 0,
   },
   inputFieldError: {
-    color: theme.colors.danger,
+    color: colors.danger,
   },
   errorRow: {
     flexDirection: "row",
@@ -388,12 +428,12 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: theme.colors.danger,
+    backgroundColor: colors.danger,
   },
   errorText: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.danger,
+    color: colors.danger,
     fontWeight: "600",
   },
   metaRow: {
@@ -414,36 +454,36 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: theme.colors.borderStrong,
+    borderColor: colors.borderStrong,
     backgroundColor: "transparent",
     alignItems: "center",
     justifyContent: "center",
   },
   checkboxChecked: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   rememberText: {
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
-    color: theme.colors.text,
+    color: colors.text,
     fontWeight: "400",
   },
   forgotText: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "700",
   },
   loginButton: {
     height: 58,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
     gap: 10,
-    shadowColor: theme.colors.shadow,
+    shadowColor: colors.shadow,
     shadowOpacity: 0.25,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },
@@ -452,7 +492,7 @@ const styles = StyleSheet.create({
   loginButtonText: {
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
-    color: theme.colors.textOnPrimary,
+    color: colors.textOnPrimary,
     fontWeight: "700",
     letterSpacing: 0.3,
   },
@@ -464,11 +504,11 @@ const styles = StyleSheet.create({
   },
   registerPromptText: {
     fontSize: theme.typography.body.fontSize,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   registerLinkText: {
     fontSize: theme.typography.body.fontSize,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "700",
   },
   socialSection: {
@@ -484,30 +524,30 @@ const styles = StyleSheet.create({
   socialDivider: {
     height: 1,
     flex: 1,
-    backgroundColor: theme.colors.borderStrong,
+    backgroundColor: colors.borderStrong,
   },
   socialTitle: {
     fontSize: theme.typography.label.fontSize,
     lineHeight: theme.typography.label.lineHeight,
     fontWeight: "700",
     letterSpacing: 1.9,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   socialButton: {
     height: 58,
     borderRadius: theme.radius.pill,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 12,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
   },
   socialButtonText: {
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
-    color: theme.colors.text,
+    color: colors.text,
     fontWeight: "500",
   },
-});
+}));

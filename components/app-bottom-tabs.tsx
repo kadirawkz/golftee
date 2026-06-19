@@ -5,8 +5,8 @@ import { BackHandler, Platform, StyleSheet, Text, View, useWindowDimensions } fr
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "./animated-pressable";
 import { AppHeader } from "./app-header";
-import { theme } from "./theme";
-import { useNotificationState } from "./notifications";
+import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "./theme";
+import { useNotificationState } from "../services/notifications";
 
 type TabRoute = "/home" | "/explore" | "/bookings" | "/profile";
 
@@ -37,6 +37,7 @@ type HeaderRoute =
   | "/favourites"
   | "/account"
   | "/settings"
+  | "/payment-methods"
   | "/notifications"
   | "/login"
   | "/signup"
@@ -78,6 +79,7 @@ const HEADER_CONFIG_BY_ROUTE: Partial<Record<HeaderRoute, Partial<HeaderConfig>>
   "/favourites": { title: "Favourites", showRightButton: false, showLeftButton: true },
   "/account": { title: "Account", showRightButton: false, showLeftButton: true },
   "/settings": { title: "Settings", showRightButton: false, showLeftButton: true },
+  "/payment-methods": { title: "Payment Methods", showRightButton: false, showLeftButton: true },
   "/notifications": { title: "Notifications", showRightButton: false },
   "/login": { showHeader: false, showRightButton: false, showLeftButton: false },
   "/signup": { showHeader: false, showRightButton: false, showLeftButton: false },
@@ -100,14 +102,17 @@ export function AppBottomTabs({ children }: AppBottomTabsProps) {
   const pathname = usePathname();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const shellBackgroundColor = theme.system.getBackground(pathname);
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(themedStyles);
+
+  const shellBackgroundColor = theme.system.getBackground(pathname, colors);
 
   const isSecureNoChromeRoute = SECURE_NO_CHROME_ROUTES.includes(pathname);
   const showBottomNav =
     !isSecureNoChromeRoute &&
     (tabItems.some((item) => item.route === pathname) || pathname === "/course-details" || pathname === "/manage-booking");
   const routeHeaderConfig = HEADER_CONFIG_BY_ROUTE[pathname as HeaderRoute] ?? {};
-  
+
   const { notifications } = useNotificationState();
   const unreadCount = notifications.filter((n) => !n.read).length;
   const hasUnreadNotifications = unreadCount > 0;
@@ -137,6 +142,10 @@ export function AppBottomTabs({ children }: AppBottomTabsProps) {
 
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
       if (tabItems.some((item) => item.route === pathname)) {
+        if (pathname !== "/home") {
+          router.replace("/home");
+          return true;
+        }
         BackHandler.exitApp();
         return true;
       }
@@ -213,7 +222,7 @@ export function AppBottomTabs({ children }: AppBottomTabsProps) {
                   <Ionicons
                     name={item.icon}
                     size={iconSize}
-                    color={active ? theme.colors.primary : theme.colors.muted}
+                    color={active ? colors.text : colors.muted}
                   />
                 </View>
                 <Text style={[labelStyle, active && styles.navLabelActive]} numberOfLines={1}>
@@ -239,10 +248,10 @@ export function AppBottomTabs({ children }: AppBottomTabsProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const themedStyles = createThemedStyleSheet((colors) => ({
   chromeShell: {
     flex: 1,
-    backgroundColor: theme.colors.page,
+    backgroundColor: colors.page,
   },
   content: {
     flex: 1,
@@ -260,10 +269,10 @@ const styles = StyleSheet.create({
     bottom: 8,
     height: 68,
     borderRadius: 20,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    shadowColor: theme.colors.shadow,
+    borderColor: colors.border,
+    shadowColor: colors.shadow,
     shadowOpacity: 0.06,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
@@ -271,7 +280,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-around",
-    opacity: 0.90,
+    opacity: 0.95,
   },
   navItem: {
     flex: 1,
@@ -289,32 +298,32 @@ const styles = StyleSheet.create({
   iconPill: {
     width: 27,
     height: 27,
-    borderRadius: theme.radius.pill,
+    borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.colors.surfaceTint,
+    backgroundColor: colors.surfaceSoft,
   },
   iconPillActive: {
-    backgroundColor: theme.colors.accentSoft,
+    backgroundColor: colors.surfaceMuted,
   },
   navLabel: {
-    fontSize: theme.typography.caption.fontSize,
-    lineHeight: theme.typography.caption.lineHeight,
-    color: theme.colors.muted,
-    fontWeight: theme.typography.caption.fontWeight,
-    letterSpacing: theme.typography.caption.letterSpacing,
+    fontSize: 10,
+    lineHeight: 13,
+    color: colors.muted,
+    fontWeight: "600",
+    letterSpacing: 0.4,
   },
   navLabelCompact: {
-    fontSize: theme.typography.overline.fontSize,
-    lineHeight: theme.typography.overline.lineHeight,
-    letterSpacing: theme.typography.overline.letterSpacing,
+    fontSize: 9,
+    lineHeight: 12,
+    letterSpacing: 1.8,
   },
   navLabelTablet: {
-    fontSize: theme.typography.caption.fontSize,
-    lineHeight: theme.typography.caption.lineHeight,
+    fontSize: 10,
+    lineHeight: 13,
   },
   navLabelActive: {
-    color: theme.colors.primary,
+    color: colors.text,
     fontWeight: "700",
   },
-});
+}));

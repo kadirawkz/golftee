@@ -7,10 +7,10 @@ import { ActivityIndicator, Platform, ScrollView, StyleSheet, Text, useWindowDim
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
-import { createBooking, updateBooking } from "../components/bookings";
-import { getManagedCourseById } from "../components/course-management";
-import { useResponsiveLayout } from "../components/responsive-layout";
-import { theme } from "../components/theme";
+import { createBooking, updateBooking } from "../services/bookings";
+import { getManagedCourseById } from "../services/course-management";
+import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
+import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../components/theme";
 import { getCourseImage } from "../lib/image-mapping";
 
 function parsePositiveNumber(value: string | undefined, fallback: number) {
@@ -28,6 +28,8 @@ function getFirstParamValue(value: string | string[] | undefined) {
 }
 
 export default function BookingCheckoutScreen() {
+  const { colors, resolvedTheme } = useAppTheme();
+  const styles = useThemedStyles(themedStyles);
   const router = useRouter();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -48,28 +50,66 @@ export default function BookingCheckoutScreen() {
     total?: string | string[];
   }>();
 
-  const [selectedPayment, setSelectedPayment] = useState<"wallet" | "card">("wallet");
+  interface PaymentMethod {
+    id: string;
+    type: "wallet" | "card";
+    brand: string;
+    last4: string;
+    expiry?: string;
+    cardholderName?: string;
+  }
+
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [selectedPaymentId, setSelectedPaymentId] = useState<string>("");
+
+  const DEFAULT_METHODS: PaymentMethod[] = [
+    {
+      id: "default-wallet",
+      type: "wallet",
+      brand: Platform.OS === "ios" ? "Apple Pay" : "Google Pay",
+      last4: "",
+    },
+    {
+      id: "default-card",
+      type: "card",
+      brand: "Mastercard",
+      last4: "8829",
+      expiry: "08/25",
+      cardholderName: "Alex Morgan",
+    },
+  ];
 
   // Load preferred payment method from App Settings
   useEffect(() => {
-    const loadDefaultPayment = async () => {
+    const loadPaymentData = async () => {
       try {
-        const val = await AsyncStorage.getItem("golftee:settings:default_payment");
-        if (val === "wallet" || val === "card") {
-          setSelectedPayment(val);
+        const stored = await AsyncStorage.getItem("golftee:payment_methods");
+        let parsed: PaymentMethod[] = [];
+        if (stored) {
+          parsed = JSON.parse(stored);
+        } else {
+          parsed = [...DEFAULT_METHODS];
+        }
+        setPaymentMethods(parsed);
+
+        const defaultId = await AsyncStorage.getItem("golftee:settings:default_payment_id");
+        if (defaultId && parsed.some((m) => m.id === defaultId)) {
+          setSelectedPaymentId(defaultId);
+        } else if (parsed.length > 0) {
+          setSelectedPaymentId(parsed[0].id);
         }
       } catch (err) {
-        console.warn("Failed to load default payment method", err);
+        console.warn("Failed to load payment methods", err);
       }
     };
-    loadDefaultPayment();
+    loadPaymentData();
   }, []);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const handlePaymentChange = (method: "wallet" | "card") => {
-    setSelectedPayment(method);
+  const handlePaymentChange = (id: string) => {
+    setSelectedPaymentId(id);
   };
 
   const courseId = getFirstParamValue(params.id);
@@ -112,13 +152,19 @@ export default function BookingCheckoutScreen() {
       return;
     }
 
+    const chosenMethod = paymentMethods.find((m) => m.id === selectedPaymentId);
+    if (!chosenMethod) {
+      setNotice("Please add and select a payment method.");
+      return;
+    }
+
     setIsSubmitting(true);
     setNotice(null);
 
     try {
       const bookingInput = {
         courseId: course.id,
-        paymentMethod: selectedPayment,
+        paymentMethod: chosenMethod.type,
         players,
         teeDate: dateKeyParam,
         teeTime: timeParam,
@@ -144,7 +190,7 @@ export default function BookingCheckoutScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={["bottom"]}>
-      <StatusBar style="dark" />
+      <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
@@ -179,6 +225,10 @@ export default function BookingCheckoutScreen() {
           <View style={styles.courseHeroOverlay} />
           <View style={styles.courseHeroContent}>
             <Text style={styles.courseName}>{course.title}</Text>
+            <View style={styles.heroLocationRow}>
+              <Ionicons name="location" size={14} color="rgba(255, 255, 255, 0.8)" />
+              <Text style={styles.heroLocation}>{course.location}</Text>
+            </View>
           </View>
         </View>
 
@@ -203,52 +253,75 @@ export default function BookingCheckoutScreen() {
         </View>
 
         <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Payment Method</Text>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>Payment Method</Text>
+              <Pressable onPress={() => router.push("/payment-methods")} variant="chip">
+                <Text style={styles.manageMethodsLink}>Manage</Text>
+              </Pressable>
+            </View>
 
-            <Pressable
-              style={[styles.paymentCard, selectedPayment === "wallet" && styles.paymentCardActive]}
-              onPress={() => handlePaymentChange("wallet")}
-              variant="card"
-            >
-              <View style={styles.paymentLeft}>
-                <View
-                  style={[
-                    styles.paymentIconWrap,
-                    Platform.OS === "ios" ? styles.appleIcon : styles.walletIconWrap,
-                  ]}
-                >
-                  <Text style={[styles.appleText, Platform.OS !== "ios" && styles.walletIconText]}>
-                    {walletPaymentBadge}
-                  </Text>
+            {paymentMethods.length === 0 ? (
+              <Pressable
+                style={styles.paymentCard}
+                onPress={() => router.push("/payment-methods")}
+                variant="card"
+              >
+                <View style={styles.paymentLeft}>
+                  <View style={styles.paymentIconWrap}>
+                    <Ionicons name="add" size={22} color={colors.primary} />
+                  </View>
+                  <View>
+                    <Text style={styles.paymentName}>Add Payment Method</Text>
+                    <Text style={styles.paymentSub}>No saved payment options found</Text>
+                  </View>
                 </View>
-                <View>
-                  <Text style={styles.paymentName}>{walletPaymentLabel}</Text>
-                  <Text style={styles.paymentSub}>Fast, secure checkout</Text>
-                </View>
-              </View>
-              <View style={selectedPayment === "wallet" ? styles.radioOuterActive : styles.radioOuter}>
-                {selectedPayment === "wallet" && <View style={styles.radioInnerActive} />}
-              </View>
-            </Pressable>
+              </Pressable>
+            ) : (
+              paymentMethods.map((method) => {
+                const isSelected = method.id === selectedPaymentId;
+                const isWallet = method.type === "wallet";
 
-            <Pressable
-              style={[styles.paymentCard, selectedPayment === "card" && styles.paymentCardActive]}
-              onPress={() => handlePaymentChange("card")}
-              variant="card"
-            >
-              <View style={styles.paymentLeft}>
-                <View style={styles.paymentIconWrap}>
-                  <Ionicons name="card" size={22} color={theme.colors.primary} />
-                </View>
-                <View>
-                  <Text style={styles.paymentName}>.... 8829</Text>
-                  <Text style={styles.paymentSub}>Mastercard - Expires 08/25</Text>
-                </View>
-              </View>
-              <View style={selectedPayment === "card" ? styles.radioOuterActive : styles.radioOuter}>
-                {selectedPayment === "card" && <View style={styles.radioInnerActive} />}
-              </View>
-            </Pressable>
+                return (
+                  <Pressable
+                    key={method.id}
+                    style={[styles.paymentCard, isSelected && styles.paymentCardActive]}
+                    onPress={() => handlePaymentChange(method.id)}
+                    variant="card"
+                  >
+                    <View style={styles.paymentLeft}>
+                      <View
+                        style={[
+                          styles.paymentIconWrap,
+                          isWallet && method.brand === "Apple Pay" && styles.appleIcon,
+                          isWallet && method.brand === "Google Pay" && styles.walletIconWrap,
+                        ]}
+                      >
+                        {isWallet ? (
+                          <Ionicons
+                            name={method.brand === "Apple Pay" ? "logo-apple" : "logo-google"}
+                            size={20}
+                            color={method.brand === "Apple Pay" ? "#FFFFFF" : colors.primary}
+                          />
+                        ) : (
+                          <Ionicons name="card" size={22} color={colors.primary} />
+                        )}
+                      </View>
+                      <View>
+                        <Text style={styles.paymentName}>
+                          {isWallet ? method.brand : `•••• ${method.last4}`}
+                        </Text>
+                        <Text style={styles.paymentSub}>
+                          {isWallet ? "Digital Wallet Checkout" : `${method.brand} - Exp. ${method.expiry}`}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={isSelected ? styles.radioOuterActive : styles.radioOuter}>
+                      {isSelected && <View style={styles.radioInnerActive} />}
+                    </View>
+                  </Pressable>
+                );
+              })
+            )}
           </View>
 
         <View style={styles.priceCard}>
@@ -294,11 +367,11 @@ export default function BookingCheckoutScreen() {
         <View style={[styles.footerCtaInner, { maxWidth: contentMaxWidth }]}>
           <Pressable style={[styles.placeButton]} onPress={() => void handlePlaceBooking()} disabled={isSubmitting} variant="cta">
             {isSubmitting ? (
-              <ActivityIndicator size="small" color={theme.colors.surface} />
+              <ActivityIndicator size="small" color={colors.surface} />
             ) : (
               <>
                 <Text style={styles.placeButtonText}>{bookingIdParam ? "Save Booking Changes" : "Place Booking"}</Text>
-                <Ionicons name="arrow-forward" size={20} color={theme.colors.surface} />
+                <Ionicons name="arrow-forward" size={20} color={colors.surface} />
               </>
             )}
           </Pressable>
@@ -311,10 +384,10 @@ export default function BookingCheckoutScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const themedStyles = createThemedStyleSheet((colors) => ({
   screen: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: colors.background,
   },
   scrollContent: {
     paddingTop: 14,
@@ -330,26 +403,27 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   kicker: {
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontSize: theme.typography.label.fontSize,
     lineHeight: theme.typography.label.lineHeight,
     letterSpacing: 2,
     fontWeight: "700",
   },
   headline: {
-    color: theme.colors.primary,
-    fontSize: theme.typography.displayL.fontSize,
-    lineHeight: theme.typography.displayL.lineHeight,
+    color: colors.primary,
+    fontSize: theme.typography.h2.fontSize,
+    lineHeight: theme.typography.h2.lineHeight,
     fontWeight: "800",
   },
   headlineCompact: {
-    fontSize: theme.typography.displayS.fontSize,
-    lineHeight: theme.typography.displayS.lineHeight,
+    fontSize: theme.typography.h3.fontSize,
+    lineHeight: theme.typography.h3.lineHeight,
   },
   courseHero: {
-    height: 164,
+    height: 214,
     borderRadius: 16,
     overflow: "hidden",
+    position: "relative",
   },
   courseHeroImage: {
     width: "100%",
@@ -357,30 +431,50 @@ const styles = StyleSheet.create({
   },
   courseHeroOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: theme.colors.overlayHero,
+    backgroundColor: colors.overlayStrong,
   },
   courseHeroContent: {
     position: "absolute",
-    bottom: 12,
-    left: 14,
-    right: 14,
+    left: 18,
+    right: 18,
+    bottom: 18,
+  },
+  heroKicker: {
+    color: "#D8AB5C",
+    fontSize: theme.typography.caption.fontSize,
+    lineHeight: theme.typography.caption.lineHeight,
+    letterSpacing: 1.2,
+    fontWeight: "800",
+    marginBottom: 6,
   },
   courseName: {
-    color: theme.colors.surface,
-    fontSize: theme.typography.h1.fontSize,
-    lineHeight: theme.typography.h1.lineHeight,
+    color: "#FFFFFF",
+    fontSize: theme.typography.h2.fontSize,
+    lineHeight: theme.typography.h2.lineHeight,
     fontWeight: "800",
+    marginBottom: 6,
+  },
+  heroLocationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  heroLocation: {
+    color: "rgba(255, 255, 255, 0.8)",
+    fontSize: theme.typography.subtitle.fontSize,
+    lineHeight: theme.typography.subtitle.lineHeight,
+    fontWeight: "500",
   },
   detailCard: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
   detailTitle: {
-    color: theme.colors.primary,
+    color: colors.primary,
     fontSize: theme.typography.title.fontSize,
     lineHeight: theme.typography.title.lineHeight,
     fontWeight: "700",
@@ -392,19 +486,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    borderBottomColor: colors.border,
   },
   detailRowLast: {
     borderBottomWidth: 0,
     paddingBottom: 4,
   },
   detailLabel: {
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
   },
   detailValue: {
-    color: theme.colors.primary,
+    color: colors.primary,
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
     fontWeight: "700",
@@ -413,24 +507,35 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sectionTitle: {
-    color: theme.colors.primary,
+    color: colors.primary,
     fontSize: theme.typography.title.fontSize,
     lineHeight: theme.typography.title.lineHeight,
     fontWeight: "800",
+  },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  manageMethodsLink: {
+    fontSize: theme.typography.bodySm.fontSize,
+    fontWeight: "800",
+    color: colors.accent,
   },
   paymentCard: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     paddingHorizontal: 14,
     paddingVertical: 11,
   },
   paymentCardActive: {
-    borderColor: theme.colors.primary,
+    borderColor: colors.primary,
   },
   paymentLeft: {
     flexDirection: "row",
@@ -443,31 +548,31 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.colors.surfaceTint,
+    backgroundColor: colors.surfaceTint,
   },
   appleIcon: {
-    backgroundColor: theme.colors.inverse,
+    backgroundColor: colors.inverse,
   },
   appleText: {
-    color: theme.colors.surface,
+    color: colors.surface,
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
     fontWeight: "800",
   },
   walletIconWrap: {
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: colors.primarySoft,
   },
   walletIconText: {
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   paymentName: {
-    color: theme.colors.primary,
+    color: colors.primary,
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
     fontWeight: "700",
   },
   paymentSub: {
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
   },
@@ -476,14 +581,14 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
     borderWidth: 2,
-    borderColor: theme.colors.borderStrong,
+    borderColor: colors.borderStrong,
   },
   radioOuterActive: {
     width: 22,
     height: 22,
     borderRadius: 11,
     borderWidth: 2,
-    borderColor: theme.colors.primary,
+    borderColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -491,18 +596,18 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
   },
   priceCard: {
-    backgroundColor: theme.colors.surfaceTint,
+    backgroundColor: colors.surfaceTint,
     borderRadius: 16,
     padding: 16,
     marginTop: 2,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
   },
   priceTitle: {
-    color: theme.colors.primary,
+    color: colors.primary,
     fontSize: theme.typography.h2.fontSize,
     lineHeight: theme.typography.h2.lineHeight,
     fontWeight: "800",
@@ -515,19 +620,19 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   priceLabel: {
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
   },
   priceValue: {
-    color: theme.colors.primary,
+    color: colors.primary,
     fontSize: theme.typography.h2.fontSize,
     lineHeight: theme.typography.h2.lineHeight,
     fontWeight: "800",
   },
   priceBorderBottom: {
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    borderBottomColor: colors.border,
     paddingBottom: 12,
     marginBottom: 14,
   },
@@ -535,13 +640,13 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   totalLabel: {
-    color: theme.colors.primary,
+    color: colors.primary,
     fontSize: theme.typography.title.fontSize,
     lineHeight: theme.typography.title.lineHeight,
     fontWeight: "800",
   },
   totalAmount: {
-    color: theme.colors.primary,
+    color: colors.primary,
     fontSize: theme.typography.h1.fontSize,
     lineHeight: theme.typography.h1.lineHeight,
     fontWeight: "900",
@@ -549,7 +654,7 @@ const styles = StyleSheet.create({
   noticeText: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontWeight: "600",
   },
   footerCtaWrap: {
@@ -557,9 +662,9 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: theme.colors.glass,
+    backgroundColor: colors.glass,
     borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
+    borderTopColor: colors.border,
     paddingTop: 12,
     paddingBottom: 36,
     alignItems: "center",
@@ -570,19 +675,19 @@ const styles = StyleSheet.create({
   placeButton: {
     height: 58,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
     gap: 10,
-    shadowColor: theme.colors.shadow,
+    shadowColor: colors.shadow,
     shadowOpacity: 0.2,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
     elevation: 6,
   },
   placeButtonText: {
-    color: theme.colors.surface,
+    color: colors.surface,
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
     fontWeight: "800",
@@ -590,10 +695,10 @@ const styles = StyleSheet.create({
   footerPolicy: {
     marginTop: 10,
     textAlign: "center",
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight + 2,
     fontWeight: "600",
     letterSpacing: 0.6,
   },
-});
+}));

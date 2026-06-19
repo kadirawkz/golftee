@@ -236,7 +236,7 @@ export async function toggleFavoriteCourse(courseId: string) {
     try {
       const course = getManagedCourseById(courseId);
       void addNotification(
-        "promotion",
+        "account",
         "Favorite Removed",
         `Removed ${course.title} from your favorite courses.`,
         "heart-dislike-outline",
@@ -268,7 +268,7 @@ export async function toggleFavoriteCourse(courseId: string) {
   try {
     const course = getManagedCourseById(courseId);
     void addNotification(
-      "promotion",
+      "account",
       "Course Favourited",
       `Added ${course.title} to your favorite courses list.`,
       "heart",

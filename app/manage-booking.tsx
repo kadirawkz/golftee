@@ -14,10 +14,10 @@ import {
   isCancellableBooking,
   isEditableBooking,
   useBookingState,
-} from "../components/bookings";
-import { getManagedCourseById } from "../components/course-management";
-import { useResponsiveLayout } from "../components/responsive-layout";
-import { theme } from "../components/theme";
+} from "../services/bookings";
+import { getManagedCourseById } from "../services/course-management";
+import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
+import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../components/theme";
 import { getCourseImage } from "../lib/image-mapping";
 
 const CHECKIN_QR_IMAGE =
@@ -30,6 +30,8 @@ const PARTY_BUBBLE_STYLES = [
 ] as const;
 
 export default function ManageBookingScreen() {
+  const { colors, resolvedTheme } = useAppTheme();
+  const styles = useThemedStyles(themedStyles);
   const router = useRouter();
   const { horizontalPadding, screenBottomPadding } = useResponsiveLayout();
   const { bookingId } = useLocalSearchParams<{ bookingId?: string | string[] }>();
@@ -68,7 +70,7 @@ export default function ManageBookingScreen() {
   if (!bookingState.initialized || bookingState.loading) {
     return (
       <SafeAreaView style={styles.screen} edges={["bottom"]}>
-        <StatusBar style="dark" />
+        <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
         <View style={styles.centerState}>
           <Text style={styles.centerStateText}>Loading booking details...</Text>
         </View>
@@ -79,7 +81,7 @@ export default function ManageBookingScreen() {
   if (!booking) {
     return (
       <SafeAreaView style={styles.screen} edges={["bottom"]}>
-        <StatusBar style="dark" />
+        <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
         <View style={styles.centerState}>
           <Text style={styles.centerStateText}>Booking not found.</Text>
         </View>
@@ -89,7 +91,7 @@ export default function ManageBookingScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={["bottom"]}>
-      <StatusBar style="dark" />
+      <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -114,13 +116,13 @@ export default function ManageBookingScreen() {
 
         <View style={styles.metaGrid}>
           <View style={styles.metaCard}>
-            <Ionicons name="calendar-outline" size={22} color={theme.colors.primary} />
+            <Ionicons name="calendar-outline" size={22} color={colors.primary} />
             <Text style={styles.metaTitle}>DATE</Text>
             <Text style={styles.metaMain}>{formatBookingDate(booking.tee_date)}</Text>
           </View>
 
           <View style={styles.metaCard}>
-            <Ionicons name="time-outline" size={22} color={theme.colors.primary} />
+            <Ionicons name="time-outline" size={22} color={colors.primary} />
             <Text style={styles.metaTitle}>TEE TIME</Text>
             <Text style={styles.metaMain}>{formatBookingTime(booking.tee_time)}</Text>
           </View>
@@ -172,7 +174,7 @@ export default function ManageBookingScreen() {
 
         <View style={styles.actionList}>
           <Pressable style={styles.primaryAction} variant="cta">
-            <Ionicons name="calendar-outline" size={22} color={theme.colors.surface} />
+            <Ionicons name="calendar-outline" size={22} color={colors.surface} />
             <Text style={styles.primaryActionText}>Add to Calendar</Text>
           </Pressable>
 
@@ -187,7 +189,7 @@ export default function ManageBookingScreen() {
             disabled={!canModifyBooking}
             variant="button"
           >
-            <Ionicons name="create-outline" size={22} color={theme.colors.primary} />
+            <Ionicons name="create-outline" size={22} color={colors.primary} />
             <Text style={styles.secondaryActionText}>{canModifyBooking ? "Modify Booking" : "Booking Locked"}</Text>
           </Pressable>
 
@@ -198,9 +200,9 @@ export default function ManageBookingScreen() {
             variant="button"
           >
             {isCancelling ? (
-              <ActivityIndicator size="small" color={theme.colors.danger} />
+              <ActivityIndicator size="small" color={colors.danger} />
             ) : (
-              <Ionicons name="close-circle" size={22} color={theme.colors.danger} />
+              <Ionicons name="close-circle" size={22} color={colors.danger} />
             )}
             <Text style={styles.dangerActionText}>
               {!canCancelBooking ? "Cancellation Closed" : "Cancel Reservation"}
@@ -215,24 +217,24 @@ export default function ManageBookingScreen() {
         >
           <View style={styles.detailsLeft}>
             <View style={styles.detailsIconWrap}>
-              <Ionicons name="information-circle" size={22} color={theme.colors.primary} />
+              <Ionicons name="information-circle" size={22} color={colors.primary} />
             </View>
             <View>
               <Text style={styles.detailsTitle}>Course Details</Text>
               <Text style={styles.detailsSubtitle}>Directions, amenities, and course rules</Text>
             </View>
           </View>
-          <Ionicons name="chevron-forward" size={20} color={theme.colors.textSoft} />
+          <Ionicons name="chevron-forward" size={20} color={colors.textSoft} />
         </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const themedStyles = createThemedStyleSheet((colors) => ({
   screen: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: colors.background,
   },
   scrollContent: {
     paddingHorizontal: 16,
@@ -249,7 +251,7 @@ const styles = StyleSheet.create({
   centerStateText: {
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontWeight: "600",
     textAlign: "center",
   },
@@ -258,7 +260,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
   },
   heroImage: {
     width: "100%",
@@ -266,7 +268,7 @@ const styles = StyleSheet.create({
   },
   heroOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: theme.colors.overlayHero,
+    backgroundColor: colors.overlayHero,
   },
   heroContent: {
     position: "absolute",
@@ -277,27 +279,27 @@ const styles = StyleSheet.create({
   confirmedPill: {
     alignSelf: "flex-start",
     borderRadius: 999,
-    backgroundColor: theme.colors.accentSoft,
+    backgroundColor: colors.accentSoft,
     paddingHorizontal: 11,
     paddingVertical: 4,
     marginBottom: 6,
   },
   confirmedPillText: {
-    color: theme.colors.accentWarm,
+    color: colors.accentWarm,
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
     fontWeight: "800",
     letterSpacing: 1.2,
   },
   heroTitle: {
-    color: theme.colors.surface,
+    color: "#FFFFFF",
     fontSize: theme.typography.h2.fontSize,
     lineHeight: theme.typography.h2.lineHeight,
     fontWeight: "800",
     marginBottom: 2,
   },
   heroSubtitle: {
-    color: theme.colors.textOnPrimarySoft,
+    color: "rgba(255, 255, 255, 0.8)",
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
   },
@@ -308,9 +310,9 @@ const styles = StyleSheet.create({
   metaCard: {
     flex: 1,
     borderRadius: 14,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     paddingHorizontal: 12,
     paddingVertical: 13,
     gap: 5,
@@ -318,21 +320,21 @@ const styles = StyleSheet.create({
   metaTitle: {
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     letterSpacing: 1.1,
     fontWeight: "700",
   },
   metaMain: {
     fontSize: theme.typography.h3.fontSize,
     lineHeight: theme.typography.h3.lineHeight,
-    color: theme.colors.text,
+    color: colors.text,
     fontWeight: "700",
   },
   partyCard: {
     borderRadius: 14,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     paddingHorizontal: 12,
     paddingVertical: 13,
     flexDirection: "row",
@@ -348,45 +350,45 @@ const styles = StyleSheet.create({
     height: 34,
     borderRadius: 17,
     borderWidth: 2,
-    borderColor: theme.colors.surface,
+    borderColor: colors.surface,
     marginLeft: -9,
   },
   avatarBubbleMuted: {
-    backgroundColor: theme.colors.muted,
+    backgroundColor: colors.muted,
   },
   avatarBubbleSuccess: {
-    backgroundColor: theme.colors.success,
+    backgroundColor: colors.success,
   },
   avatarBubbleAccent: {
-    backgroundColor: theme.colors.accent,
+    backgroundColor: colors.accent,
   },
   avatarMore: {
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.colors.muted,
+    backgroundColor: colors.muted,
   },
   avatarMoreText: {
-    color: theme.colors.surface,
+    color: colors.surface,
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
     fontWeight: "700",
   },
   qrSection: {
     borderRadius: 18,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     paddingHorizontal: 16,
     paddingVertical: 18,
     alignItems: "center",
     gap: 7,
   },
   qrTitle: {
-    color: theme.colors.surface,
+    color: colors.surface,
     fontSize: theme.typography.h2.fontSize,
     lineHeight: theme.typography.h2.lineHeight,
     fontWeight: "700",
   },
   qrSubtitle: {
-    color: theme.colors.textOnPrimarySoft,
+    color: colors.textOnPrimarySoft,
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
     textAlign: "center",
@@ -396,7 +398,7 @@ const styles = StyleSheet.create({
     width: 208,
     height: 238,
     borderRadius: 12,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 6,
@@ -406,7 +408,7 @@ const styles = StyleSheet.create({
     height: 200,
   },
   qrId: {
-    color: theme.colors.textOnPrimaryDim,
+    color: colors.textOnPrimaryDim,
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
     letterSpacing: 1,
@@ -414,36 +416,36 @@ const styles = StyleSheet.create({
   },
   priceCard: {
     borderRadius: 14,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     padding: 14,
     gap: 6,
   },
   priceTitle: {
     fontSize: theme.typography.title.fontSize,
     lineHeight: theme.typography.title.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "800",
     marginBottom: 4,
   },
   priceRow: {
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontWeight: "600",
   },
   priceTotal: {
     marginTop: 4,
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "800",
   },
   noticeText: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontWeight: "600",
   },
   actionList: {
@@ -452,14 +454,14 @@ const styles = StyleSheet.create({
   primaryAction: {
     height: 56,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
     gap: 10,
   },
   primaryActionText: {
-    color: theme.colors.surface,
+    color: colors.surface,
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
     fontWeight: "700",
@@ -467,16 +469,16 @@ const styles = StyleSheet.create({
   secondaryAction: {
     height: 56,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
     gap: 10,
   },
   secondaryActionText: {
-    color: theme.colors.text,
+    color: colors.text,
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
     fontWeight: "700",
@@ -484,28 +486,28 @@ const styles = StyleSheet.create({
   dangerAction: {
     height: 56,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.dangerSoft,
+    backgroundColor: colors.dangerSoft,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
     gap: 10,
   },
   dangerActionText: {
-    color: theme.colors.danger,
+    color: colors.danger,
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
     fontWeight: "700",
   },
   detailsCard: {
     borderRadius: 14,
-    backgroundColor: theme.colors.surfaceSoft,
+    backgroundColor: colors.surfaceSoft,
     paddingHorizontal: 12,
     paddingVertical: 14,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
   },
   detailsLeft: {
     flexDirection: "row",
@@ -517,20 +519,20 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
   },
   detailsTitle: {
-    color: theme.colors.text,
+    color: colors.text,
     fontSize: theme.typography.h3.fontSize,
     lineHeight: theme.typography.h3.lineHeight,
     fontWeight: "700",
   },
   detailsSubtitle: {
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
     marginTop: 1,
   },
-});
+}));

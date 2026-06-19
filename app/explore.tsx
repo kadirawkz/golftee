@@ -3,7 +3,7 @@ import * as Location from "expo-location";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, InteractionManager, Linking, Platform, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { FlatList, InteractionManager, Linking, Platform, ScrollView, StyleSheet, Text, TextInput, View, Modal, TouchableWithoutFeedback, Animated, TouchableOpacity, BackHandler } from "react-native";
 import { WebView } from "react-native-webview";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
@@ -13,10 +13,10 @@ import {
     CourseStyle,
     DEFAULT_USER_LOCATION,
     STYLE_OPTIONS,
-} from "../components/course-data";
-import { useCourseCatalog } from "../components/course-management";
-import { openInGoogleMaps } from "../components/map-links";
-import { theme } from "../components/theme";
+} from "../services/course-data";
+import { useCourseCatalog } from "../services/course-management";
+import { openInGoogleMaps } from "../utils/map-links";
+import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../components/theme";
 
 const PRICE_RANGES = [
   { label: "All Prices", min: 0, max: 999 },
@@ -27,6 +27,7 @@ const PRICE_RANGES = [
 
 const RATING_FILTERS = [
   { label: "All Ratings", value: 0 },
+  { label: "3.5+", value: 3.5 },
   { label: "4.0+", value: 4.0 },
   { label: "4.5+", value: 4.5 },
   { label: "4.8+", value: 4.8 },
@@ -56,9 +57,16 @@ const LOCATION_ERROR_NOTICE = {
 };
 
 export default function ExploreScreen() {
+  const { colors, resolvedTheme } = useAppTheme();
+  const styles = useThemedStyles(themedStyles);
   const router = useRouter();
   const courseCatalog = useCourseCatalog();
-  const { section, scrollOffset } = useLocalSearchParams<{ section?: string; scrollOffset?: string }>();
+  const { section, scrollOffset, view, courseId } = useLocalSearchParams<{
+    section?: string;
+    scrollOffset?: string;
+    view?: "list" | "map";
+    courseId?: string;
+  }>();
   const scrollRef = useRef<FlatList<DisplayedCourse>>(null);
   const webViewRef = useRef<WebView>(null);
   const hasAutoScrolled = useRef(false);
@@ -69,6 +77,43 @@ export default function ExploreScreen() {
   const [selectedPriceRange, setSelectedPriceRange] = useState(0);
   const [selectedRating, setSelectedRating] = useState(0);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(450)).current;
+
+  const openFilterModal = () => {
+    setShowFilterDropdown(true);
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        speed: 12,
+        bounciness: 4,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const closeFilterModal = () => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 450,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setShowFilterDropdown(false);
+    });
+  };
+
   const [searchQuery, setSearchQuery] = useState("");
   const [userLocation, setUserLocation] = useState(DEFAULT_USER_LOCATION);
   const [locationLabel, setLocationLabel] = useState(DEFAULT_LOCATION_LABEL);
@@ -83,7 +128,10 @@ export default function ExploreScreen() {
     body: "",
   });
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  // Animated values for the bottom course card slide-up / fade
+  const cardAnim = useRef(new Animated.Value(0)).current;
   const [showInteractiveMap, setShowInteractiveMap] = useState(false);
+  const [isMapReady, setIsMapReady] = useState(false);
   const hasCenteredOnUser = useRef(false);
   const showInteractiveMapRef = useRef(false);
   const deferredSearchQuery = useDeferredValue(searchQuery);
@@ -324,6 +372,13 @@ export default function ExploreScreen() {
     setActiveStyle(style);
   };
 
+  const handleResetFilters = () => {
+    setSelectedPriceRange(0);
+    setSelectedRating(0);
+    setActiveStyle("ALL");
+    setSearchQuery("");
+  };
+
   const normalizedSearchQuery = deferredSearchQuery.trim().toLowerCase();
   const activePriceRange = PRICE_RANGES[selectedPriceRange];
 
@@ -370,6 +425,22 @@ export default function ExploreScreen() {
     }
   }, [displayedCoursesWithDistance, selectedCourseId]);
 
+  // Animate the bottom course card in/out
+  useEffect(() => {
+    Animated.spring(cardAnim, {
+      toValue: selectedCourse ? 1 : 0,
+      useNativeDriver: true,
+      speed: 16,
+      bounciness: 7,
+    }).start();
+  }, [selectedCourse, cardAnim]);
+
+  const centerSelectedCourse = useCallback(() => {
+    if (selectedCourse && webViewRef.current) {
+      webViewRef.current.injectJavaScript(`selectMarker("${selectedCourse.id}", ${selectedCourse.coordinates.latitude}, ${selectedCourse.coordinates.longitude});`);
+    }
+  }, [selectedCourse]);
+
   const focusCourseOnMap = useCallback((courseId: string) => {
     const course = displayedCoursesById.get(courseId);
     if (!course) {
@@ -385,6 +456,39 @@ export default function ExploreScreen() {
       }
     }, 200);
   }, [displayedCoursesById]);
+
+  useEffect(() => {
+    if (view === "map") {
+      setViewMode("map");
+      if (courseId && showInteractiveMap) {
+        const timer = setTimeout(() => {
+          focusCourseOnMap(courseId);
+        }, 300);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [view, courseId, showInteractiveMap, focusCourseOnMap]);
+
+  useEffect(() => {
+    if (Platform.OS !== "android") {
+      return;
+    }
+
+    const onBackPress = () => {
+      if (viewMode === "map" && selectedCourseId !== null) {
+        setSelectedCourseId(null);
+        return true;
+      }
+      if (viewMode === "map") {
+        setViewMode("list");
+        return true;
+      }
+      return false;
+    };
+
+    const subscription = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+    return () => subscription.remove();
+  }, [viewMode, selectedCourseId]);
 
   const renderCourseItem = useCallback(
     ({ item: course }: { item: DisplayedCourse }) => (
@@ -405,29 +509,58 @@ export default function ExploreScreen() {
     [openCourseDetails]
   );
 
+  // Reset map ready status when interactive map is hidden
+  useEffect(() => {
+    if (!showInteractiveMap) {
+      setIsMapReady(false);
+    }
+  }, [showInteractiveMap]);
+
   // Update selected marker in WebView when selectedCourseId changes from list interaction
   useEffect(() => {
-    if (selectedCourseId && webViewRef.current) {
-      const course = displayedCoursesById.get(selectedCourseId);
-      if (course) {
-        const js = `selectMarker("${course.id}", ${course.coordinates.latitude}, ${course.coordinates.longitude});`;
-        webViewRef.current.injectJavaScript(js);
+    if (webViewRef.current && isMapReady) {
+      if (selectedCourseId) {
+        const course = displayedCoursesById.get(selectedCourseId);
+        if (course) {
+          const js = `selectMarker("${course.id}", ${course.coordinates.latitude}, ${course.coordinates.longitude});`;
+          webViewRef.current.injectJavaScript(js);
+        }
+      } else {
+        webViewRef.current.injectJavaScript('deselectMarker();');
       }
     }
-  }, [selectedCourseId, displayedCoursesById]);
+  }, [selectedCourseId, displayedCoursesById, isMapReady]);
 
   // Update user location marker in WebView when it resolves
   useEffect(() => {
-    if (webViewRef.current && locationState === "ready") {
+    if (webViewRef.current && isMapReady && locationState === "ready") {
       const js = `updateUserLocation(${userLocation.latitude}, ${userLocation.longitude});`;
       webViewRef.current.injectJavaScript(js);
     }
-  }, [userLocation, locationState]);
+  }, [userLocation, locationState, isMapReady]);
+
+  // Update courses list in WebView when courses list or map readiness changes
+  useEffect(() => {
+    if (webViewRef.current && isMapReady) {
+      const coursesPayload = displayedCoursesWithDistance.map((c) => ({
+        id: c.id,
+        title: c.title,
+        location: c.location,
+        lat: c.coordinates.latitude,
+        lng: c.coordinates.longitude,
+        distanceKm: c.distanceKm,
+      }));
+      const js = `updateCourses('${JSON.stringify(coursesPayload).replace(/'/g, "\\'")}', ${selectedCourseId ? `"${selectedCourseId}"` : "null"});`;
+      webViewRef.current.injectJavaScript(js);
+    }
+  }, [displayedCoursesWithDistance, isMapReady, selectedCourseId]);
 
   const handleWebViewMessage = (event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
-      if (data.type === 'SELECT_COURSE') {
+      if (data.type === 'MAP_READY') {
+        setIsMapReady(true);
+      } else if (data.type === 'SELECT_COURSE') {
         setSelectedCourseId(data.courseId);
       } else if (data.type === 'VIEW_DETAILS') {
         openCourseDetails(data.courseId);
@@ -440,17 +573,6 @@ export default function ExploreScreen() {
   };
 
   const leafletHtml = useMemo(() => {
-    const coursesJson = JSON.stringify(
-      displayedCoursesWithDistance.map((c) => ({
-        id: c.id,
-        title: c.title,
-        location: c.location,
-        lat: c.coordinates.latitude,
-        lng: c.coordinates.longitude,
-        distanceKm: c.distanceKm,
-      }))
-    );
-
     return `
 <!DOCTYPE html>
 <html>
@@ -487,6 +609,12 @@ export default function ExploreScreen() {
       color: #C79A4B;
       text-decoration: none;
     }
+    /* Custom pin base */
+    .golf-pin {
+      width: 32px;
+      height: 40px;
+      position: relative;
+    }
   </style>
 </head>
 <body>
@@ -499,105 +627,120 @@ export default function ExploreScreen() {
       attribution: '© OpenStreetMap'
     }).addTo(map);
 
-    var greenIcon = new L.Icon({
-      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png',
-      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-      iconSize: [25, 41],
-      iconAnchor: [12, 41],
-      popupAnchor: [1, -34],
-      shadowSize: [41, 41]
-    });
+    // SVG-based custom golf pins — no external image dependency
+    function makePinSVG(fill, stroke, flagFill) {
+      return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 40" width="32" height="40">' +
+        '<path d="M16 1C9.37 1 4 6.37 4 13c0 9 12 26 12 26s12-17 12-26C28 6.37 22.63 1 16 1z" fill="' + fill + '" stroke="' + stroke + '" stroke-width="1.8"/>' +
+        '<circle cx="16" cy="13" r="6" fill="' + flagFill + '"/>' +
+        '</svg>';
+    }
 
-    var goldIcon = new L.Icon({
-      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-gold.png',
-      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-      iconSize: [25, 41],
-      iconAnchor: [12, 41],
-      popupAnchor: [1, -34],
-      shadowSize: [41, 41]
-    });
+    function makeDivIcon(fill, stroke, flagFill, isSelected) {
+      var svg = makePinSVG(fill, stroke, flagFill);
+      var cls = 'golf-pin' + (isSelected ? ' selected' : '');
+      var html = '<div class="' + cls + '" style="width:32px;height:40px;">' + svg + '</div>';
+      return L.divIcon({
+        html: html,
+        className: '',
+        iconSize: [32, 40],
+        iconAnchor: [16, 40],
+        popupAnchor: [0, -40]
+      });
+    }
 
-    var blueIcon = new L.Icon({
-      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
-      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-      iconSize: [25, 41],
-      iconAnchor: [12, 41],
-      popupAnchor: [1, -34],
-      shadowSize: [41, 41]
-    });
+    var greenIcon  = makeDivIcon('#2D7D4E', '#12392D', '#fff', false);
+    var goldIcon   = makeDivIcon('#C79A4B', '#8B6512', '#fff', false);
+    var blueIcon   = makeDivIcon('#2563EB', '#1e40af', '#fff', false);
 
-    var courses = ${coursesJson};
     var markers = {};
     var userMarker = null;
-    var selectedCourseId = ${selectedCourseId ? `"${selectedCourseId}"` : "null"};
-
-    courses.forEach(function(course) {
-      var isSelected = course.id === selectedCourseId;
-      var icon = isSelected ? goldIcon : greenIcon;
-      
-      var popupContent = '<div class="popup-content">' +
-        '<h3 class="popup-title">' + course.title + '</h3>' +
-        '<p class="popup-text">' + course.location + ' - ' + Math.round(course.distanceKm) + ' km away</p>' +
-        '<a href="javascript:void(0)" class="popup-link" onclick="handlePopupClick(\\'' + course.id + '\\')">View Details →</a>' +
-        '</div>';
-
-      var marker = L.marker([course.lat, course.lng], { icon: icon })
-        .addTo(map)
-        .bindPopup(popupContent);
-        
-      marker.on('click', function() {
-        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'SELECT_COURSE', courseId: course.id }));
-      });
-      
-      markers[course.id] = marker;
-      
-      if (isSelected) {
-        setTimeout(function() {
-          marker.openPopup();
-          map.setView([course.lat, course.lng], 9);
-        }, 100);
-      }
-    });
+    var selectedCourseId = null;
 
     function handlePopupClick(courseId) {
       window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'VIEW_DETAILS', courseId: courseId }));
     }
 
     function selectMarker(id, lat, lng) {
+      selectedCourseId = id;
+      // Reset all pins to green
       for (var key in markers) {
-        markers[key].setIcon(greenIcon);
+        markers[key].setIcon(makeDivIcon('#2D7D4E', '#12392D', '#fff', false));
       }
+      // Apply gold animation to selected pin
       if (markers[id]) {
-        markers[id].setIcon(goldIcon);
-        markers[id].openPopup();
+        markers[id].setIcon(makeDivIcon('#C79A4B', '#8B6512', '#fff', true));
       }
-      map.panTo([lat, lng]);
+      if (map.getZoom() < 9.5) {
+        map.setView([lat, lng], 9.5);
+      } else {
+        map.panTo([lat, lng]);
+      }
+    }
+
+    function deselectMarker() {
+      selectedCourseId = null;
+      for (var key in markers) {
+        markers[key].setIcon(makeDivIcon('#2D7D4E', '#12392D', '#fff', false));
+      }
     }
 
     function updateUserLocation(lat, lng) {
       if (userMarker) {
         userMarker.setLatLng([lat, lng]);
       } else {
-        userMarker = L.marker([lat, lng], { icon: blueIcon }).addTo(map)
-          .bindPopup('<b style="font-family: sans-serif; font-size:12px; color:#12392D;">Your Location</b>');
+        userMarker = L.marker([lat, lng], { icon: blueIcon }).addTo(map);
       }
-      map.setView([lat, lng], 8.5);
+      if (!selectedCourseId) {
+        map.setView([lat, lng], 8.5);
+      }
     }
-    
-    if (${locationState === "ready" ? "true" : "false"}) {
-      updateUserLocation(${userLocation.latitude}, ${userLocation.longitude});
+
+    function updateCourses(coursesJson, selectedId) {
+      selectedCourseId = selectedId;
+      var newCourses = JSON.parse(coursesJson);
+      
+      // Remove all existing markers
+      for (var key in markers) {
+        map.removeLayer(markers[key]);
+      }
+      markers = {};
+      
+      newCourses.forEach(function(course) {
+        var isSelected = course.id === selectedCourseId;
+        var icon = isSelected ? makeDivIcon('#C79A4B', '#8B6512', '#fff', true) : greenIcon;
+        
+        var marker = L.marker([course.lat, course.lng], { icon: icon })
+          .addTo(map);
+          
+        marker.on('click', function() {
+          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'SELECT_COURSE', courseId: course.id }));
+        });
+        
+        markers[course.id] = marker;
+        
+        if (isSelected) {
+          setTimeout(function() {
+            map.setView([course.lat, course.lng], 9.5);
+          }, 100);
+        }
+      });
     }
 
     map.on('click', function(e) {
       if (e.sourceTarget === map) {
+        selectedCourseId = null;
         window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'DESELECT_COURSE' }));
       }
     });
+
+    // Notify React Native that the Leaflet script and map are ready
+    window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MAP_READY' }));
   </script>
 </body>
 </html>
     `;
-  }, [displayedCoursesWithDistance, selectedCourseId, userLocation, locationState]);  const listViewHeader = (
+  }, []);
+  const listViewHeader = (
     <>
       <ScrollView
         horizontal
@@ -681,80 +824,133 @@ export default function ExploreScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={["bottom"]}>
-      <StatusBar style="dark" />
+      <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
 
       {/* Sticky Header with Search and Toggle */}
       <View style={styles.topStickyHeader}>
         <View style={styles.searchWrap}>
-          <Ionicons name="search" size={18} color={theme.colors.muted} />
+          <Ionicons name="search" size={18} color={colors.muted} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search courses, location, or style"
-            placeholderTextColor={theme.colors.muted}
+            placeholderTextColor={colors.muted}
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoCapitalize="none"
             autoCorrect={false}
             returnKeyType="search"
             clearButtonMode="while-editing"
+            accessibilityLabel="Search golf courses"
+            accessibilityHint="Type to search by course name, location, or style"
           />
           {searchQuery.length > 0 ? (
-            <Pressable style={styles.clearSearchButton} onPress={() => setSearchQuery("")} variant="icon">
-              <Ionicons name="close-circle" size={16} color={theme.colors.muted} />
+            <Pressable
+              style={styles.clearSearchButton}
+              onPress={() => setSearchQuery("")}
+              variant="icon"
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+            >
+              <Ionicons name="close-circle" size={16} color={colors.muted} />
             </Pressable>
           ) : null}
-          <Pressable style={styles.tuneButton} onPress={() => setShowFilterDropdown((prev) => !prev)} variant="icon">
-            <Ionicons name="options" size={18} color={theme.colors.primary} />
+          <View style={styles.searchDivider} />
+          <Pressable
+            style={styles.tuneButton}
+            onPress={openFilterModal}
+            variant="icon"
+            accessibilityRole="button"
+            accessibilityLabel="Open filters"
+            accessibilityHint="Opens rating and price filters modal"
+          >
+            <Ionicons name="options" size={18} color={colors.primary} />
           </Pressable>
         </View>
 
-        {showFilterDropdown ? (
-          <View style={styles.dropdownContainer}>
+      <Modal
+        visible={showFilterDropdown}
+        animationType="none"
+        transparent={true}
+        onRequestClose={closeFilterModal}
+      >
+        <View style={styles.modalWrapper}>
+          <TouchableWithoutFeedback onPress={closeFilterModal}>
+            <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]} />
+          </TouchableWithoutFeedback>
+
+          <Animated.View style={[styles.modalContent, { transform: [{ translateY: slideAnim }] }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Filters</Text>
+              <View style={styles.modalHeaderActions}>
+                <Pressable style={styles.resetButton} onPress={handleResetFilters}>
+                  <Text style={styles.resetButtonText}>Reset All</Text>
+                </Pressable>
+                <Pressable style={styles.modalCloseButton} onPress={closeFilterModal} variant="icon">
+                  <Ionicons name="close" size={20} color={colors.primary} />
+                </Pressable>
+              </View>
+            </View>
+
             <View>
               <View style={styles.dropdownHeader}>
                 <Text style={styles.dropdownTitle}>Price Range</Text>
               </View>
-              {PRICE_RANGES.map((range, idx) => (
-                <Pressable
-                  key={`price-${idx}`}
-                  style={[styles.dropdownItem, selectedPriceRange === idx && styles.dropdownItemActive]}
-                  onPress={() => handlePriceRangeChange(idx)}
-                  variant="chip"
-                >
-                  <Text style={[styles.dropdownItemText, selectedPriceRange === idx && styles.dropdownItemTextActive]}>
-                    {range.label}
-                  </Text>
-                  {selectedPriceRange === idx ? <Ionicons name="checkmark" size={16} color={theme.colors.primary} /> : null}
-                </Pressable>
-              ))}
+              <View style={styles.filterChipsContainer}>
+                {PRICE_RANGES.map((range, idx) => (
+                  <Pressable
+                    key={`price-${idx}`}
+                    style={[
+                      styles.filterChipOption,
+                      selectedPriceRange === idx && styles.filterChipOptionActive,
+                    ]}
+                    onPress={() => handlePriceRangeChange(idx)}
+                    variant="chip"
+                  >
+                    <Text
+                      style={[
+                        styles.filterChipOptionText,
+                        selectedPriceRange === idx && styles.filterChipOptionTextActive,
+                      ]}
+                    >
+                      {range.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
             </View>
 
             <View style={styles.dropdownDivider} />
 
             <View>
               <View style={styles.dropdownHeader}>
-                <Text style={styles.dropdownTitle}>Minimum Rating</Text>
+                <Text style={styles.dropdownTitle}>Rating</Text>
               </View>
-              {RATING_FILTERS.map((rating) => (
-                <Pressable
-                  key={`rating-${rating.value}`}
-                  style={[styles.dropdownItem, selectedRating === rating.value && styles.dropdownItemActive]}
-                  onPress={() => handleRatingChange(rating.value)}
-                  variant="chip"
-                >
-                  <Text style={[styles.dropdownItemText, selectedRating === rating.value && styles.dropdownItemTextActive]}>
-                    {rating.label}
-                  </Text>
-                  {selectedRating === rating.value ? <Ionicons name="checkmark" size={16} color={theme.colors.primary} /> : null}
-                </Pressable>
-              ))}
+              <View style={styles.filterChipsContainer}>
+                {RATING_FILTERS.map((rating) => (
+                  <Pressable
+                    key={`rating-${rating.value}`}
+                    style={[
+                      styles.filterChipOption,
+                      selectedRating === rating.value && styles.filterChipOptionActive,
+                    ]}
+                    onPress={() => handleRatingChange(rating.value)}
+                    variant="chip"
+                  >
+                    <Text
+                      style={[
+                        styles.filterChipOptionText,
+                        selectedRating === rating.value && styles.filterChipOptionTextActive,
+                      ]}
+                    >
+                      {rating.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
             </View>
-
-            <Pressable style={styles.dropdownCloseButton} onPress={() => setShowFilterDropdown(false)} variant="button">
-              <Text style={styles.dropdownCloseButtonText}>Done</Text>
-            </Pressable>
-          </View>
-        ) : null}
+          </Animated.View>
+        </View>
+      </Modal>
 
         {/* View Mode Toggle Switch */}
         <View style={styles.toggleRow}>
@@ -762,16 +958,22 @@ export default function ExploreScreen() {
             style={[styles.toggleBtn, viewMode === "list" && styles.toggleBtnActive]}
             onPress={() => setViewMode("list")}
             variant="chip"
+            accessibilityRole="tab"
+            accessibilityState={{ selected: viewMode === "list" }}
+            accessibilityLabel="List View"
           >
-            <Ionicons name="list" size={16} color={viewMode === "list" ? theme.colors.surface : theme.colors.primary} />
+            <Ionicons name="list" size={16} color={viewMode === "list" ? colors.surface : colors.primary} />
             <Text style={[styles.toggleBtnText, viewMode === "list" && styles.toggleBtnTextActive]}>List View</Text>
           </Pressable>
           <Pressable
             style={[styles.toggleBtn, viewMode === "map" && styles.toggleBtnActive]}
             onPress={() => setViewMode("map")}
             variant="chip"
+            accessibilityRole="tab"
+            accessibilityState={{ selected: viewMode === "map" }}
+            accessibilityLabel="Map View"
           >
-            <Ionicons name="map" size={16} color={viewMode === "map" ? theme.colors.surface : theme.colors.primary} />
+            <Ionicons name="map" size={16} color={viewMode === "map" ? colors.surface : colors.primary} />
             <Text style={[styles.toggleBtnText, viewMode === "map" && styles.toggleBtnTextActive]}>Map View</Text>
           </Pressable>
         </View>
@@ -814,7 +1016,7 @@ export default function ExploreScreen() {
               />
             ) : (
               <View style={styles.mapPlaceholder}>
-                <Ionicons name="map-outline" size={24} color={theme.colors.muted} />
+                <Ionicons name="map-outline" size={24} color={colors.muted} />
                 <Text style={styles.mapPlaceholderTitle}>Loading map...</Text>
                 <Text style={styles.mapPlaceholderText}>Course results are ready. Interactive map follows right after the screen settles.</Text>
               </View>
@@ -828,7 +1030,7 @@ export default function ExploreScreen() {
               <Text style={styles.mapViewSubtitle} numberOfLines={1}>{locationLabel}</Text>
             </View>
             <View style={styles.mapViewBadge}>
-              <Ionicons name="location" size={12} color={theme.colors.primary} />
+              <Ionicons name="location" size={12} color={colors.primary} />
               <Text style={styles.mapViewBadgeText}>{displayedCoursesWithDistance.length} pins</Text>
             </View>
           </View>
@@ -843,11 +1045,14 @@ export default function ExploreScreen() {
             onPress={() => void requestUserLocation()}
             disabled={locationState === "loading"}
             variant="button"
+            accessibilityRole="button"
+            accessibilityLabel="Use my location"
+            accessibilityHint="Centers map on your current location"
           >
             <Ionicons
               name={locationState === "ready" ? "locate" : "locate-outline"}
               size={20}
-              color={theme.colors.primary}
+              color={colors.primary}
             />
           </Pressable>
 
@@ -860,7 +1065,7 @@ export default function ExploreScreen() {
                     <Ionicons
                       name={locationNotice.kind === "permissionBlocked" ? "settings-outline" : "locate-outline"}
                       size={16}
-                      color={theme.colors.primary}
+                      color={colors.primary}
                     />
                   </View>
                   <View style={styles.locationNoticeCopy}>
@@ -879,53 +1084,94 @@ export default function ExploreScreen() {
                   onPress={() => setLocationNotice({ kind: "none", title: "", body: "" })}
                   variant="icon"
                 >
-                  <Ionicons name="close" size={18} color={theme.colors.text} />
+                  <Ionicons name="close" size={18} color={colors.text} />
                 </Pressable>
               </View>
             ) : null}
 
-            {selectedCourse ? (
-              <View style={styles.floatingCourseCard}>
+            <Animated.View
+              style={[
+                styles.floatingCourseCard,
+                {
+                  opacity: cardAnim,
+                  transform: [{
+                    translateY: cardAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [40, 0],
+                    }),
+                  }],
+                  pointerEvents: selectedCourse ? 'auto' : 'none',
+                },
+              ]}
+            >
+              {selectedCourse ? (
                 <Pressable
-                  style={styles.selectedCourseCardFloating}
-                  onPress={() => openCourseDetails(selectedCourse.id)}
+                  style={styles.mapCardInner}
+                  onPress={centerSelectedCourse}
                   variant="card"
                 >
-                  <View style={styles.selectedCourseCopy}>
-                    <Text style={styles.selectedCourseLabel}>SELECTED COURSE</Text>
-                    <Text style={styles.selectedCourseTitle} numberOfLines={1}>{selectedCourse.title}</Text>
-                    <Text style={styles.selectedCourseMeta} numberOfLines={1}>
-                      {selectedCourse.location} - {selectedCourse.distanceKm.toFixed(0)} km away
-                    </Text>
+                  {/* Top Row: Course Info & Dismiss */}
+                  <View style={styles.mapCardHeaderRow}>
+                    <View style={styles.mapCardInfo}>
+                      <Text style={styles.selectedCourseLabel}>SELECTED COURSE</Text>
+                      <Text style={styles.selectedCourseTitle} numberOfLines={1}>{selectedCourse.title}</Text>
+                      
+                      <View style={styles.mapCardMetaRow}>
+                        <View style={styles.mapCardMetaItem}>
+                          <Ionicons name="location" size={12} color={colors.textSoft} />
+                          <Text style={styles.mapCardMetaText} numberOfLines={1}>
+                            {selectedCourse.location} ({selectedCourse.distanceKm.toFixed(0)} km)
+                          </Text>
+                        </View>
+                        <View style={styles.mapCardMetaDivider} />
+                        <View style={styles.mapCardMetaItem}>
+                          <Ionicons name="star" size={12} color={colors.accentWarm} />
+                          <Text style={styles.mapCardMetaText}>{selectedCourse.rating}</Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    <Pressable
+                      style={styles.mapCardCloseBtn}
+                      onPress={() => setSelectedCourseId(null)}
+                      variant="icon"
+                    >
+                      <Ionicons name="close" size={18} color={colors.text} />
+                    </Pressable>
                   </View>
-                  <Ionicons name="arrow-forward" size={18} color={theme.colors.primary} />
-                </Pressable>
 
-                {/* Close Button */}
-                <Pressable
-                  style={styles.closeCardButton}
-                  onPress={() => setSelectedCourseId(null)}
-                  variant="icon"
-                >
-                  <Ionicons name="close" size={18} color={theme.colors.text} />
-                </Pressable>
+                  {/* Mid Row: Price and Actions */}
+                  <View style={styles.mapCardFooterRow}>
+                    <View style={styles.mapCardPriceBlock}>
+                      <Text style={styles.mapCardPriceLabel}>STARTING AT</Text>
+                      <Text style={styles.mapCardPriceVal}>{selectedCourse.price}</Text>
+                    </View>
 
-                <Pressable
-                  style={styles.openMapButtonFloating}
-                  onPress={() =>
-                    openInGoogleMaps({
-                      coordinates: selectedCourse.coordinates,
-                      placeQuery: selectedCourse.placeQuery,
-                      placeId: selectedCourse.placeId,
-                    })
-                  }
-                  variant="cta"
-                >
-                  <Ionicons name="navigate-outline" size={16} color={theme.colors.surface} />
-                  <Text style={styles.openMapButtonTextFloating}>Open in Google Maps</Text>
+                    <View style={styles.mapCardActions}>
+                      <Pressable
+                        style={[styles.mapCardBtn, styles.mapCardBtnSecondary]}
+                        onPress={() => openCourseDetails(selectedCourse.id)}
+                        variant="chip"
+                      >
+                        <Text style={styles.mapCardBtnSecondaryText}>Details</Text>
+                      </Pressable>
+
+                      <Pressable
+                        style={[styles.mapCardBtn, styles.mapCardBtnPrimary]}
+                        onPress={() => router.push({
+                          pathname: "/tee-time-booking",
+                          params: { id: selectedCourse.id }
+                        })}
+                        variant="cta"
+                      >
+                        <Ionicons name="calendar-outline" size={14} color={colors.surface} />
+                        <Text style={styles.mapCardBtnPrimaryText}>Book Now</Text>
+                      </Pressable>
+                    </View>
+                  </View>
                 </Pressable>
-              </View>
-            ) : null}
+              ) : null}
+            </Animated.View>
           </View>
         </View>
       )}
@@ -933,10 +1179,10 @@ export default function ExploreScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const themedStyles = createThemedStyleSheet((colors) => ({
   screen: {
     flex: 1,
-    backgroundColor: theme.colors.page,
+    backgroundColor: colors.page,
   },
   scrollContent: {
     paddingHorizontal: 16,
@@ -952,12 +1198,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     height: 48,
     borderRadius: 14,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     paddingHorizontal: 12,
     gap: 8,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    shadowColor: theme.colors.shadow,
+    borderColor: colors.border,
+    shadowColor: colors.shadow,
     shadowOpacity: 0.06,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
@@ -966,7 +1212,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: theme.typography.body.fontSize,
-    color: theme.colors.text,
+    color: colors.text,
   },
   clearSearchButton: {
     width: 26,
@@ -975,44 +1221,45 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  searchDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: colors.border,
+  },
   tuneButton: {
     width: 28,
     height: 28,
-    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    borderLeftWidth: 1,
-    borderLeftColor: theme.colors.border,
-    paddingLeft: 8,
   },
   filterRow: {
     paddingHorizontal: 8,
     paddingVertical: 12,
     gap: 8,
-    backgroundColor: theme.colors.page,
+    backgroundColor: colors.page,
   },
   filterChip: {
     paddingHorizontal: 16,
     height: 34,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
   filterChipActive: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   filterChipText: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
     fontWeight: "600",
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   filterChipTextActive: {
-    color: theme.colors.surface,
+    color: colors.surface,
   },
   courseCardItem: {
     marginBottom: 16,
@@ -1034,13 +1281,13 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.title.fontSize,
     lineHeight: theme.typography.title.lineHeight,
     fontWeight: "700",
-    color: theme.colors.text,
+    color: colors.text,
   },
   trendingSubtitle: {
     marginTop: 3,
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   trendingList: {
     gap: 10,
@@ -1051,8 +1298,8 @@ const styles = StyleSheet.create({
   emptyNearbyState: {
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surfaceSoft,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceSoft,
     paddingHorizontal: 16,
     paddingVertical: 18,
     alignItems: "center",
@@ -1062,13 +1309,13 @@ const styles = StyleSheet.create({
   emptyNearbyTitle: {
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "700",
   },
   emptyNearbyText: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     textAlign: "center",
     maxWidth: 280,
   },
@@ -1078,7 +1325,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 8,
     height: 1,
-    backgroundColor: theme.colors.borderStrong,
+    backgroundColor: colors.borderStrong,
   },
   mapSection: {
     marginBottom: 8,
@@ -1093,14 +1340,14 @@ const styles = StyleSheet.create({
   mapTitle: {
     fontSize: theme.typography.h3.fontSize,
     lineHeight: theme.typography.h3.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "800",
   },
   mapSubtitle: {
     marginTop: 3,
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     maxWidth: 240,
   },
   mapBadge: {
@@ -1108,8 +1355,8 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.pill,
     paddingHorizontal: 12,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
@@ -1117,7 +1364,7 @@ const styles = StyleSheet.create({
   mapBadgeText: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "700",
   },
   mapCard: {
@@ -1125,8 +1372,8 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
   useLocationButton: {
     marginTop: 12,
@@ -1134,7 +1381,7 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     borderRadius: theme.radius.pill,
     paddingHorizontal: 14,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -1147,15 +1394,15 @@ const styles = StyleSheet.create({
   useLocationButtonText: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.surface,
+    color: colors.surface,
     fontWeight: "700",
   },
   locationNoticeCard: {
     marginTop: 10,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     padding: 14,
     gap: 12,
   },
@@ -1168,7 +1415,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: colors.primarySoft,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1178,14 +1425,14 @@ const styles = StyleSheet.create({
   locationNoticeTitle: {
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "700",
     marginBottom: 2,
   },
   locationNoticeBody: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   locationNoticeAction: {
     alignSelf: "flex-start",
@@ -1193,15 +1440,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: theme.radius.pill,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
   },
   locationNoticeActionText: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "700",
   },
   map: {
@@ -1212,20 +1459,20 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.colors.surfaceSoft,
+    backgroundColor: colors.surfaceSoft,
     paddingHorizontal: 24,
     gap: 8,
   },
   mapPlaceholderTitle: {
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "700",
   },
   mapPlaceholderText: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     textAlign: "center",
     maxWidth: 260,
   },
@@ -1237,20 +1484,20 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
     fontWeight: "700",
-    color: theme.colors.primary,
+    color: colors.primary,
     marginBottom: 2,
   },
   calloutText: {
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   selectedCourseCard: {
     marginTop: 12,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     padding: 14,
     flexDirection: "row",
     alignItems: "center",
@@ -1263,7 +1510,7 @@ const styles = StyleSheet.create({
   selectedCourseLabel: {
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
-    color: theme.colors.accentWarm,
+    color: colors.accentWarm,
     letterSpacing: 1.1,
     fontWeight: "700",
     marginBottom: 4,
@@ -1271,20 +1518,20 @@ const styles = StyleSheet.create({
   selectedCourseTitle: {
     fontSize: theme.typography.title.fontSize,
     lineHeight: theme.typography.title.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "800",
     marginBottom: 3,
   },
   selectedCourseMeta: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   openMapButton: {
     marginTop: 10,
     height: 48,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
@@ -1293,7 +1540,7 @@ const styles = StyleSheet.create({
   openMapButtonText: {
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
-    color: theme.colors.surface,
+    color: colors.surface,
     fontWeight: "700",
   },
   emptyCoursesState: {
@@ -1304,8 +1551,8 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
@@ -1313,13 +1560,13 @@ const styles = StyleSheet.create({
   emptyCoursesTitle: {
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "700",
   },
   emptyCoursesText: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     textAlign: "center",
     maxWidth: 280,
   },
@@ -1327,26 +1574,107 @@ const styles = StyleSheet.create({
     height: 24,
   },
   
-  // Dropdown Styles
-  dropdownContainer: {
-    backgroundColor: theme.colors.surface,
+  // Modal & Dropdown Styles
+  modalWrapper: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  modalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+  },
+  modalContent: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: Platform.OS === "ios" ? 40 : 24,
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: -4 },
+    elevation: 10,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+    paddingBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    borderBottomColor: colors.borderSoft,
+  },
+  modalHeaderActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  resetButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  resetButtonText: {
+    fontSize: theme.typography.bodySm.fontSize,
+    fontWeight: "600",
+    color: colors.primary,
+  },
+  modalTitle: {
+    fontSize: theme.typography.title.fontSize,
+    lineHeight: theme.typography.title.lineHeight,
+    fontWeight: "800",
+    color: colors.primary,
+  },
+  modalCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
   },
   dropdownHeader: {
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    borderBottomColor: colors.border,
     marginBottom: 4,
   },
   dropdownTitle: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
     fontWeight: "700",
-    color: theme.colors.text,
+    color: colors.text,
     letterSpacing: 0.5,
+  },
+  filterChipsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  filterChipOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.page,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  filterChipOptionActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+  },
+  filterChipOptionText: {
+    fontSize: theme.typography.bodySm.fontSize,
+    color: colors.textSoft,
+    fontWeight: "500",
+  },
+  filterChipOptionTextActive: {
+    color: colors.primary,
+    fontWeight: "700",
   },
   dropdownItem: {
     flexDirection: "row",
@@ -1358,28 +1686,28 @@ const styles = StyleSheet.create({
   },
   dropdownItemActive: {
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
   },
   dropdownItemText: {
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontWeight: "500",
   },
   dropdownItemTextActive: {
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "600",
   },
   dropdownDivider: {
     height: 1,
-    backgroundColor: theme.colors.border,
+    backgroundColor: colors.border,
     marginVertical: 8,
   },
   dropdownCloseButton: {
     marginTop: 8,
     paddingVertical: 12,
     paddingHorizontal: 12,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     borderRadius: theme.radius.pill,
     alignItems: "center",
   },
@@ -1387,20 +1715,20 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
     fontWeight: "600",
-    color: theme.colors.surface,
+    color: colors.surface,
   },
   topStickyHeader: {
-    backgroundColor: theme.colors.page,
+    backgroundColor: colors.page,
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.borderSoft,
+    borderBottomColor: colors.borderSoft,
     zIndex: 10,
   },
   toggleRow: {
     flexDirection: "row",
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: colors.primarySoft,
     borderRadius: theme.radius.pill,
     padding: 4,
     marginTop: 10,
@@ -1416,20 +1744,20 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.pill,
   },
   toggleBtnActive: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
   },
   toggleBtnText: {
     fontSize: theme.typography.bodySm.fontSize,
     fontWeight: "700",
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   toggleBtnTextActive: {
-    color: theme.colors.surface,
+    color: colors.surface,
   },
   mapContainer: {
     flex: 1,
     position: "relative",
-    backgroundColor: theme.colors.page,
+    backgroundColor: colors.page,
   },
   mapViewHeaderFloating: {
     position: "absolute",
@@ -1442,10 +1770,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 14,
-    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    backgroundColor: colors.glass,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    shadowColor: theme.colors.shadow,
+    borderColor: colors.border,
+    shadowColor: colors.shadow,
     shadowOpacity: 0.1,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
@@ -1455,13 +1783,13 @@ const styles = StyleSheet.create({
   mapViewTitle: {
     fontSize: theme.typography.title.fontSize,
     lineHeight: theme.typography.title.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "800",
   },
   mapViewSubtitle: {
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     marginTop: 2,
   },
   mapViewBadge: {
@@ -1471,12 +1799,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: colors.primarySoft,
   },
   mapViewBadgeText: {
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "700",
   },
   mapViewWrapper: {
@@ -1485,7 +1813,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: theme.colors.surfaceSoft,
+    backgroundColor: colors.surfaceSoft,
   },
   useLocationButtonFloating: {
     position: "absolute",
@@ -1493,17 +1821,17 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: theme.colors.shadow,
+    shadowColor: colors.shadow,
     shadowOpacity: 0.12,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
     elevation: 5,
     zIndex: 10,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
   },
   floatingBottomContainer: {
     position: "absolute",
@@ -1514,12 +1842,12 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   floatingCourseCard: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     padding: 14,
-    shadowColor: theme.colors.shadow,
+    shadowColor: colors.shadow,
     shadowOpacity: 0.12,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 6 },
@@ -1547,7 +1875,7 @@ const styles = StyleSheet.create({
   openMapButtonFloating: {
     height: 42,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
@@ -1556,7 +1884,106 @@ const styles = StyleSheet.create({
   openMapButtonTextFloating: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.surface,
+    color: colors.surface,
     fontWeight: "700",
   },
-});
+  mapCardInner: {
+    gap: 12,
+  },
+  mapCardHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  mapCardInfo: {
+    flex: 1,
+    paddingRight: 24,
+    gap: 2,
+  },
+  mapCardMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 2,
+  },
+  mapCardMetaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  mapCardMetaText: {
+    fontSize: theme.typography.caption.fontSize,
+    lineHeight: theme.typography.caption.lineHeight,
+    color: colors.textSoft,
+  },
+  mapCardMetaDivider: {
+    width: 1,
+    height: 10,
+    backgroundColor: colors.border,
+  },
+  mapCardCloseBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mapCardFooterRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderTopWidth: 1,
+    borderTopColor: colors.borderSoft,
+    paddingTop: 12,
+    marginTop: 4,
+  },
+  mapCardPriceBlock: {
+    justifyContent: "center",
+  },
+  mapCardPriceLabel: {
+    fontSize: 9,
+    lineHeight: 12,
+    color: colors.muted,
+    fontWeight: "700",
+    letterSpacing: 0.8,
+  },
+  mapCardPriceVal: {
+    fontSize: 18,
+    lineHeight: 24,
+    color: colors.accentWarm,
+    fontWeight: "800",
+  },
+  mapCardActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  mapCardBtn: {
+    height: 36,
+    borderRadius: theme.radius.pill,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
+  },
+  mapCardBtnPrimary: {
+    backgroundColor: colors.primary,
+  },
+  mapCardBtnPrimaryText: {
+    fontSize: 11,
+    color: colors.surface,
+    fontWeight: "700",
+  },
+  mapCardBtnSecondary: {
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  mapCardBtnSecondaryText: {
+    fontSize: 11,
+    color: colors.text,
+    fontWeight: "700",
+  },
+}));

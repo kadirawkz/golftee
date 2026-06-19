@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "./animated-pressable";
-import { theme } from "./theme";
+import { createThemedStyleSheet, useThemedStyles, useAppTheme } from "./theme";
 
 type AppHeaderProps = {
   title?: string;
@@ -25,11 +25,15 @@ export function AppHeader({
   onPressRight,
   showLeftButton = true,
   showRightButton = true,
-  backgroundColor = theme.colors.page,
+  backgroundColor,
 }: AppHeaderProps) {
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(themedStyles);
+  const resolvedBg = backgroundColor ?? colors.page;
+
   return (
-    <SafeAreaView edges={["top"]} style={[styles.safeArea, { backgroundColor }]}>
-      <View style={[styles.topBar, { backgroundColor }]}> 
+    <SafeAreaView edges={["top"]} style={[styles.safeArea, { backgroundColor: resolvedBg }]}>
+      <View style={[styles.topBar, { backgroundColor: resolvedBg }]}>
         <View style={styles.sideSlot}>
           {showLeftButton ? (
             <Pressable
@@ -38,7 +42,7 @@ export function AppHeader({
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               variant="icon"
             >
-              <Ionicons name={leftIcon} size={24} color={theme.colors.primary} />
+              <Ionicons name={leftIcon} size={24} color={colors.text} />
             </Pressable>
           ) : (
             <View style={styles.iconPlaceholder} />
@@ -57,7 +61,7 @@ export function AppHeader({
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               variant="icon"
             >
-              <Ionicons name={rightIcon} size={24} color={theme.colors.primary} />
+              <Ionicons name={rightIcon} size={24} color={colors.text} />
             </Pressable>
           ) : (
             <View style={styles.iconPlaceholder} />
@@ -68,9 +72,9 @@ export function AppHeader({
   );
 }
 
-const styles = StyleSheet.create({
+const themedStyles = createThemedStyleSheet((colors) => ({
   safeArea: {
-    backgroundColor: theme.colors.page,
+    backgroundColor: colors.page,
   },
   topBar: {
     height: 52,
@@ -79,7 +83,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-end",
     justifyContent: "space-between",
-    backgroundColor: theme.colors.page,
+    backgroundColor: colors.page,
   },
   sideSlot: {
     width: 34,
@@ -90,7 +94,7 @@ const styles = StyleSheet.create({
   iconButton: {
     width: 34,
     height: 34,
-    borderRadius: theme.radius.pill,
+    borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -111,17 +115,17 @@ const styles = StyleSheet.create({
   },
   topTitle: {
     textAlign: "center",
-    fontSize: theme.typography.h4.fontSize,
-    lineHeight: theme.typography.h4.lineHeight,
+    fontSize: 18,
+    lineHeight: 24,
     fontWeight: "800",
-    color: theme.colors.primary,
+    color: colors.text,
     letterSpacing: 0.1,
     transform: [{ translateY: -1 }],
   },
   topTitleLarge: {
-    fontSize: theme.typography.h2.fontSize + 2,
-    lineHeight: theme.typography.h2.lineHeight + 2,
+    fontSize: 26,
+    lineHeight: 32,
     letterSpacing: -0.2,
     fontWeight: "900",
   },
-});
+}));

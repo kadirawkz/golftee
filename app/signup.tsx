@@ -13,12 +13,14 @@ import {
 } from "react-native";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { getAuthConfigurationError, signUpWithEmail, resendVerificationEmail } from "../components/auth";
-import { theme } from "../components/theme";
+import { getAuthConfigurationError, signUpWithEmail, resendVerificationEmail } from "../services/auth";
+import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../components/theme";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function SignupScreen() {
+  const { colors, resolvedTheme } = useAppTheme();
+  const styles = useThemedStyles(themedStyles);
   const router = useRouter();
   const { width } = useWindowDimensions();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -117,9 +119,10 @@ export default function SignupScreen() {
       return;
     }
 
-    if (trimmedHandicap && Number.isNaN(Number(trimmedHandicap))) {
+    const numericHandicap = Number(trimmedHandicap);
+    if (trimmedHandicap && (Number.isNaN(numericHandicap) || numericHandicap < 0 || numericHandicap > 54)) {
       setErrors({ handicap: true });
-      setAuthNotice("Please enter a valid numeric handicap value.");
+      setAuthNotice("Please enter a valid numeric handicap value between 0.0 and 54.0.");
       return;
     }
 
@@ -187,7 +190,7 @@ export default function SignupScreen() {
   if (isVerificationSent) {
     return (
       <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
-        <StatusBar style="dark" />
+        <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
         <View style={styles.successContainer}>
           <ScrollView
             style={styles.scroll}
@@ -196,7 +199,7 @@ export default function SignupScreen() {
           >
             <View style={styles.successCard}>
               <View style={styles.successIconWrap}>
-                <Ionicons name="mail-unread-outline" size={36} color={theme.colors.successText} />
+                <Ionicons name="mail-unread-outline" size={36} color={colors.successText} />
               </View>
               <Text style={styles.successTitle}>Verify Email</Text>
               
@@ -220,7 +223,7 @@ export default function SignupScreen() {
                   <Ionicons 
                     name={resendStatus.type === "success" ? "checkmark-circle-outline" : "alert-circle-outline"} 
                     size={16} 
-                    color={resendStatus.type === "success" ? theme.colors.successText : theme.colors.danger} 
+                    color={resendStatus.type === "success" ? colors.successText : colors.danger} 
                   />
                   <Text style={[
                     styles.resendStatusText,
@@ -237,7 +240,7 @@ export default function SignupScreen() {
                   onPress={handleOpenEmailApp} 
                   variant="cta"
                 >
-                  <Ionicons name="mail" size={20} color={theme.colors.surface} />
+                  <Ionicons name="mail" size={20} color={colors.surface} />
                   <Text style={styles.ctaButtonText}>Open Email App</Text>
                 </Pressable>
 
@@ -256,7 +259,7 @@ export default function SignupScreen() {
                     <Text style={styles.secondaryButtonText}>Resend Email ({countdown}s)</Text>
                   ) : (
                     <>
-                      <Ionicons name="refresh" size={18} color={theme.colors.primary} />
+                      <Ionicons name="refresh" size={18} color={colors.primary} />
                       <Text style={styles.secondaryButtonText}>Resend Email</Text>
                     </>
                   )}
@@ -267,7 +270,7 @@ export default function SignupScreen() {
                   onPress={handleEditDetails}
                   variant="chip"
                 >
-                  <Ionicons name="create-outline" size={16} color={theme.colors.primary} />
+                  <Ionicons name="create-outline" size={16} color={colors.primary} />
                   <Text style={styles.textButtonText}>Change Email / Edit Details</Text>
                 </Pressable>
               </View>
@@ -283,7 +286,7 @@ export default function SignupScreen() {
                   <Ionicons 
                     name={showTroubleshoot ? "chevron-up" : "chevron-down"} 
                     size={16} 
-                    color={theme.colors.textSoft} 
+                    color={colors.textSoft} 
                   />
                 </Pressable>
 
@@ -316,7 +319,7 @@ export default function SignupScreen() {
                 onPress={() => router.replace("/login")} 
                 variant="button"
               >
-                <Ionicons name="arrow-back" size={18} color={theme.colors.primary} />
+                <Ionicons name="arrow-back" size={18} color={colors.primary} />
                 <Text style={styles.backToLoginText}>Return to Login</Text>
               </Pressable>
             </View>
@@ -328,11 +331,18 @@ export default function SignupScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
-      <StatusBar style="dark" />
+      <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
 
       <View style={styles.authTopBar}>
-        <Pressable style={styles.authBackButton} onPress={() => router.replace("/login")} variant="icon">
-          <Ionicons name="arrow-back" size={22} color={theme.colors.primary} />
+        <Pressable
+          style={styles.authBackButton}
+          onPress={() => router.replace("/login")}
+          variant="icon"
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          accessibilityHint="Navigates to the login screen"
+        >
+          <Ionicons name="arrow-back" size={22} color={colors.primary} />
         </Pressable>
         <Text style={styles.authTopTitle}>Create Account</Text>
         <View style={styles.authTopSpacer} />
@@ -369,10 +379,10 @@ export default function SignupScreen() {
                   USERNAME
                 </Text>
                 <View style={styles.inputRow}>
-                  <Ionicons name="person-outline" size={18} color={errors.username ? theme.colors.danger : theme.colors.muted} />
+                  <Ionicons name="person-outline" size={18} color={errors.username ? colors.danger : colors.muted} />
                   <TextInput
                     placeholder="Choose a username"
-                    placeholderTextColor={theme.colors.muted}
+                    placeholderTextColor={colors.muted}
                     style={[styles.inputField, errors.username && styles.inputFieldError]}
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -383,6 +393,8 @@ export default function SignupScreen() {
                       if (authNotice) setAuthNotice(null);
                     }}
                     editable={!isSubmitting}
+                    accessibilityLabel="Username input"
+                    accessibilityHint="Choose a unique username"
                   />
                 </View>
               </View>
@@ -393,10 +405,10 @@ export default function SignupScreen() {
                   EMAIL ADDRESS
                 </Text>
                 <View style={styles.inputRow}>
-                  <Ionicons name="mail-outline" size={18} color={errors.email ? theme.colors.danger : theme.colors.muted} />
+                  <Ionicons name="mail-outline" size={18} color={errors.email ? colors.danger : colors.muted} />
                   <TextInput
                     placeholder="name@example.com"
-                    placeholderTextColor={theme.colors.muted}
+                    placeholderTextColor={colors.muted}
                     style={[styles.inputField, errors.email && styles.inputFieldError]}
                     keyboardType="email-address"
                     autoCapitalize="none"
@@ -408,6 +420,8 @@ export default function SignupScreen() {
                       if (authNotice) setAuthNotice(null);
                     }}
                     editable={!isSubmitting}
+                    accessibilityLabel="Email Address input"
+                    accessibilityHint="Enter your email address"
                   />
                 </View>
               </View>
@@ -418,10 +432,10 @@ export default function SignupScreen() {
                   PASSWORD
                 </Text>
                 <View style={styles.inputRow}>
-                  <Ionicons name="lock-closed-outline" size={18} color={errors.password ? theme.colors.danger : theme.colors.muted} />
+                  <Ionicons name="lock-closed-outline" size={18} color={errors.password ? colors.danger : colors.muted} />
                   <TextInput
                     placeholder="Create a password"
-                    placeholderTextColor={theme.colors.muted}
+                    placeholderTextColor={colors.muted}
                     style={[styles.inputField, errors.password && styles.inputFieldError]}
                     secureTextEntry
                     value={password}
@@ -431,6 +445,8 @@ export default function SignupScreen() {
                       if (authNotice) setAuthNotice(null);
                     }}
                     editable={!isSubmitting}
+                    accessibilityLabel="Password input"
+                    accessibilityHint="Create a strong password"
                   />
                 </View>
               </View>
@@ -441,10 +457,10 @@ export default function SignupScreen() {
                   CONFIRM PASSWORD
                 </Text>
                 <View style={styles.inputRow}>
-                  <Ionicons name="shield-checkmark-outline" size={18} color={errors.confirmPassword ? theme.colors.danger : theme.colors.muted} />
+                  <Ionicons name="shield-checkmark-outline" size={18} color={errors.confirmPassword ? colors.danger : colors.muted} />
                   <TextInput
                     placeholder="Re-enter your password"
-                    placeholderTextColor={theme.colors.muted}
+                    placeholderTextColor={colors.muted}
                     style={[styles.inputField, errors.confirmPassword && styles.inputFieldError]}
                     secureTextEntry
                     value={confirmPassword}
@@ -454,6 +470,8 @@ export default function SignupScreen() {
                       if (authNotice) setAuthNotice(null);
                     }}
                     editable={!isSubmitting}
+                    accessibilityLabel="Confirm Password input"
+                    accessibilityHint="Re-enter your password"
                   />
                 </View>
               </View>
@@ -464,10 +482,10 @@ export default function SignupScreen() {
                   HANDICAP (OPTIONAL)
                 </Text>
                 <View style={styles.inputRow}>
-                  <Ionicons name="golf-outline" size={18} color={errors.handicap ? theme.colors.danger : theme.colors.muted} />
+                  <Ionicons name="golf-outline" size={18} color={errors.handicap ? colors.danger : colors.muted} />
                   <TextInput
                     placeholder="e.g. 12.4"
-                    placeholderTextColor={theme.colors.muted}
+                    placeholderTextColor={colors.muted}
                     style={[styles.inputField, errors.handicap && styles.inputFieldError]}
                     keyboardType="decimal-pad"
                     value={handicap}
@@ -477,6 +495,8 @@ export default function SignupScreen() {
                       if (authNotice) setAuthNotice(null);
                     }}
                     editable={!isSubmitting}
+                    accessibilityLabel="Handicap input, optional"
+                    accessibilityHint="Enter a valid handicap between 0.0 and 54.0"
                   />
                 </View>
               </View>
@@ -494,17 +514,28 @@ export default function SignupScreen() {
               onPress={() => void handleSignup()}
               disabled={isSubmitting || Boolean(supabaseConfigurationError)}
               variant="cta"
+              accessibilityRole="button"
+              accessibilityState={{ disabled: isSubmitting }}
+              accessibilityLabel={isSubmitting ? "Creating Account" : "Create GolfTee Account"}
+              accessibilityHint="Submits account registration form"
             >
               <Text style={styles.signupButtonText}>
                 {isSubmitting ? "Creating Account..." : "Create GolfTee Account"}
               </Text>
-              <Ionicons name="arrow-forward" size={20} color={theme.colors.surface} />
+              <Ionicons name="arrow-forward" size={20} color={colors.surface} />
             </Pressable>
 
             {/* Separator to login */}
             <View style={styles.loginPrompt}>
               <Text style={styles.loginPromptText}>Already have an account? </Text>
-              <Pressable onPress={() => router.replace("/login")} variant="chip" disabled={isSubmitting}>
+              <Pressable
+                onPress={() => router.replace("/login")}
+                variant="chip"
+                disabled={isSubmitting}
+                accessibilityRole="link"
+                accessibilityLabel="Log In link"
+                accessibilityHint="Navigates to the login screen"
+              >
                 <Text style={styles.loginLinkText}>Log In</Text>
               </Pressable>
             </View>
@@ -515,10 +546,10 @@ export default function SignupScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const themedStyles = createThemedStyleSheet((colors) => ({
   screen: {
     flex: 1,
-    backgroundColor: theme.colors.page,
+    backgroundColor: colors.page,
   },
   scroll: {
     flex: 1,
@@ -551,7 +582,7 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.h4.fontSize,
     lineHeight: theme.typography.h4.lineHeight,
     fontWeight: "800",
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   authTopSpacer: {
     width: 34,
@@ -570,14 +601,14 @@ const styles = StyleSheet.create({
     lineHeight: theme.typography.title.lineHeight,
     fontWeight: "900",
     letterSpacing: 0.6,
-    color: theme.colors.text,
+    color: colors.text,
   },
   subtitle: {
     maxWidth: "92%",
     fontSize: theme.typography.body.fontSize,
     lineHeight: 22,
     fontWeight: "400",
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   subtitleCompact: {
     maxWidth: "100%",
@@ -594,14 +625,14 @@ const styles = StyleSheet.create({
   inputShell: {
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     paddingHorizontal: 16,
     paddingTop: 14,
     paddingBottom: 12,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
   },
   inputShellError: {
-    borderColor: theme.colors.danger,
+    borderColor: colors.danger,
   },
   inputRow: {
     flexDirection: "row",
@@ -613,21 +644,21 @@ const styles = StyleSheet.create({
     lineHeight: theme.typography.label.lineHeight,
     fontWeight: "700",
     letterSpacing: 1.6,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     marginBottom: 8,
   },
   inputLabelError: {
-    color: theme.colors.danger,
+    color: colors.danger,
   },
   inputField: {
     flex: 1,
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
-    color: theme.colors.text,
+    color: colors.text,
     paddingVertical: 0,
   },
   inputFieldError: {
-    color: theme.colors.danger,
+    color: colors.danger,
   },
   errorRow: {
     flexDirection: "row",
@@ -643,23 +674,23 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: theme.colors.danger,
+    backgroundColor: colors.danger,
   },
   errorText: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.danger,
+    color: colors.danger,
     fontWeight: "600",
   },
   signupButton: {
     height: 58,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
     gap: 10,
-    shadowColor: theme.colors.shadow,
+    shadowColor: colors.shadow,
     shadowOpacity: 0.25,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },
@@ -668,7 +699,7 @@ const styles = StyleSheet.create({
   signupButtonText: {
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
-    color: theme.colors.textOnPrimary,
+    color: colors.textOnPrimary,
     fontWeight: "700",
     letterSpacing: 0.3,
   },
@@ -680,16 +711,16 @@ const styles = StyleSheet.create({
   },
   loginPromptText: {
     fontSize: theme.typography.body.fontSize,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   loginLinkText: {
     fontSize: theme.typography.body.fontSize,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "700",
   },
   successContainer: {
     flex: 1,
-    backgroundColor: theme.colors.page,
+    backgroundColor: colors.page,
   },
   successScrollContent: {
     flexGrow: 1,
@@ -702,18 +733,18 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 420,
     borderRadius: 28,
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: colors.primarySoft,
     paddingHorizontal: 24,
     paddingVertical: 36,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: theme.colors.borderSoft,
+    borderColor: colors.borderSoft,
   },
   successIconWrap: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: theme.colors.success,
+    backgroundColor: colors.success,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 20,
@@ -722,34 +753,34 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.displayS.fontSize,
     lineHeight: theme.typography.displayS.lineHeight,
     fontWeight: "800",
-    color: theme.colors.primary,
+    color: colors.primary,
     marginBottom: 8,
   },
   successText: {
     fontSize: theme.typography.body.fontSize,
     lineHeight: 20,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     textAlign: "center",
     marginBottom: 10,
   },
   emailBadge: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: theme.radius.pill,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: theme.colors.borderStrong,
+    borderColor: colors.borderStrong,
     marginBottom: 14,
   },
   emailBadgeText: {
     fontSize: theme.typography.body.fontSize,
     fontWeight: "700",
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   successHint: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: 18,
-    color: theme.colors.muted,
+    color: colors.muted,
     textAlign: "center",
     marginBottom: 20,
     paddingHorizontal: 8,
@@ -766,20 +797,20 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   resendStatusSuccess: {
-    backgroundColor: theme.colors.success,
+    backgroundColor: colors.success,
   },
   resendStatusError: {
-    backgroundColor: theme.colors.dangerSoft,
+    backgroundColor: colors.dangerSoft,
   },
   resendStatusText: {
     fontSize: theme.typography.bodySm.fontSize,
     fontWeight: "600",
   },
   resendStatusTextSuccess: {
-    color: theme.colors.successText,
+    color: colors.successText,
   },
   resendStatusTextError: {
-    color: theme.colors.danger,
+    color: colors.danger,
   },
   actionGroup: {
     width: "100%",
@@ -790,7 +821,7 @@ const styles = StyleSheet.create({
     height: 52,
     width: "100%",
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
@@ -798,16 +829,16 @@ const styles = StyleSheet.create({
   },
   ctaButtonText: {
     fontSize: theme.typography.subtitle.fontSize,
-    color: theme.colors.textOnPrimary,
+    color: colors.textOnPrimary,
     fontWeight: "700",
   },
   secondaryButton: {
     height: 50,
     width: "100%",
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
@@ -815,7 +846,7 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     fontSize: theme.typography.subtitle.fontSize,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "700",
   },
   disabledButton: {
@@ -830,15 +861,15 @@ const styles = StyleSheet.create({
   },
   textButtonText: {
     fontSize: theme.typography.bodySm.fontSize,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "700",
   },
   accordionContainer: {
     width: "100%",
     borderWidth: 1,
-    borderColor: theme.colors.borderSoft,
+    borderColor: colors.borderSoft,
     borderRadius: 16,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     overflow: "hidden",
     marginBottom: 24,
   },
@@ -848,19 +879,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
   },
   accordionHeaderText: {
     fontSize: theme.typography.bodySm.fontSize,
     fontWeight: "700",
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   accordionContent: {
     paddingHorizontal: 16,
     paddingBottom: 16,
     gap: 8,
     borderTopWidth: 1,
-    borderTopColor: theme.colors.borderSoft,
+    borderTopColor: colors.borderSoft,
     paddingTop: 12,
   },
   troubleItem: {
@@ -872,18 +903,18 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     marginTop: 6,
   },
   troubleText: {
     flex: 1,
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: 16,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   divider: {
     height: 1,
-    backgroundColor: theme.colors.borderSoft,
+    backgroundColor: colors.borderSoft,
     width: "100%",
     marginBottom: 20,
   },
@@ -897,7 +928,7 @@ const styles = StyleSheet.create({
   },
   backToLoginText: {
     fontSize: theme.typography.subtitle.fontSize,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "700",
   },
-});
+}));

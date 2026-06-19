@@ -270,6 +270,7 @@ export type Database = {
           review_text: string;
           sort_order: number;
           updated_at: string;
+          user_id: string | null;
         };
         Insert: {
           author_badge: string;
@@ -283,6 +284,7 @@ export type Database = {
           review_text: string;
           sort_order?: number;
           updated_at?: string;
+          user_id?: string | null;
         };
         Update: {
           author_badge?: string;
@@ -296,8 +298,16 @@ export type Database = {
           review_text?: string;
           sort_order?: number;
           updated_at?: string;
+          user_id?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "course_reviews_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ];
       };
       tee_time_bookings: {
         Row: {
@@ -427,6 +437,58 @@ export type Database = {
           }
         ];
       };
+      notifications: {
+        Row: {
+          id: string;
+          user_id: string;
+          type: string;
+          title: string;
+          message: string;
+          occurred_at: string;
+          read: boolean;
+          icon: string;
+          action_text: string | null;
+          route: string | null;
+          route_params: Json | null;
+          created_at: string;
+        };
+        Insert: {
+          id: string;
+          user_id: string;
+          type: string;
+          title: string;
+          message: string;
+          occurred_at?: string;
+          read?: boolean;
+          icon: string;
+          action_text?: string | null;
+          route?: string | null;
+          route_params?: Json | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          type?: string;
+          title?: string;
+          message?: string;
+          occurred_at?: string;
+          read?: boolean;
+          icon?: string;
+          action_text?: string | null;
+          route?: string | null;
+          route_params?: Json | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -492,3 +554,7 @@ export type CourseReviewRow = Database["public"]["Tables"]["course_reviews"]["Ro
 export type TeeTimeBookingRow = Database["public"]["Tables"]["tee_time_bookings"]["Row"];
 export type TeeTimeBookingInsert = Database["public"]["Tables"]["tee_time_bookings"]["Insert"];
 export type TeeTimeBookingUpdate = Database["public"]["Tables"]["tee_time_bookings"]["Update"];
+export type NotificationRow = Database["public"]["Tables"]["notifications"]["Row"];
+export type NotificationInsert = Database["public"]["Tables"]["notifications"]["Insert"];
+export type NotificationUpdate = Database["public"]["Tables"]["notifications"]["Update"];
+

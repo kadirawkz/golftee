@@ -12,7 +12,6 @@
       "bundleIdentifier": "com.kadirawkz.golftee",
       "infoPlist": {
         "LSApplicationQueriesSchemes": [
-          "comgooglemaps",
           "comgooglemaps"
         ],
         "ITSAppUsesNonExemptEncryption": false

@@ -10,6 +10,7 @@ export type CourseRecord = {
   placeId?: string;
   image: string;
   style: CourseStyle;
+  isGetaway?: boolean;
   coordinates: {
     latitude: number;
     longitude: number;

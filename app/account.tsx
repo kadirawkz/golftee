@@ -5,11 +5,11 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View, Modal
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
-import { updateProfile, useAuthSession } from "../components/auth";
-import { useCourseCatalog, getManagedCourseById } from "../components/course-management";
-import { useResponsiveLayout } from "../components/responsive-layout";
-import { theme } from "../components/theme";
-import { useBookingState, formatBookingDate, getBookingTotal } from "../components/bookings";
+import { updateProfile, useAuthSession } from "../services/auth";
+import { useCourseCatalog, getManagedCourseById } from "../services/course-management";
+import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
+import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../components/theme";
+import { useBookingState, formatBookingDate, getBookingTotal } from "../services/bookings";
 import { supabase } from "../lib/supabase";
 import * as ImagePicker from "expo-image-picker";
 
@@ -75,6 +75,8 @@ function PremiumInput({
   keyboardType?: "default" | "email-address" | "phone-pad" | "decimal-pad";
   editable?: boolean;
 }) {
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(themedStyles);
   return (
     <View style={[styles.inputContainer, !editable && styles.inputDisabled]}>
       <Text style={styles.inputLabel}>{label}</Text>
@@ -82,7 +84,7 @@ function PremiumInput({
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={theme.colors.muted}
+        placeholderTextColor={colors.muted}
         style={styles.inputText}
         keyboardType={keyboardType}
         autoCapitalize="words"
@@ -94,6 +96,8 @@ function PremiumInput({
 }
 
 export default function AccountScreen() {
+  const { colors, resolvedTheme } = useAppTheme();
+  const styles = useThemedStyles(themedStyles);
   const auth = useAuthSession();
   const { horizontalPadding, screenBottomPadding } = useResponsiveLayout();
   const catalog = useCourseCatalog();
@@ -333,7 +337,7 @@ export default function AccountScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={["bottom"]}>
-      <StatusBar style="dark" />
+      <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -360,7 +364,7 @@ export default function AccountScreen() {
                 )}
               </Pressable>
               <Pressable style={styles.avatarEditBadge} onPress={() => setIsPhotoModalVisible(true)} variant="icon">
-                <Ionicons name="create" size={12} color={theme.colors.surface} />
+                <Ionicons name="create" size={12} color={colors.surface} />
               </Pressable>
             </View>
             <View style={styles.photoCopy}>
@@ -409,7 +413,7 @@ export default function AccountScreen() {
                   variant="chip"
                 >
                   <Text style={styles.countryCodeText}>{countryCode}</Text>
-                  <Ionicons name="chevron-down" size={10} color={theme.colors.textSoft} />
+                  <Ionicons name="chevron-down" size={10} color={colors.textSoft} />
                 </Pressable>
                 
                 <TextInput
@@ -419,7 +423,7 @@ export default function AccountScreen() {
                     setIsPhoneVerified(false); // Reset verification if number changes
                   }}
                   placeholder="555 555 5555"
-                  placeholderTextColor={theme.colors.muted}
+                  placeholderTextColor={colors.muted}
                   style={styles.localPhoneInput}
                   keyboardType="phone-pad"
                 />
@@ -432,7 +436,7 @@ export default function AccountScreen() {
                 >
                   {isPhoneVerified ? (
                     <>
-                      <Ionicons name="checkmark-circle" size={13} color={theme.colors.successText} />
+                      <Ionicons name="checkmark-circle" size={13} color={colors.successText} />
                       <Text style={styles.verifyBadgeTextActive}>Verified</Text>
                     </>
                   ) : (
@@ -483,7 +487,7 @@ export default function AccountScreen() {
         {/* Status card */}
         {statusMessage ? (
           <View style={styles.noticeCard}>
-            <Ionicons name="information-circle-outline" size={18} color={theme.colors.primary} />
+            <Ionicons name="information-circle-outline" size={18} color={colors.primary} />
             <Text style={styles.noticeText}>{statusMessage}</Text>
           </View>
         ) : null}
@@ -497,7 +501,7 @@ export default function AccountScreen() {
             variant="cta"
           >
             {isSaving ? (
-              <ActivityIndicator size="small" color={theme.colors.surface} />
+              <ActivityIndicator size="small" color={colors.surface} />
             ) : (
               <Text style={styles.primaryButtonText}>Save Details</Text>
             )}
@@ -507,7 +511,7 @@ export default function AccountScreen() {
             onPress={() => setIsBillingModalVisible(true)}
             variant="button"
           >
-            <Ionicons name="receipt-outline" size={16} color={theme.colors.primary} />
+            <Ionicons name="receipt-outline" size={16} color={colors.primary} />
             <Text style={styles.secondaryButtonText}>View Booking Statements</Text>
           </Pressable>
         </View>
@@ -564,7 +568,7 @@ export default function AccountScreen() {
               <TextInput
                 style={styles.inputField}
                 placeholder="e.g. 1234"
-                placeholderTextColor={theme.colors.muted}
+                placeholderTextColor={colors.muted}
                 value={otpCode}
                 onChangeText={setOtpCode}
                 keyboardType="numeric"
@@ -593,7 +597,7 @@ export default function AccountScreen() {
                 variant="cta"
               >
                 {isVerifyingOtp ? (
-                  <ActivityIndicator size="small" color={theme.colors.surface} />
+                  <ActivityIndicator size="small" color={colors.surface} />
                 ) : (
                   <Text style={styles.modalBtnSaveText}>Verify Code</Text>
                 )}
@@ -623,7 +627,7 @@ export default function AccountScreen() {
                 variant="button"
                 disabled={isSavingAvatar}
               >
-                <Ionicons name="camera" size={20} color={theme.colors.primary} />
+                <Ionicons name="camera" size={20} color={colors.primary} />
                 <Text style={styles.nativePickText}>Take Photo</Text>
               </Pressable>
               
@@ -633,7 +637,7 @@ export default function AccountScreen() {
                 variant="button"
                 disabled={isSavingAvatar}
               >
-                <Ionicons name="image" size={20} color={theme.colors.primary} />
+                <Ionicons name="image" size={20} color={colors.primary} />
                 <Text style={styles.nativePickText}>Choose Photo</Text>
               </Pressable>
             </View>
@@ -683,14 +687,14 @@ export default function AccountScreen() {
                 <Text style={styles.billingSubtitle}>Transactions history logs</Text>
               </View>
               <Pressable style={styles.billingCloseBtn} onPress={() => setIsBillingModalVisible(false)} variant="icon">
-                <Ionicons name="close" size={22} color={theme.colors.primary} />
+                <Ionicons name="close" size={22} color={colors.primary} />
               </Pressable>
             </View>
 
             <ScrollView contentContainerStyle={styles.billingScroll} showsVerticalScrollIndicator={false}>
               {bookingState.bookings.length === 0 ? (
                 <View style={styles.emptyBillingState}>
-                  <Ionicons name="receipt-outline" size={38} color={theme.colors.muted} />
+                  <Ionicons name="receipt-outline" size={38} color={colors.muted} />
                   <Text style={styles.emptyBillingText}>No transactions recorded.</Text>
                 </View>
               ) : (
@@ -739,7 +743,7 @@ export default function AccountScreen() {
                           <Ionicons
                             name={booking.payment_method === "wallet" ? "wallet-outline" : "card-outline"}
                             size={13}
-                            color={theme.colors.textSoft}
+                            color={colors.textSoft}
                           />
                           <Text style={styles.paymentMethodText}>
                             {booking.payment_method === "wallet" ? "Digital Wallet" : "Card Checkout"}
@@ -763,10 +767,10 @@ export default function AccountScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const themedStyles = createThemedStyleSheet((colors) => ({
   screen: {
     flex: 1,
-    backgroundColor: theme.colors.page,
+    backgroundColor: colors.page,
   },
   scrollContent: {
     padding: 16,
@@ -775,9 +779,9 @@ const styles = StyleSheet.create({
   },
   profileCard: {
     borderRadius: 20,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     padding: 16,
     gap: 14,
   },
@@ -794,7 +798,7 @@ const styles = StyleSheet.create({
     height: 76,
     borderRadius: 38,
     overflow: "hidden",
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: colors.primarySoft,
   },
   avatarEditBadge: {
     position: "absolute",
@@ -803,9 +807,9 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     borderWidth: 1.5,
-    borderColor: theme.colors.surface,
+    borderColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -816,12 +820,12 @@ const styles = StyleSheet.create({
   avatarInitialContainer: {
     width: "100%",
     height: "100%",
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
   },
   avatarInitialText: {
-    color: theme.colors.surface,
+    color: colors.surface,
     fontSize: 32,
     fontWeight: "800",
   },
@@ -831,14 +835,14 @@ const styles = StyleSheet.create({
   photoTitle: {
     fontSize: theme.typography.h3.fontSize,
     lineHeight: theme.typography.h3.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "800",
     marginBottom: 2,
   },
   photoSubtitle: {
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     marginBottom: 8,
   },
   profileMetaRow: {
@@ -848,13 +852,13 @@ const styles = StyleSheet.create({
   metaPill: {
     flex: 1,
     borderRadius: 12,
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: colors.primarySoft,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
   metaPillLabel: {
     fontSize: 9,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     letterSpacing: 1.1,
     fontWeight: "700",
     marginBottom: 2,
@@ -862,7 +866,7 @@ const styles = StyleSheet.create({
   metaPillValue: {
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "800",
   },
   section: {
@@ -870,39 +874,39 @@ const styles = StyleSheet.create({
   },
   sectionHeader: {
     fontSize: theme.typography.subtitle.fontSize,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "800",
     marginLeft: 4,
   },
   card: {
     borderRadius: 18,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     padding: 12,
     gap: 10,
   },
   inputContainer: {
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     paddingHorizontal: 12,
     paddingTop: 10,
     paddingBottom: 8,
   },
   inputDisabled: {
-    backgroundColor: theme.colors.surfaceSoft,
+    backgroundColor: colors.surfaceSoft,
   },
   inputLabel: {
     fontSize: 9,
     fontWeight: "700",
     letterSpacing: 1.1,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     marginBottom: 4,
   },
   inputText: {
     fontSize: theme.typography.bodySm.fontSize,
-    color: theme.colors.text,
+    color: colors.text,
     paddingVertical: 0,
   },
   phoneRowField: {
@@ -916,8 +920,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surfaceSoft,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceSoft,
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
@@ -925,25 +929,25 @@ const styles = StyleSheet.create({
   countryCodeText: {
     fontSize: 12,
     fontWeight: "700",
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   localPhoneInput: {
     flex: 1,
     fontSize: 13,
-    color: theme.colors.text,
+    color: colors.text,
     paddingVertical: 0,
   },
   verifyBadge: {
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: colors.primarySoft,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
   },
   verifyBadgeSuccess: {
-    backgroundColor: theme.colors.success,
-    borderColor: theme.colors.success,
+    backgroundColor: colors.success,
+    borderColor: colors.success,
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
@@ -951,12 +955,12 @@ const styles = StyleSheet.create({
   verifyBadgeText: {
     fontSize: 10,
     fontWeight: "800",
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   verifyBadgeTextActive: {
     fontSize: 10,
     fontWeight: "800",
-    color: theme.colors.successText,
+    color: colors.successText,
   },
   clubSelector: {
     gap: 6,
@@ -966,34 +970,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
-    backgroundColor: theme.colors.surfaceSoft,
+    backgroundColor: colors.surfaceSoft,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
   },
   clubChipActive: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   clubChipText: {
     fontSize: 11,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontWeight: "600",
   },
   clubChipTextActive: {
-    color: theme.colors.surface,
+    color: colors.surface,
     fontWeight: "700",
   },
   loadingText: {
     marginTop: 4,
     fontSize: 10,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontStyle: "italic",
   },
   noticeCard: {
     borderRadius: 14,
-    backgroundColor: theme.colors.surfaceSoft,
+    backgroundColor: colors.surfaceSoft,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     padding: 12,
     flexDirection: "row",
     alignItems: "center",
@@ -1002,7 +1006,7 @@ const styles = StyleSheet.create({
   noticeText: {
     flex: 1,
     fontSize: theme.typography.bodySm.fontSize,
-    color: theme.colors.text,
+    color: colors.text,
     fontWeight: "600",
   },
   footerActions: {
@@ -1011,21 +1015,21 @@ const styles = StyleSheet.create({
   primaryButton: {
     height: 48,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
   },
   primaryButtonText: {
     fontSize: theme.typography.body.fontSize,
-    color: theme.colors.surface,
+    color: colors.surface,
     fontWeight: "700",
   },
   secondaryButton: {
     height: 48,
     borderRadius: theme.radius.pill,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surfaceSoft,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceSoft,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
@@ -1033,7 +1037,7 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     fontSize: theme.typography.bodySm.fontSize,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "700",
   },
 
@@ -1047,22 +1051,22 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: "100%",
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 20,
     padding: 20,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     gap: 14,
   },
   modalTitle: {
     fontSize: theme.typography.h3.fontSize,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "800",
     textAlign: "center",
   },
   modalSubtitle: {
     fontSize: theme.typography.bodySm.fontSize,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     textAlign: "center",
     marginBottom: 8,
   },
@@ -1077,8 +1081,8 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surfaceSoft,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceSoft,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -1087,7 +1091,7 @@ const styles = StyleSheet.create({
   nativePickText: {
     fontSize: 12,
     fontWeight: "700",
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   modalDividerRow: {
     flexDirection: "row",
@@ -1099,12 +1103,12 @@ const styles = StyleSheet.create({
   modalDividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: theme.colors.borderSoft,
+    backgroundColor: colors.borderSoft,
   },
   modalDividerText: {
     fontSize: 9,
     fontWeight: "800",
-    color: theme.colors.muted,
+    color: colors.muted,
     letterSpacing: 0.8,
   },
   presetGrid: {
@@ -1117,10 +1121,10 @@ const styles = StyleSheet.create({
     width: "48%",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     padding: 8,
     alignItems: "center",
-    backgroundColor: theme.colors.surfaceSoft,
+    backgroundColor: colors.surfaceSoft,
   },
   presetImage: {
     width: 48,
@@ -1131,14 +1135,14 @@ const styles = StyleSheet.create({
   presetLabel: {
     fontSize: 10,
     fontWeight: "700",
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   modalCloseBtn: {
     height: 42,
     borderRadius: theme.radius.pill,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surfaceSoft,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceSoft,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 4,
@@ -1146,7 +1150,7 @@ const styles = StyleSheet.create({
   modalCloseText: {
     fontSize: 13,
     fontWeight: "700",
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
 
   // Country Row in Selection list
@@ -1156,25 +1160,25 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.borderSoft,
+    borderBottomColor: colors.borderSoft,
     gap: 12,
   },
   countryCodeNum: {
     fontSize: 14,
     fontWeight: "800",
-    color: theme.colors.primary,
+    color: colors.primary,
     width: 50,
   },
   countryName: {
     fontSize: 13,
-    color: theme.colors.text,
+    color: colors.text,
     fontWeight: "600",
   },
 
   // OTP error
   otpErrorText: {
     fontSize: 11,
-    color: theme.colors.danger,
+    color: colors.danger,
     textAlign: "center",
     fontWeight: "600",
   },
@@ -1187,7 +1191,7 @@ const styles = StyleSheet.create({
   },
   billingModalContainer: {
     height: "80%",
-    backgroundColor: theme.colors.page,
+    backgroundColor: colors.page,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     overflow: "hidden",
@@ -1197,25 +1201,25 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     padding: 16,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderColor: theme.colors.borderSoft,
+    borderColor: colors.borderSoft,
   },
   billingTitle: {
     fontSize: theme.typography.subtitle.fontSize,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "800",
   },
   billingSubtitle: {
     fontSize: 10,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontWeight: "600",
   },
   billingCloseBtn: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: theme.colors.surfaceSoft,
+    backgroundColor: colors.surfaceSoft,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1232,13 +1236,13 @@ const styles = StyleSheet.create({
   emptyBillingText: {
     fontSize: 13,
     fontWeight: "700",
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   invoiceCard: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     padding: 14,
     gap: 10,
   },
@@ -1254,25 +1258,25 @@ const styles = StyleSheet.create({
   invoiceCourseTitle: {
     fontSize: 13,
     fontWeight: "800",
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   invoiceDate: {
     fontSize: 10,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     marginTop: 1,
   },
   invoiceAmount: {
     fontSize: theme.typography.subtitle.fontSize,
     fontWeight: "800",
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   invoiceAmountCancelled: {
     textDecorationLine: "line-through",
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   invoiceDivider: {
     height: 1,
-    backgroundColor: theme.colors.borderSoft,
+    backgroundColor: colors.borderSoft,
   },
   invoiceBreakdown: {
     gap: 4,
@@ -1283,12 +1287,12 @@ const styles = StyleSheet.create({
   },
   invoiceLabel: {
     fontSize: 11,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   invoiceVal: {
     fontSize: 11,
     fontWeight: "600",
-    color: theme.colors.text,
+    color: colors.text,
   },
   invoiceFooterRow: {
     flexDirection: "row",
@@ -1303,7 +1307,7 @@ const styles = StyleSheet.create({
   },
   paymentMethodText: {
     fontSize: 10,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontWeight: "600",
   },
   statusBadge: {
@@ -1312,32 +1316,32 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   statusBadgePaid: {
-    backgroundColor: theme.colors.success,
+    backgroundColor: colors.success,
   },
   statusBadgeCancelled: {
-    backgroundColor: `${theme.colors.danger}18`,
+    backgroundColor: `${colors.danger}18`,
   },
   statusBadgeText: {
     fontSize: 8,
     fontWeight: "800",
   },
   statusBadgeTextPaid: {
-    color: theme.colors.successText,
+    color: colors.successText,
   },
   statusBadgeTextCancelled: {
-    color: theme.colors.danger,
+    color: colors.danger,
   },
   inputShell: {
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: theme.colors.surfaceSoft,
+    backgroundColor: colors.surfaceSoft,
   },
   inputField: {
     fontSize: theme.typography.body.fontSize,
-    color: theme.colors.text,
+    color: colors.text,
     paddingVertical: 0,
   },
   modalActionsRow: {
@@ -1354,20 +1358,20 @@ const styles = StyleSheet.create({
   },
   modalBtnCancel: {
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surfaceSoft,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceSoft,
   },
   modalBtnCancelText: {
     fontSize: theme.typography.body.fontSize,
     fontWeight: "700",
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   modalBtnSave: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
   },
   modalBtnSaveText: {
     fontSize: theme.typography.body.fontSize,
     fontWeight: "700",
-    color: theme.colors.surface,
+    color: colors.surface,
   },
-});
+}));

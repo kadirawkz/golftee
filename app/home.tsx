@@ -17,20 +17,20 @@ import { CourseCard } from "../components/course-card";
 import {
     calculateDistanceKm,
     DEFAULT_USER_LOCATION,
-} from "../components/course-data";
-import { useCourseCatalog, getManagedCourseById } from "../components/course-management";
+} from "../services/course-data";
+import { useCourseCatalog, getManagedCourseById } from "../services/course-management";
 import { FavoriteCoursesSection } from "../components/favorite-courses-section";
-import { useFavoriteCourseIds } from "../components/favorites";
-import { useResponsiveLayout } from "../components/responsive-layout";
-import { theme } from "../components/theme";
+import { useFavoriteCourseIds } from "../services/favorites";
+import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
+import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../components/theme";
 import { getCourseImage } from "../lib/image-mapping";
-import { useAuthSession } from "../components/auth";
+import { useAuthSession } from "../services/auth";
 import {
   useBookingState,
   isUpcomingBooking,
   formatBookingDateTime,
   isHistoricalBooking,
-} from "../components/bookings";
+} from "../services/bookings";
 
 const HERO_NEWS_IMAGE = require("../assets/images/home-hero-news.webp");
 const HERO_OFFER_IMAGE = require("../assets/images/home-hero-offer.webp");
@@ -44,7 +44,7 @@ const HERO_SLIDES = [
     description:
       "Catch tournament notes, course maintenance updates, and booking changes before planning your next round.",
     cta: "See Updates",
-    route: "/notifications" as const,
+    route: { pathname: "/notifications", params: { filter: "promotion" } } as any,
     image: HERO_NEWS_IMAGE,
   },
   {
@@ -53,7 +53,7 @@ const HERO_SLIDES = [
     title: "Golden Hour Rates on Signature Fairways",
     description: "Enjoy special late-day pricing this week on select premium courses across the island.",
     cta: "View Offer",
-    route: "/explore" as const,
+    route: { pathname: "/notifications", params: { filter: "promotion" } } as any,
     image: HERO_OFFER_IMAGE,
   },
   {
@@ -63,7 +63,7 @@ const HERO_SLIDES = [
     description:
       "Discover premier access to private courses and world-class tournaments tailored for your handicap.",
     cta: "Book Tee Time",
-    route: "/explore" as const,
+    route: "/explore" as any,
     image: HERO_MEMBER_IMAGE,
   },
 ] as const;
@@ -83,6 +83,8 @@ function HeroIndicatorDot({
   index: number;
   activeIndex: SharedValue<number>;
 }) {
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(themedStyles);
   const dotAnimatedStyle = useAnimatedStyle(() => {
     const distance = Math.abs(activeIndex.value - index);
 
@@ -92,7 +94,7 @@ function HeroIndicatorDot({
       backgroundColor: interpolateColor(
         distance,
         [0, 1, 2],
-        [theme.colors.primary, theme.colors.accentWarm, theme.colors.borderStrong]
+        [colors.primary, colors.accentWarm, colors.borderStrong]
       ),
       transform: [{ scale: interpolate(distance, [0, 1, 2], [1, 0.95, 0.88]) }],
     };
@@ -102,6 +104,8 @@ function HeroIndicatorDot({
 }
 
 export default function HomeScreen() {
+  const { colors, resolvedTheme } = useAppTheme();
+  const styles = useThemedStyles(themedStyles);
   const router = useRouter();
   const auth = useAuthSession();
   const bookingState = useBookingState();
@@ -135,10 +139,16 @@ export default function HomeScreen() {
     return getManagedCourseById(nextBooking.course_id);
   }, [nextBooking]);
   const featuredHomeCourses = useMemo(() => allCourses.slice(0, 3), [allCourses]);
-  const getawayHomeCourses = useMemo(
-    () => allCourses.slice(4, 8).map((course) => ({ id: course.id, title: course.title, place: course.location, image: course.image })),
-    [allCourses]
-  );
+  const getawayHomeCourses = useMemo(() => {
+    const getaways = allCourses.filter((course) => course.isGetaway);
+    const sourceList = getaways.length > 0 ? getaways : allCourses.slice(4, 8);
+    return sourceList.map((course) => ({
+      id: course.id,
+      title: course.title,
+      place: course.location,
+      image: course.image,
+    }));
+  }, [allCourses]);
   const homeNearestCourses = useMemo(
     () =>
       allCourses
@@ -235,7 +245,7 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.screen}>
-      <StatusBar style="dark" />
+      <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -276,7 +286,7 @@ export default function HomeScreen() {
               </Text>
             </View>
             <View style={styles.tierIconWrap}>
-              <Ionicons name="ribbon-outline" size={18} color={theme.colors.accentWarm} />
+              <Ionicons name="ribbon-outline" size={18} color={colors.accentWarm} />
             </View>
           </View>
           
@@ -318,21 +328,21 @@ export default function HomeScreen() {
             <View style={styles.nextRoundCard}>
               <View style={styles.nextRoundCardBody}>
                 <View style={styles.nextRoundCourseRow}>
-                  <Ionicons name="golf" size={16} color={theme.colors.primary} style={styles.nextRoundIcon} />
+                  <Ionicons name="golf" size={16} color={colors.primary} style={styles.nextRoundIcon} />
                   <Text style={styles.nextRoundCourseName} numberOfLines={1}>
                     {nextBookingCourse.title}
                   </Text>
                 </View>
                 
                 <View style={styles.nextRoundTimeRow}>
-                  <Ionicons name="calendar-outline" size={14} color={theme.colors.textSoft} style={styles.nextRoundIcon} />
+                  <Ionicons name="calendar-outline" size={14} color={colors.textSoft} style={styles.nextRoundIcon} />
                   <Text style={styles.nextRoundTimeText}>
                     {formatBookingDateTime(nextBooking)}
                   </Text>
                 </View>
 
                 <View style={styles.nextRoundPlayersRow}>
-                  <Ionicons name="people-outline" size={14} color={theme.colors.textSoft} style={styles.nextRoundIcon} />
+                  <Ionicons name="people-outline" size={14} color={colors.textSoft} style={styles.nextRoundIcon} />
                   <Text style={styles.nextRoundTimeText}>
                     {nextBooking.players} {nextBooking.players === 1 ? "Player" : "Players"}
                   </Text>
@@ -349,7 +359,7 @@ export default function HomeScreen() {
                     }}
                     variant="chip"
                   >
-                    <Ionicons name="map-outline" size={14} color={theme.colors.primary} />
+                    <Ionicons name="map-outline" size={14} color={colors.primary} />
                     <Text style={styles.nextRoundBtnTextSecondary}>Directions</Text>
                   </Pressable>
                   
@@ -371,7 +381,7 @@ export default function HomeScreen() {
           <View style={styles.nextRoundSection}>
             <View style={styles.nextRoundCardEmpty}>
               <View style={styles.nextRoundEmptyContent}>
-                <Ionicons name="golf-outline" size={28} color={theme.colors.muted} />
+                <Ionicons name="golf-outline" size={28} color={colors.muted} />
                 <View style={styles.nextRoundEmptyTextCol}>
                   <Text style={styles.nextRoundEmptyTitle}>No Upcoming Tee Times</Text>
                   <Text style={styles.nextRoundEmptyDesc}>Ready for a round? Book a signature green nearby.</Text>
@@ -489,7 +499,7 @@ export default function HomeScreen() {
             variant="chip"
           >
             <Text style={styles.viewAllText}>View All</Text>
-            <Ionicons name="arrow-forward" size={14} color={theme.colors.primary} />
+            <Ionicons name="arrow-forward" size={14} color={colors.primary} />
           </Pressable>
         </View>
 
@@ -560,8 +570,6 @@ export default function HomeScreen() {
                 styleLabel={course.style}
                 tone={course.style === "COASTAL" ? "green" : "gold"}
                 cardStyle={[styles.trendingCard, isTabletLike && styles.trendingCardTablet]}
-                compactActionLabel="View Details"
-                onPressCompactAction={() => openCourseDetails(course.id)}
                 onPress={() => openCourseDetails(course.id)}
               />
             ))}
@@ -609,10 +617,10 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const themedStyles = createThemedStyleSheet((colors) => ({
   screen: {
     flex: 1,
-    backgroundColor: theme.colors.page,
+    backgroundColor: colors.page,
   },
   scrollContent: {
     paddingTop: 10,
@@ -632,7 +640,7 @@ const styles = StyleSheet.create({
   },
   heroOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: theme.colors.overlay,
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
   },
   heroContent: {
     flex: 1,
@@ -646,8 +654,8 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.label.fontSize,
     lineHeight: theme.typography.label.lineHeight,
     fontWeight: theme.typography.label.fontWeight,
-    color: theme.colors.accentSoft,
-    backgroundColor: theme.colors.primary,
+    color: "#FFF3C7",
+    backgroundColor: "#111827",
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: 999,
@@ -658,7 +666,7 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.h4.fontSize,
     lineHeight: theme.typography.h4.lineHeight,
     fontWeight: theme.typography.h4.fontWeight,
-    color: theme.colors.surface,
+    color: "#FFFFFF",
     marginBottom: 6,
   },
   heroTitleCompact: {
@@ -668,7 +676,7 @@ const styles = StyleSheet.create({
   heroSubtitle: {
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
-    color: theme.colors.textOnPrimarySoft,
+    color: "rgba(255, 255, 255, 0.85)",
     marginBottom: 12,
     maxWidth: 340,
   },
@@ -680,7 +688,7 @@ const styles = StyleSheet.create({
   bookButton: {
     alignSelf: "flex-start",
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: "#FFFFFF",
     paddingHorizontal: 15,
     paddingVertical: 9,
   },
@@ -688,7 +696,7 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
     fontWeight: "700",
-    color: theme.colors.surface,
+    color: "#111827",
   },
   heroDots: {
     alignSelf: "center",
@@ -702,8 +710,8 @@ const styles = StyleSheet.create({
     width: HERO_INDICATOR_SIZE,
     height: HERO_INDICATOR_SIZE,
     borderRadius: 999,
-    backgroundColor: theme.colors.borderStrong,
-    shadowColor: theme.colors.primary,
+    backgroundColor: colors.borderStrong,
+    shadowColor: colors.primary,
     shadowOpacity: 0.14,
     shadowRadius: 7,
     shadowOffset: { width: 0, height: 3 },
@@ -723,21 +731,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11,
     height: 36,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 2,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
   },
   viewAllText: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
     fontWeight: "700",
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   kicker: {
     fontSize: theme.typography.label.fontSize,
     lineHeight: theme.typography.label.lineHeight,
     fontWeight: theme.typography.label.fontWeight,
-    color: theme.colors.accentWarm,
+    color: colors.accentWarm,
     letterSpacing: theme.typography.label.letterSpacing,
     marginBottom: 2,
   },
@@ -745,7 +753,7 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.h4.fontSize,
     lineHeight: theme.typography.h4.lineHeight,
     fontWeight: theme.typography.h4.fontWeight,
-    color: theme.colors.text,
+    color: colors.text,
   },
   featuredRow: {
     gap: 14,
@@ -763,13 +771,13 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.h4.fontSize,
     lineHeight: theme.typography.h4.lineHeight,
     fontWeight: theme.typography.h4.fontWeight,
-    color: theme.colors.text,
+    color: colors.text,
   },
   trendingSubtitle: {
     marginTop: 4,
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     maxWidth: 280,
   },
   trendingList: {
@@ -795,10 +803,10 @@ const styles = StyleSheet.create({
     width: "48.4%",
     aspectRatio: 1,
     borderRadius: 12,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    shadowColor: theme.colors.shadow,
+    borderColor: colors.border,
+    shadowColor: colors.shadow,
     shadowOpacity: 0.08,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 6 },
@@ -815,7 +823,7 @@ const styles = StyleSheet.create({
   },
   getawaySquareOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: theme.colors.overlay,
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
   },
   getawaySquareInfo: {
     position: "absolute",
@@ -826,14 +834,14 @@ const styles = StyleSheet.create({
   getawaySquareName: {
     fontSize: theme.typography.title.fontSize,
     lineHeight: theme.typography.title.lineHeight,
-    color: theme.colors.surface,
+    color: "#FFFFFF",
     fontWeight: theme.typography.title.fontWeight,
   },
   getawaySquarePlace: {
     marginTop: 2,
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
-    color: theme.colors.textOnPrimarySoft,
+    color: "rgba(255, 255, 255, 0.8)",
     fontWeight: theme.typography.caption.fontWeight,
     letterSpacing: theme.typography.caption.letterSpacing,
   },
@@ -845,7 +853,7 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.overline.fontSize,
     lineHeight: theme.typography.overline.lineHeight,
     fontWeight: theme.typography.overline.fontWeight,
-    color: theme.colors.accentWarm,
+    color: colors.accentWarm,
     letterSpacing: theme.typography.overline.letterSpacing,
     marginBottom: 2,
   },
@@ -853,16 +861,16 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.h3.fontSize,
     lineHeight: theme.typography.h3.lineHeight,
     fontWeight: theme.typography.h3.fontWeight,
-    color: theme.colors.text,
+    color: colors.text,
   },
   playerCard: {
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: colors.primarySoft,
     borderRadius: theme.radius.lg,
     borderWidth: 1,
-    borderColor: theme.colors.borderSoft,
+    borderColor: colors.borderSoft,
     padding: 16,
     marginBottom: 20,
-    shadowColor: theme.colors.shadow,
+    shadowColor: colors.shadow,
     shadowOpacity: 0.03,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
@@ -873,7 +881,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.borderSoft,
+    borderBottomColor: colors.borderSoft,
     paddingBottom: 12,
     marginBottom: 12,
   },
@@ -881,22 +889,22 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.overline.fontSize,
     lineHeight: theme.typography.overline.lineHeight,
     fontWeight: theme.typography.overline.fontWeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     letterSpacing: theme.typography.overline.letterSpacing,
     marginBottom: 2,
   },
   playerCardTier: {
     fontSize: theme.typography.title.fontSize,
     fontWeight: "800",
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   tierIconWrap: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.borderSoft,
+    borderColor: colors.borderSoft,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -913,21 +921,21 @@ const styles = StyleSheet.create({
   playerStatVal: {
     fontSize: theme.typography.h4.fontSize,
     fontWeight: theme.typography.h4.fontWeight,
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   playerStatStatus: {
-    color: theme.colors.accentWarm,
+    color: colors.accentWarm,
   },
   playerStatLabel: {
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
     fontWeight: theme.typography.caption.fontWeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   playerStatDivider: {
     width: 1,
     height: 24,
-    backgroundColor: theme.colors.borderSoft,
+    backgroundColor: colors.borderSoft,
   },
   quickActionsContainer: {
     flexDirection: "row",
@@ -938,12 +946,12 @@ const styles = StyleSheet.create({
   quickActionBtn: {
     flex: 1,
     alignItems: "center",
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: theme.radius.md,
     paddingVertical: 12,
     borderWidth: 1,
-    borderColor: theme.colors.borderSoft,
-    shadowColor: theme.colors.shadow,
+    borderColor: colors.borderSoft,
+    shadowColor: colors.shadow,
     shadowOpacity: 0.04,
     shadowRadius: 6,
     elevation: 1,
@@ -959,7 +967,7 @@ const styles = StyleSheet.create({
   quickActionLabel: {
     fontSize: theme.typography.bodySm.fontSize,
     fontWeight: "700",
-    color: theme.colors.text,
+    color: colors.text,
   },
   nextRoundSection: {
     marginBottom: 26,
@@ -971,15 +979,15 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.h4.fontSize,
     lineHeight: theme.typography.h4.lineHeight,
     fontWeight: theme.typography.h4.fontWeight,
-    color: theme.colors.text,
+    color: colors.text,
   },
   nextRoundCard: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1.5,
-    borderColor: theme.colors.primary,
+    borderColor: colors.primary,
     borderRadius: theme.radius.lg,
     overflow: "hidden",
-    shadowColor: theme.colors.shadow,
+    shadowColor: colors.shadow,
     shadowOpacity: 0.08,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 6 },
@@ -997,7 +1005,7 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.title.fontSize,
     lineHeight: theme.typography.title.lineHeight,
     fontWeight: theme.typography.title.fontWeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     flex: 1,
   },
   nextRoundTimeRow: {
@@ -1015,7 +1023,7 @@ const styles = StyleSheet.create({
   },
   nextRoundTimeText: {
     fontSize: theme.typography.body.fontSize,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontWeight: "500",
   },
   nextRoundActions: {
@@ -1032,27 +1040,27 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   nextRoundBtnPrimary: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
   },
   nextRoundBtnSecondary: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1.5,
-    borderColor: theme.colors.borderStrong,
+    borderColor: colors.borderStrong,
   },
   nextRoundBtnTextPrimary: {
-    color: theme.colors.surface,
+    color: colors.surface,
     fontWeight: "700",
     fontSize: theme.typography.bodySm.fontSize,
   },
   nextRoundBtnTextSecondary: {
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "700",
     fontSize: theme.typography.bodySm.fontSize,
   },
   nextRoundCardEmpty: {
-    backgroundColor: theme.colors.surfaceSoft,
+    backgroundColor: colors.surfaceSoft,
     borderWidth: 1,
-    borderColor: theme.colors.borderSoft,
+    borderColor: colors.borderSoft,
     borderRadius: theme.radius.lg,
     padding: 16,
     flexDirection: "row",
@@ -1073,24 +1081,24 @@ const styles = StyleSheet.create({
   nextRoundEmptyTitle: {
     fontSize: theme.typography.title.fontSize,
     fontWeight: theme.typography.title.fontWeight,
-    color: theme.colors.text,
+    color: colors.text,
   },
   nextRoundEmptyDesc: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   nextRoundEmptyBookBtn: {
     paddingHorizontal: 16,
     height: 36,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
   },
   nextRoundEmptyBookBtnText: {
-    color: theme.colors.surface,
+    color: colors.surface,
     fontWeight: "700",
     fontSize: theme.typography.bodySm.fontSize,
   },
-});
+}));

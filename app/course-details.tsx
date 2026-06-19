@@ -6,14 +6,14 @@ import { InteractionManager, ScrollView, StyleSheet, Text, View, useWindowDimens
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
-import { getColomboDateKey } from "../components/colombo-time";
-import { getManagedCourseById, getNextBookableTeeSlot, useCourseDetails, addCourseReview } from "../components/course-management";
-import { toggleFavoriteCourse, useIsFavoriteCourse } from "../components/favorites";
-import { openInGoogleMaps } from "../components/map-links";
-import { theme } from "../components/theme";
+import { getColomboDateKey } from "../utils/colombo-time";
+import { getManagedCourseById, getNextBookableTeeSlot, useCourseDetails, addCourseReview } from "../services/course-management";
+import { toggleFavoriteCourse, useIsFavoriteCourse } from "../services/favorites";
+import { openInGoogleMaps } from "../utils/map-links";
+import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../components/theme";
 import { getCourseImage } from "../lib/image-mapping";
-import { DailyWeatherForecast, getFourteenDayForecast, getWeatherCodeIconName } from "../components/weather";
-import { useAuthSession } from "../components/auth";
+import { DailyWeatherForecast, getFourteenDayForecast, getWeatherCodeIconName } from "../services/weather";
+import { useAuthSession } from "../services/auth";
 
 
 interface CourseReview {
@@ -69,10 +69,12 @@ function formatReviewDate(value: string) {
 }
 
 function AmenityCard({ icon, title, subtitle }: Amenity) {
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(themedStyles);
   return (
     <View style={styles.amenityCard}>
       <View style={styles.amenityIcon}>
-        <Ionicons name={icon} size={24} color={theme.colors.primary} />
+        <Ionicons name={icon} size={24} color={colors.primary} />
       </View>
       <View style={styles.amenityContent}>
         <Text style={styles.amenityTitle}>{title}</Text>
@@ -83,12 +85,14 @@ function AmenityCard({ icon, title, subtitle }: Amenity) {
 }
 
 function ReviewCard({ author, handicap, rating, text, date }: Omit<CourseReview, "id">) {
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(themedStyles);
   return (
     <View style={styles.reviewCard}>
       <View style={styles.reviewTopRow}>
         <View style={styles.ratingWrap}>
           {[...Array(rating)].map((_, i) => (
-            <Ionicons key={i} name="star" size={12} color={theme.colors.accentWarm} />
+            <Ionicons key={i} name="star" size={12} color={colors.accentWarm} />
           ))}
         </View>
         <Text style={styles.reviewDate}>{date}</Text>
@@ -96,7 +100,7 @@ function ReviewCard({ author, handicap, rating, text, date }: Omit<CourseReview,
       <Text style={styles.reviewText}>{text}</Text>
       <View style={styles.reviewAuthor}>
         <View style={styles.authorAvatar}>
-          <Ionicons name="person-circle" size={32} color={theme.colors.muted} />
+          <Ionicons name="person-circle" size={32} color={colors.muted} />
         </View>
         <View>
           <Text style={styles.authorName}>{author}</Text>
@@ -108,6 +112,8 @@ function ReviewCard({ author, handicap, rating, text, date }: Omit<CourseReview,
 }
 
 export default function CourseDetailsScreen() {
+  const { colors, resolvedTheme } = useAppTheme();
+  const styles = useThemedStyles(themedStyles);
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
   const courseId = Array.isArray(id) ? id[0] : id;
@@ -174,13 +180,8 @@ export default function CourseDetailsScreen() {
     }
     setIsSubmittingReview(true);
     try {
-      const authorName = auth.profile?.full_name || auth.profile?.username || auth.session?.user?.email || "Golfer";
-      const authorBadge = auth.profile?.handicap != null ? `Handicap: ${auth.profile.handicap}` : "Golfer";
-      
       await addCourseReview({
         courseId: course.id,
-        authorName,
-        authorBadge,
         rating: newRating,
         reviewText: newReviewText.trim(),
       });
@@ -333,7 +334,7 @@ export default function CourseDetailsScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={[]}>
-      <StatusBar style="dark" />
+      <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -352,7 +353,7 @@ export default function CourseDetailsScreen() {
             <Ionicons
               name={isFavorite ? "heart" : "heart-outline"}
               size={20}
-              color={isFavorite ? theme.colors.surface : theme.colors.primary}
+              color={isFavorite ? colors.surface : colors.primary}
             />
           </Pressable>
           <View style={styles.heroContent}>
@@ -361,27 +362,26 @@ export default function CourseDetailsScreen() {
             </View>
             <Text style={styles.courseTitle}>{course.title}</Text>
             <View style={styles.heroLocationPill}>
-              <Ionicons name="location" size={14} color={theme.colors.surface} />
+              <Ionicons name="location" size={14} color="#FFFFFF" />
               <Text style={styles.heroLocationText}>{course.location}</Text>
             </View>
             <View style={styles.courseMetaRow}>
               <View style={styles.metaItem}>
-                <Ionicons name="star" size={14} color={theme.colors.accentWarm} />
+                <Ionicons name="star" size={14} color={colors.accentWarm} />
                 <Text style={styles.metaText}>{course.rating} ({reviewCount} Reviews)</Text>
               </View>
               <View style={styles.metaDot} />
               <Pressable
                 style={styles.metaMapButton}
-                onPress={() =>
-                  openInGoogleMaps({
-                    coordinates: course.coordinates,
-                    placeQuery: course.placeQuery,
-                    placeId: course.placeId,
-                  })
-                }
+                onPress={() => {
+                  router.push({
+                    pathname: "/explore",
+                    params: { view: "map", courseId: course.id },
+                  });
+                }}
                 variant="chip"
               >
-                <Ionicons name="map-outline" size={14} color={theme.colors.surface} />
+                <Ionicons name="map-outline" size={14} color="#FFFFFF" />
                 <Text style={styles.metaMapButtonText}>Open in Map</Text>
               </Pressable>
             </View>
@@ -421,7 +421,7 @@ export default function CourseDetailsScreen() {
                       <Ionicons
                         name={getWeatherCodeIconName(day.weatherCode)}
                         size={20}
-                        color={theme.colors.accentWarm}
+                        color={colors.accentWarm}
                       />
                     </View>
                     <Text style={styles.weatherTemp}>{`${day.tempMax}\u00B0`}</Text>
@@ -454,7 +454,7 @@ export default function CourseDetailsScreen() {
               {resolvedHighlights.map((highlight, idx) => (
                 <View key={`${highlight.title}-${idx}`} style={styles.featureItem}>
                   <View style={styles.featureIcon}>
-                    <Ionicons name={highlight.icon} size={18} color={theme.colors.primary} />
+                    <Ionicons name={highlight.icon} size={18} color={colors.primary} />
                   </View>
                   <View>
                     <Text style={styles.featureTitle}>{highlight.title}</Text>
@@ -475,7 +475,7 @@ export default function CourseDetailsScreen() {
               }
               variant="button"
             >
-              <Ionicons name="navigate-outline" size={18} color={theme.colors.primary} />
+              <Ionicons name="navigate-outline" size={18} color={colors.primary} />
               <Text style={styles.mapActionText}>Open in Google Maps</Text>
             </Pressable>
 
@@ -498,7 +498,7 @@ export default function CourseDetailsScreen() {
                 }}
                 variant="chip"
               >
-                <Ionicons name="create-outline" size={14} color={theme.colors.primary} />
+                <Ionicons name="create-outline" size={14} color={colors.primary} />
                 <Text style={styles.writeReviewButtonText}>Write Review</Text>
               </Pressable>
             </View>
@@ -515,7 +515,7 @@ export default function CourseDetailsScreen() {
                 <Ionicons
                   name={showAllReviews ? "chevron-up" : "chevron-down"}
                   size={15}
-                  color={theme.colors.primary}
+                  color={colors.primary}
                 />
               </Pressable>
             ) : null}
@@ -548,7 +548,7 @@ export default function CourseDetailsScreen() {
             variant="cta"
           >
             <Text style={styles.bookButtonText}>Book Tee Time</Text>
-            <Ionicons name="arrow-forward" size={16} color={theme.colors.surface} />
+            <Ionicons name="arrow-forward" size={16} color={colors.surface} />
           </Pressable>
         </View>
       </View>
@@ -578,7 +578,7 @@ export default function CourseDetailsScreen() {
                 onPress={closeReviewModal}
                 style={styles.modalCloseButton}
               >
-                <Ionicons name="close" size={24} color={theme.colors.text} />
+                <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
 
@@ -594,7 +594,7 @@ export default function CourseDetailsScreen() {
                     <Ionicons
                       name={star <= newRating ? "star" : "star-outline"}
                       size={36}
-                      color={theme.colors.accentWarm}
+                      color={colors.accentWarm}
                     />
                   </TouchableOpacity>
                 ))}
@@ -608,7 +608,7 @@ export default function CourseDetailsScreen() {
                 value={newReviewText}
                 onChangeText={setNewReviewText}
                 placeholder="How was the course conditions, clubhouse amenities, or your overall round? Share your memory here..."
-                placeholderTextColor={theme.colors.muted}
+                placeholderTextColor={colors.muted}
                 maxLength={500}
               />
               <Text style={styles.charCount}>
@@ -622,7 +622,7 @@ export default function CourseDetailsScreen() {
                 variant="cta"
               >
                 {isSubmittingReview ? (
-                  <ActivityIndicator color={theme.colors.surface} />
+                  <ActivityIndicator color={colors.surface} />
                 ) : (
                   <Text style={styles.submitButtonText}>Submit Memory</Text>
                 )}
@@ -635,10 +635,10 @@ export default function CourseDetailsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const themedStyles = createThemedStyleSheet((colors) => ({
   screen: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: colors.background,
   },
   scrollContent: {
     paddingBottom: 200,
@@ -655,7 +655,7 @@ const styles = StyleSheet.create({
   },
   heroOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: theme.colors.overlay,
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
   },
   heroContent: {
     position: "absolute",
@@ -671,20 +671,20 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: theme.colors.glass,
+    backgroundColor: colors.glass,
     borderWidth: 1,
-    borderColor: theme.colors.glassBorder,
+    borderColor: colors.glassBorder,
     alignItems: "center",
     justifyContent: "center",
     zIndex: 12,
   },
   favoriteButtonActive: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   badgePill: {
     alignSelf: "flex-start",
-    backgroundColor: theme.colors.accentSoft,
+    backgroundColor: colors.accentSoft,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
@@ -693,14 +693,14 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
-    color: theme.colors.accentWarm,
+    color: colors.accentWarm,
     fontWeight: "700",
     letterSpacing: 1.2,
   },
   courseTitle: {
     fontSize: theme.typography.displayL.fontSize,
     lineHeight: theme.typography.displayL.lineHeight,
-    color: theme.colors.surface,
+    color: "#FFFFFF",
     fontWeight: "800",
     marginBottom: 10,
   },
@@ -718,7 +718,7 @@ const styles = StyleSheet.create({
   heroLocationText: {
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
-    color: theme.colors.surface,
+    color: "#FFFFFF",
     fontWeight: "600",
   },
   courseMetaRow: {
@@ -734,7 +734,7 @@ const styles = StyleSheet.create({
   metaText: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.textOnPrimaryStrong,
+    color: "rgba(255, 255, 255, 0.95)",
     fontWeight: "500",
   },
   metaMapButton: {
@@ -745,21 +745,21 @@ const styles = StyleSheet.create({
   metaMapButtonText: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.surface,
+    color: "#FFFFFF",
     fontWeight: "600",
   },
   favoriteNotice: {
     marginTop: 8,
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.textOnPrimaryStrong,
+    color: "rgba(255, 255, 255, 0.95)",
     fontWeight: "600",
   },
   metaDot: {
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: theme.colors.textOnPrimaryDim,
+    backgroundColor: "rgba(255, 255, 255, 0.55)",
   },
   contentSection: {
     paddingHorizontal: 16,
@@ -774,20 +774,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   sectionTitle: {
-    color: theme.colors.text,
+    color: colors.text,
     fontSize: theme.typography.title.fontSize,
     lineHeight: theme.typography.title.lineHeight,
     fontWeight: "700",
   },
   sectionMeta: {
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontSize: theme.typography.label.fontSize,
     lineHeight: theme.typography.label.lineHeight,
     letterSpacing: 1,
     fontWeight: "700",
   },
   weatherStateText: {
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
     fontWeight: "500",
@@ -799,16 +799,16 @@ const styles = StyleSheet.create({
   weatherCard: {
     width: 78,
     borderRadius: 14,
-    backgroundColor: theme.colors.surfaceTint,
+    backgroundColor: colors.surfaceTint,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     paddingVertical: 10,
     paddingHorizontal: 8,
     alignItems: "center",
     gap: 4,
   },
   weatherDate: {
-    color: theme.colors.text,
+    color: colors.text,
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
     fontWeight: "700",
@@ -817,18 +817,18 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: colors.primarySoft,
     alignItems: "center",
     justifyContent: "center",
   },
   weatherTemp: {
     fontSize: theme.typography.title.fontSize,
     lineHeight: theme.typography.title.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "800",
   },
   weatherMinTemp: {
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
     fontWeight: "600",
@@ -841,16 +841,16 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 12,
     borderRadius: 14,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     alignItems: "flex-start",
   },
   amenityIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: theme.colors.accentSoft,
+    backgroundColor: colors.accentSoft,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
@@ -862,13 +862,13 @@ const styles = StyleSheet.create({
   amenityTitle: {
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "700",
   },
   amenitySubtitle: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   experienceHeader: {
     flexDirection: "row",
@@ -881,12 +881,12 @@ const styles = StyleSheet.create({
     width: 50,
     height: 4,
     borderRadius: 2,
-    backgroundColor: theme.colors.accent,
+    backgroundColor: colors.accent,
   },
   experienceText: {
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     marginTop: 8,
   },
   featuresWrap: {
@@ -902,7 +902,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: theme.colors.accentSoft,
+    backgroundColor: colors.accentSoft,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
@@ -910,13 +910,13 @@ const styles = StyleSheet.create({
   featureTitle: {
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "700",
   },
   featureSubtitle: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     marginTop: 2,
   },
   courseImageWrap: {
@@ -930,8 +930,8 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: theme.radius.pill,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     paddingHorizontal: 16,
     flexDirection: "row",
     alignItems: "center",
@@ -941,7 +941,7 @@ const styles = StyleSheet.create({
   mapActionText: {
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "700",
   },
   courseImage: {
@@ -961,14 +961,14 @@ const styles = StyleSheet.create({
     height: 30,
     paddingHorizontal: 10,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.surfaceSoft,
+    backgroundColor: colors.surfaceSoft,
     borderWidth: 1,
-    borderColor: theme.colors.borderSoft,
+    borderColor: colors.borderSoft,
   },
   showMoreButtonText: {
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "700",
   },
   reviewsList: {
@@ -977,9 +977,9 @@ const styles = StyleSheet.create({
   reviewCard: {
     padding: 14,
     borderRadius: 14,
-    backgroundColor: theme.colors.surfaceSoft,
+    backgroundColor: colors.surfaceSoft,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     gap: 10,
   },
   reviewTopRow: {
@@ -995,13 +995,13 @@ const styles = StyleSheet.create({
   reviewDate: {
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontWeight: "600",
   },
   reviewText: {
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
-    color: theme.colors.text,
+    color: colors.text,
     fontStyle: "italic",
   },
   reviewAuthor: {
@@ -1014,20 +1014,20 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: theme.colors.border,
+    backgroundColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
   authorName: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "700",
   },
   authorMeta: {
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontWeight: "600",
   },
   floatingBooking: {
@@ -1037,10 +1037,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    shadowColor: theme.colors.shadow,
+    borderColor: colors.border,
+    shadowColor: colors.shadow,
     shadowOpacity: 0.12,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },
@@ -1061,20 +1061,20 @@ const styles = StyleSheet.create({
   bookingLabel: {
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontWeight: "700",
     letterSpacing: 1,
   },
   bookingPrice: {
     fontSize: theme.typography.h2.fontSize,
     lineHeight: theme.typography.h2.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "800",
   },
   bookingPriceSuffix: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontWeight: "500",
   },
   bookButton: {
@@ -1084,12 +1084,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
   },
   bookButtonText: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.surface,
+    color: colors.surface,
     fontWeight: "700",
   },
   writeReviewButton: {
@@ -1099,14 +1099,14 @@ const styles = StyleSheet.create({
     height: 30,
     paddingHorizontal: 10,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: colors.primarySoft,
     borderWidth: 1,
-    borderColor: theme.colors.borderSoft,
+    borderColor: colors.borderSoft,
   },
   writeReviewButtonText: {
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "700",
   },
   keyboardAvoidingView: {
@@ -1115,10 +1115,10 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: theme.colors.overlayStrong,
+    backgroundColor: colors.overlayStrong,
   },
   modalContent: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderTopLeftRadius: theme.radius.xl,
     borderTopRightRadius: theme.radius.xl,
     maxHeight: "85%",
@@ -1131,19 +1131,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 18,
     borderBottomWidth: 1,
-    borderColor: theme.colors.borderSoft,
+    borderColor: colors.borderSoft,
   },
   modalTitle: {
     fontSize: theme.typography.h3.fontSize,
     lineHeight: theme.typography.h3.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "800",
   },
   modalCloseButton: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: theme.colors.surfaceSoft,
+    backgroundColor: colors.surfaceSoft,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1154,7 +1154,7 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: theme.typography.title.fontSize,
     lineHeight: theme.typography.title.lineHeight,
-    color: theme.colors.text,
+    color: colors.text,
     fontWeight: "700",
   },
   modalRatingWrap: {
@@ -1167,25 +1167,25 @@ const styles = StyleSheet.create({
   },
   reviewTextInput: {
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     borderRadius: theme.radius.md,
     padding: 14,
-    color: theme.colors.text,
+    color: colors.text,
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
-    backgroundColor: theme.colors.surfaceTint,
+    backgroundColor: colors.surfaceTint,
     textAlignVertical: "top",
     minHeight: 120,
   },
   charCount: {
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     textAlign: "right",
     marginTop: -8,
   },
   submitButton: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     borderRadius: theme.radius.pill,
     height: 48,
     alignItems: "center",
@@ -1198,7 +1198,7 @@ const styles = StyleSheet.create({
   submitButtonText: {
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
-    color: theme.colors.surface,
+    color: colors.surface,
     fontWeight: "700",
   },
-});
+}));

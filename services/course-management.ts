@@ -103,6 +103,7 @@ function mapRowToCourse(row: any): CourseRecord {
     placeId: row.place_id ?? undefined,
     image: row.image,
     style: (finalStyle as string).toUpperCase() as CourseStyle,
+    isGetaway: row.is_getaway,
     coordinates: {
       latitude: row.latitude,
       longitude: row.longitude,
@@ -120,6 +121,7 @@ function createPlaceholderCourse(id?: string): CourseRecord {
     placeQuery: "Sri Lanka",
     image: "https://images.unsplash.com/photo-1464983953574-0892a716854b?auto=format&fit=crop&w=1200&q=80",
     style: "PARKLAND",
+    isGetaway: false,
     coordinates: {
       latitude: 6.9271,
       longitude: 79.8612,
@@ -436,22 +438,39 @@ export async function getNextBookableTeeSlot(courseId: string, startDate?: strin
 
 export async function addCourseReview({
   courseId,
-  authorName,
-  authorBadge,
   rating,
   reviewText,
 }: {
   courseId: string;
-  authorName: string;
-  authorBadge: string;
   rating: number;
   reviewText: string;
 }) {
   assertSupabaseConfigured();
+  
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    throw new Error("You need to be signed in to submit a review.");
+  }
+  
+  const userId = session.user.id;
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("full_name, username, handicap")
+    .eq("id", userId)
+    .single();
+
+  if (profileError) {
+    throw new Error("Unable to retrieve your user profile for review submission.");
+  }
+
+  const authorName = profile.full_name || profile.username || session.user.email || "Golfer";
+  const authorBadge = profile.handicap != null ? `Handicap: ${profile.handicap}` : "Golfer";
+
   const { data, error } = await supabase
     .from("course_reviews")
     .insert({
       course_id: courseId,
+      user_id: userId,
       author_name: authorName,
       author_badge: authorBadge,
       rating,

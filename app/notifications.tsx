@@ -1,12 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
-import { useResponsiveLayout } from "../components/responsive-layout";
-import { theme } from "../components/theme";
+import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
+import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../components/theme";
 import {
   AppNotification,
   NotificationType,
@@ -14,30 +14,33 @@ import {
   markAsRead,
   markAllAsRead,
   deleteNotification,
-} from "../components/notifications";
+  deleteAllNotifications,
+} from "../services/notifications";
 
-type NotificationFilter = "all" | "booking" | "promotion" | "achievement" | "updates";
+type NotificationFilter = "all" | "booking" | "promotion" | "achievement" | "account";
 
 const FILTER_OPTIONS: { label: string; value: NotificationFilter }[] = [
   { label: "All", value: "all" },
   { label: "Bookings", value: "booking" },
-  { label: "Offers", value: "promotion" },
+  { label: "Offers & Updates", value: "promotion" },
+  { label: "Account Activity", value: "account" },
   { label: "Achievements", value: "achievement" },
-  { label: "App & Account", value: "updates" },
 ];
 
-function getIconColor(type: NotificationType) {
+function getIconColor(type: NotificationType, colors: any) {
   switch (type) {
     case "booking":
-      return theme.colors.primary;
+      return colors.primary;
     case "promotion":
-      return theme.colors.accentWarm;
+      return colors.accentWarm;
     case "achievement":
-      return theme.colors.warning;
+      return colors.warning;
     case "updates":
-      return theme.colors.muted;
+      return colors.muted;
+    case "account":
+      return colors.muted;
     default:
-      return theme.colors.primary;
+      return colors.primary;
   }
 }
 
@@ -80,7 +83,9 @@ function NotificationCard({
   onAction: (notification: AppNotification) => void;
   onDelete: (id: string) => void;
 }) {
-  const iconColor = getIconColor(notification.type);
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(themedStyles);
+  const iconColor = getIconColor(notification.type, colors);
   const timestampLabel = getRelativeTimeLabel(notification.occurredAt);
 
   return (
@@ -94,7 +99,7 @@ function NotificationCard({
           <Text style={styles.notificationTitle}>{notification.title}</Text>
           {!notification.read ? <View style={styles.readIndicator} /> : null}
           <Pressable style={styles.dismissButton} onPress={() => onDelete(notification.id)} variant="icon">
-            <Ionicons name="close-outline" size={18} color={theme.colors.muted} />
+            <Ionicons name="close-outline" size={18} color={colors.muted} />
           </Pressable>
         </View>
         <Text style={styles.notificationMessage}>{notification.message}</Text>
@@ -119,10 +124,19 @@ function NotificationCard({
 }
 
 export default function NotificationsScreen() {
+  const { colors, resolvedTheme } = useAppTheme();
+  const styles = useThemedStyles(themedStyles);
   const router = useRouter();
+  const { filter } = useLocalSearchParams<{ filter?: NotificationFilter }>();
   const { horizontalPadding, screenBottomPadding } = useResponsiveLayout();
   const { notifications } = useNotificationState();
   const [activeFilter, setActiveFilter] = useState<NotificationFilter>("all");
+
+  useEffect(() => {
+    if (filter) {
+      setActiveFilter(filter);
+    }
+  }, [filter]);
 
   const sortedNotifications = useMemo(
     () =>
@@ -136,7 +150,11 @@ export default function NotificationsScreen() {
     if (activeFilter === "all") {
       return sortedNotifications;
     }
-
+    if (activeFilter === "promotion") {
+      return sortedNotifications.filter(
+        (notification) => notification.type === "promotion" || notification.type === "updates"
+      );
+    }
     return sortedNotifications.filter((notification) => notification.type === activeFilter);
   }, [activeFilter, sortedNotifications]);
 
@@ -146,6 +164,10 @@ export default function NotificationsScreen() {
 
   const handleMarkAllRead = () => {
     void markAllAsRead();
+  };
+
+  const handleDismissAll = () => {
+    void deleteAllNotifications();
   };
 
   const handleMarkRead = (id: string) => {
@@ -181,7 +203,7 @@ export default function NotificationsScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={["bottom"]}>
-      <StatusBar style="dark" />
+      <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -193,20 +215,27 @@ export default function NotificationsScreen() {
         overScrollMode="never"
       >
         <View style={styles.summaryCard}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={styles.summaryLabel}>NOTIFICATIONS</Text>
             <Text style={styles.summaryValue}>{unreadCount} unread updates</Text>
           </View>
-          {unreadCount > 0 ? (
-            <Pressable style={styles.markAllButton} onPress={handleMarkAllRead} variant="cta">
-              <Text style={styles.markAllButtonText}>Mark All Read</Text>
-            </Pressable>
-          ) : (
-            <View style={styles.summaryBadge}>
-              <Ionicons name="checkmark-circle" size={16} color={theme.colors.successText} />
-              <Text style={styles.summaryBadgeText}>All Caught Up</Text>
-            </View>
-          )}
+          <View style={styles.summaryActionsRow}>
+            {unreadCount > 0 ? (
+              <Pressable style={styles.summaryActionBtn} onPress={handleMarkAllRead} variant="cta">
+                <Text style={styles.summaryActionBtnText}>Mark All Read</Text>
+              </Pressable>
+            ) : null}
+            {notifications.length > 0 ? (
+              <Pressable style={[styles.summaryActionBtn, styles.dismissAllButton]} onPress={handleDismissAll} variant="chip">
+                <Text style={[styles.summaryActionBtnText, styles.dismissAllButtonText]}>Dismiss All</Text>
+              </Pressable>
+            ) : (
+              <View style={styles.summaryBadge}>
+                <Ionicons name="checkmark-circle" size={14} color={colors.successText} />
+                <Text style={styles.summaryBadgeText}>Caught Up</Text>
+              </View>
+            )}
+          </View>
         </View>
 
         <ScrollView
@@ -272,7 +301,7 @@ export default function NotificationsScreen() {
 
           {filteredNotifications.length === 0 ? (
             <View style={styles.emptyState}>
-              <Ionicons name="notifications-off-outline" size={24} color={theme.colors.muted} />
+              <Ionicons name="notifications-off-outline" size={24} color={colors.muted} />
               <Text style={styles.emptyStateTitle}>No notifications here</Text>
               <Text style={styles.emptyStateText}>
                 Try a different filter or check back after your next booking update.
@@ -285,10 +314,10 @@ export default function NotificationsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const themedStyles = createThemedStyleSheet((colors) => ({
   screen: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: colors.background,
   },
   scrollContent: {
     paddingHorizontal: 16,
@@ -297,59 +326,72 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   summaryCard: {
-    borderRadius: 20,
-    backgroundColor: theme.colors.primarySoft,
+    borderRadius: 14,
+    backgroundColor: colors.primarySoft,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    borderColor: colors.border,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 12,
+    gap: 10,
   },
   summaryLabel: {
-    fontSize: theme.typography.caption.fontSize,
-    lineHeight: theme.typography.caption.lineHeight,
-    color: theme.colors.textSoft,
+    fontSize: 9,
+    lineHeight: 12,
+    color: colors.textSoft,
     letterSpacing: 1.2,
     fontWeight: "700",
-    marginBottom: 4,
+    marginBottom: 2,
   },
   summaryValue: {
-    fontSize: theme.typography.title.fontSize,
-    lineHeight: theme.typography.title.lineHeight,
-    color: theme.colors.primary,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.primary,
     fontWeight: "800",
   },
   summaryBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
-    height: 32,
+    gap: 4,
+    paddingHorizontal: 8,
+    height: 28,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.success,
+    backgroundColor: colors.success,
   },
   summaryBadgeText: {
-    fontSize: theme.typography.bodySm.fontSize,
-    lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.successText,
+    fontSize: 10,
+    lineHeight: 14,
+    color: colors.successText,
     fontWeight: "700",
   },
-  markAllButton: {
-    height: 34,
+  summaryActionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+  },
+  summaryActionBtn: {
+    height: 28,
     borderRadius: theme.radius.pill,
-    paddingHorizontal: 12,
-    backgroundColor: theme.colors.primary,
+    paddingHorizontal: 10,
+    backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
   },
-  markAllButtonText: {
-    fontSize: theme.typography.bodySm.fontSize,
-    lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.surface,
+  summaryActionBtnText: {
+    fontSize: 10,
+    lineHeight: 14,
+    color: colors.surface,
     fontWeight: "700",
+  },
+  dismissAllButton: {
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  dismissAllButtonText: {
+    color: colors.text,
   },
   filterRow: {
     gap: 8,
@@ -359,24 +401,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     height: 34,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
   filterChipActive: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   filterChipText: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontWeight: "600",
   },
   filterChipTextActive: {
-    color: theme.colors.surface,
+    color: colors.surface,
   },
   notificationsSection: {
     gap: 18,
@@ -387,7 +429,7 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     fontWeight: "700",
     letterSpacing: 1,
     marginBottom: 10,
@@ -399,14 +441,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 12,
     borderRadius: 14,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     padding: 12,
   },
   notificationCardUnread: {
-    borderColor: theme.colors.primary,
-    backgroundColor: theme.colors.primarySoft,
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
   },
   iconWrap: {
     width: 44,
@@ -428,7 +470,7 @@ const styles = StyleSheet.create({
   notificationTitle: {
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
-    color: theme.colors.text,
+    color: colors.text,
     fontWeight: "700",
     flex: 1,
   },
@@ -436,7 +478,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     flexShrink: 0,
   },
   dismissButton: {
@@ -449,7 +491,7 @@ const styles = StyleSheet.create({
   notificationMessage: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
   },
   footerRow: {
     flexDirection: "row",
@@ -470,20 +512,20 @@ const styles = StyleSheet.create({
   timestamp: {
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
-    color: theme.colors.muted,
+    color: colors.muted,
     fontWeight: "500",
   },
   actionText: {
     fontSize: theme.typography.caption.fontSize,
     lineHeight: theme.typography.caption.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "700",
   },
   emptyState: {
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surfaceSoft,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceSoft,
     paddingHorizontal: 18,
     paddingVertical: 22,
     alignItems: "center",
@@ -492,14 +534,14 @@ const styles = StyleSheet.create({
   emptyStateTitle: {
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: "700",
   },
   emptyStateText: {
     fontSize: theme.typography.bodySm.fontSize,
     lineHeight: theme.typography.bodySm.lineHeight,
-    color: theme.colors.textSoft,
+    color: colors.textSoft,
     textAlign: "center",
     maxWidth: 280,
   },
-});
+}));
