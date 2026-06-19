@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useRouter } from "expo-router";
+
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import {
@@ -9,7 +9,6 @@ import {
   Modal,
   Platform,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   View,
@@ -48,8 +47,7 @@ const DEFAULT_METHODS: PaymentMethod[] = [
 export default function PaymentMethodsScreen() {
   const { colors, resolvedTheme } = useAppTheme();
   const styles = useThemedStyles(themedStyles);
-  const router = useRouter();
-  const { horizontalPadding, screenBottomPadding, scaleFont, scaleLineHeight } = useResponsiveLayout();
+  const { horizontalPadding, screenBottomPadding } = useResponsiveLayout();
   const insets = useSafeAreaInsets();
 
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
@@ -187,7 +185,7 @@ export default function PaymentMethodsScreen() {
       setFormError("Expiry date must be in MM/YY format.");
       return;
     }
-    const [month, year] = cardExpiry.split("/").map((v) => parseInt(v, 10));
+    const month = parseInt(cardExpiry.split("/")[0], 10);
     if (month < 1 || month > 12) {
       setFormError("Invalid month in expiry.");
       return;

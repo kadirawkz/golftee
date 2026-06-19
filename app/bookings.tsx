@@ -10,7 +10,6 @@ import {
   Linking,
   ScrollView,
   Share,
-  StyleSheet,
   Text,
   TextInput,
   View,

@@ -3,7 +3,7 @@ import * as Location from "expo-location";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, InteractionManager, Linking, Platform, ScrollView, StyleSheet, Text, TextInput, View, Modal, TouchableWithoutFeedback, Animated, TouchableOpacity, BackHandler } from "react-native";
+import { FlatList, InteractionManager, Linking, Platform, ScrollView, StyleSheet, Text, TextInput, View, Modal, TouchableWithoutFeedback, Animated, BackHandler } from "react-native";
 import { WebView } from "react-native-webview";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
@@ -15,7 +15,6 @@ import {
     STYLE_OPTIONS,
 } from "../services/course-data";
 import { useCourseCatalog } from "../services/course-management";
-import { openInGoogleMaps } from "../utils/map-links";
 import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../components/theme";
 
 const PRICE_RANGES = [
@@ -506,7 +505,7 @@ export default function ExploreScreen() {
         />
       </View>
     ),
-    [openCourseDetails]
+    [openCourseDetails, styles.courseCard, styles.courseCardItem]
   );
 
   // Reset map ready status when interactive map is hidden

@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "./animated-pressable";
 import { createThemedStyleSheet, useThemedStyles, useAppTheme } from "./theme";

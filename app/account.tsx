@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View, Modal } from "react-native";
+import { ActivityIndicator, ScrollView, Text, TextInput, View, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";

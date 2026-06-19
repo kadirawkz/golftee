@@ -37,27 +37,6 @@ type AppRouteName =
 
 type ScreenTransitionPreset = "shared" | "boot" | "splash" | "auth" | "root" | "detail" | "taskFlow";
 
-type AppPathname =
-  | "/"
-  | "/launch"
-  | "/home"
-  | "/explore"
-  | "/bookings"
-  | "/profile"
-  | "/favourites"
-  | "/account"
-  | "/settings"
-  | "/booking-history"
-  | "/course-details"
-  | "/manage-booking"
-  | "/tee-time-booking"
-  | "/booking-checkout"
-  | "/notifications"
-  | "/splash"
-  | "/login"
-  | "/signup"
-  | "/forgot-password";
-
 export interface ThemeColors {
   background: string;
   page: string;

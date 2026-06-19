@@ -13,8 +13,6 @@ import { supabase } from "../lib/supabase";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
-const BACKGROUND_IMAGE =
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuD_5BKCG8Zh7AAgflRKh9OreYX0em7HY62MIYhAGGTTIV8uyTkkcljbFHcMS5olpcil4zJIsJswq12eK62vnzH-N0iH3K2Y2OeDiQGMn8M73lT-5X5uuCAk4sXAwPlKEiNSjvtRY2w6RBZw5h-wjaTFO-va556Z5PnrkrMcxo3QRySUyL44BeOHTHtTPdAG3iE_Amz5rl9yjAblI-M3oBniJaKNXBcxDa3UQLLkzQh1RvvFH5Vf3GVf0v-9lvOqTncFis60R9HOeC0";
 
 const HIGHLIGHTS = [
   { title: "Book Premier Tee Times", desc: "Reserve slots instantly at world-class private golf courses." },
@@ -68,7 +66,7 @@ export default function Index() {
         useNativeDriver: true,
       }),
     ]).start();
-  }, []);
+  }, [contentOpacity, logoTranslateY]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -103,10 +101,10 @@ export default function Index() {
       <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
 
       <View style={styles.background}>
-        <AppImage source={{ uri: BACKGROUND_IMAGE }} style={styles.backgroundImage} />
+        <AppImage source={require("../assets/images/get-started-background.jpg")} style={styles.backgroundImage} />
         <View style={[
           styles.dimLayer,
-          { backgroundColor: resolvedTheme === "dark" ? "rgba(7, 32, 24, 0.78)" : "rgba(255, 255, 255, 0.88)" }
+          { backgroundColor: resolvedTheme === "dark" ? "rgba(7, 32, 24, 0.78)" : "rgba(244, 248, 246, 0.78)" }
         ]} />
 
         <SafeAreaView style={styles.safeArea}>
@@ -310,7 +308,7 @@ const themedStyles = createThemedStyleSheet((colors) => ({
   },
   carouselDesc: {
     fontSize: theme.typography.bodySm.fontSize,
-    color: colors.textSoft,
+    color: colors.text,
     textAlign: "center",
     lineHeight: 18,
     maxWidth: 280,

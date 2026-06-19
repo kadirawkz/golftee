@@ -97,90 +97,93 @@ function mapDbNotification(db: any): AppNotification {
   };
 }
 
-export async function bootstrapNotifications() {
-  if (isBootstrapping) return;
-  if (snapshot.initialized) return;
+let bootstrapPromise: Promise<void> | null = null;
 
-  updateSnapshot({ loading: true });
-  isBootstrapping = true;
+export function bootstrapNotifications(): Promise<void> {
+  if (bootstrapPromise) {
+    return bootstrapPromise;
+  }
+  if (snapshot.initialized) {
+    return Promise.resolve();
+  }
 
-  const userId = currentUserId;
-  const storageKey = getStorageKey(userId);
+  bootstrapPromise = (async () => {
+    const userId = currentUserId;
+    const storageKey = getStorageKey(userId);
 
-  if (userId) {
-    try {
-      const { data, error } = await supabase
-        .from("notifications")
-        .select("*")
-        .eq("user_id", userId)
-        .order("occurred_at", { ascending: false });
+    if (userId) {
+      try {
+        const { data, error } = await supabase
+          .from("notifications")
+          .select("*")
+          .eq("user_id", userId)
+          .order("occurred_at", { ascending: false });
 
-      if (error) {
-        throw error;
+        if (error) {
+          throw error;
+        }
+
+        const mapped = (data || []).map(mapDbNotification);
+        updateSnapshot({
+          notifications: mapped,
+          initialized: true,
+          loading: false,
+        });
+        await AsyncStorage.setItem(storageKey, JSON.stringify(mapped));
+        return;
+      } catch (dbError) {
+        console.warn("Failed to load notifications from Supabase, falling back to local cache", dbError);
       }
-
-      const mapped = (data || []).map(mapDbNotification);
-      updateSnapshot({
-        notifications: mapped,
-        initialized: true,
-        loading: false,
-      });
-      await AsyncStorage.setItem(storageKey, JSON.stringify(mapped));
-      isBootstrapping = false;
-      return;
-    } catch (dbError) {
-      console.warn("Failed to load notifications from Supabase, falling back to local cache", dbError);
     }
-  }
 
-  try {
-    const raw = await AsyncStorage.getItem(storageKey);
-    if (raw) {
-      const parsed = JSON.parse(raw) as AppNotification[];
+    try {
+      const raw = await AsyncStorage.getItem(storageKey);
+      if (raw) {
+        const parsed = JSON.parse(raw) as AppNotification[];
+        updateSnapshot({
+          notifications: parsed,
+          initialized: true,
+          loading: false,
+        });
+      } else {
+        // Seed default/initial welcome notification for a clean start
+        const welcomeNotif: AppNotification = {
+          id: `welcome-${userId || "anon"}`,
+          type: "updates",
+          title: "Welcome to GolfTee!",
+          message: "Explore world-class signature courses and book tee times in seconds.",
+          occurredAt: new Date().toISOString(),
+          read: false,
+          icon: "checkmark-circle",
+          actionText: "Book Tee Time",
+          route: "/explore",
+        };
+        const welcomeList = [welcomeNotif];
+        await AsyncStorage.setItem(storageKey, JSON.stringify(welcomeList));
+        updateSnapshot({
+          notifications: welcomeList,
+          initialized: true,
+          loading: false,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to load notifications from AsyncStorage", error);
       updateSnapshot({
-        notifications: parsed,
-        initialized: true,
-        loading: false,
-      });
-    } else {
-      // Seed default/initial welcome notification for a clean start
-      const welcomeNotif: AppNotification = {
-        id: `welcome-${userId || "anon"}`,
-        type: "updates",
-        title: "Welcome to GolfTee!",
-        message: "Explore world-class signature courses and book tee times in seconds.",
-        occurredAt: new Date().toISOString(),
-        read: false,
-        icon: "checkmark-circle",
-        actionText: "Book Tee Time",
-        route: "/explore",
-      };
-      const welcomeList = [welcomeNotif];
-      await AsyncStorage.setItem(storageKey, JSON.stringify(welcomeList));
-      updateSnapshot({
-        notifications: welcomeList,
+        notifications: [],
         initialized: true,
         loading: false,
       });
     }
-  } catch (error) {
-    console.error("Failed to load notifications from AsyncStorage", error);
-    updateSnapshot({
-      notifications: [],
-      initialized: true,
-      loading: false,
-    });
-  } finally {
-    isBootstrapping = false;
-  }
+  })().finally(() => {
+    bootstrapPromise = null;
+  });
+
+  return bootstrapPromise;
 }
 
-// Subscribe to auth state changes to reload notifications when user changes.
-// Keep currentUserId in sync without calling async getSession() inside the callback to prevent deadlocks.
-supabase.auth.onAuthStateChange((_event, session) => {
-  const nextUserId = session?.user?.id ?? null;
-  if (nextUserId !== currentUserId) {
-    currentUserId = nextUserId;
+export function setNotificationsUser(userId: string | null) {
+  if (userId !== currentUserId) {
+    currentUserId = userId;
     // Force reload for the new user profile
     snapshot = {
       notifications: [],
@@ -190,6 +193,13 @@ supabase.auth.onAuthStateChange((_event, session) => {
     emitNotificationsChange();
     void bootstrapNotifications();
   }
+}
+
+// Subscribe to auth state changes to reload notifications when user changes.
+// Keep currentUserId in sync without calling async getSession() inside the callback to prevent deadlocks.
+supabase.auth.onAuthStateChange((_event, session) => {
+  const nextUserId = session?.user?.id ?? null;
+  setNotificationsUser(nextUserId);
 });
 
 async function saveNotifications(notifications: AppNotification[]) {

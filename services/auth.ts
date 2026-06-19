@@ -4,7 +4,7 @@ import type { Session } from "@supabase/supabase-js";
 import { useSyncExternalStore } from "react";
 import type { ProfileRow, ProfileUpdate } from "../lib/database.types";
 import { supabase, supabaseConfigurationError } from "../lib/supabase";
-import { addNotification } from "./notifications";
+import { addNotification, setNotificationsUser } from "./notifications";
 
 type AuthSnapshot = {
   initialized: boolean;
@@ -82,6 +82,7 @@ async function loadProfile(userId: string) {
 }
 
 async function applySession(session: Session | null) {
+  setNotificationsUser(session?.user?.id ?? null);
   updateSnapshot({
     initialized: true,
     isAuthenticated: Boolean(session),

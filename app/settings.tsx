@@ -4,13 +4,11 @@ import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
-  StyleSheet,
   Switch,
   Text,
   TextInput,
   View,
   Modal,
-  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -22,7 +20,6 @@ import { useAuthSession } from "../services/auth";
 import { useRouter } from "expo-router";
 
 function SectionHeader({ title, caption }: { title: string; caption?: string }) {
-  const { colors } = useAppTheme();
   const styles = useThemedStyles(themedStyles);
   return (
     <View style={styles.sectionHeader}>
@@ -45,7 +42,6 @@ export default function SettingsScreen() {
   const [bookingAlerts, setBookingAlerts] = useState(true);
   const [systemAlerts, setSystemAlerts] = useState(true);
   const [defaultPlayers, setDefaultPlayers] = useState(1);
-  const [defaultPayment, setDefaultPayment] = useState<"wallet" | "card">("wallet");
 
   // Modals state
   const [isPasswordModalVisible, setIsPasswordModalVisible] = useState(false);
@@ -71,7 +67,9 @@ export default function SettingsScreen() {
         if (playersVal !== null) setDefaultPlayers(parseInt(playersVal, 10));
 
         const payVal = await AsyncStorage.getItem("golftee:settings:default_payment");
-        if (payVal === "wallet" || payVal === "card") setDefaultPayment(payVal);
+        if (payVal === "wallet" || payVal === "card") {
+          // No-op or we can just load it if we need, but since state is removed we don't need to set it
+        }
       } catch (err) {
         console.warn("Failed to load settings from storage", err);
       }
@@ -95,10 +93,7 @@ export default function SettingsScreen() {
     await AsyncStorage.setItem("golftee:settings:default_players", String(count));
   };
 
-  const handleSelectDefaultPayment = async (method: "wallet" | "card") => {
-    setDefaultPayment(method);
-    await AsyncStorage.setItem("golftee:settings:default_payment", method);
-  };
+
 
   // Change Password
   const handleUpdatePassword = async () => {

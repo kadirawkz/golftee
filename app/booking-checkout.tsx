@@ -27,6 +27,32 @@ function getFirstParamValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
+interface PaymentMethod {
+  id: string;
+  type: "wallet" | "card";
+  brand: string;
+  last4: string;
+  expiry?: string;
+  cardholderName?: string;
+}
+
+const DEFAULT_METHODS: PaymentMethod[] = [
+  {
+    id: "default-wallet",
+    type: "wallet",
+    brand: Platform.OS === "ios" ? "Apple Pay" : "Google Pay",
+    last4: "",
+  },
+  {
+    id: "default-card",
+    type: "card",
+    brand: "Mastercard",
+    last4: "8829",
+    expiry: "08/25",
+    cardholderName: "Alex Morgan",
+  },
+];
+
 export default function BookingCheckoutScreen() {
   const { colors, resolvedTheme } = useAppTheme();
   const styles = useThemedStyles(themedStyles);
@@ -50,34 +76,8 @@ export default function BookingCheckoutScreen() {
     total?: string | string[];
   }>();
 
-  interface PaymentMethod {
-    id: string;
-    type: "wallet" | "card";
-    brand: string;
-    last4: string;
-    expiry?: string;
-    cardholderName?: string;
-  }
-
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [selectedPaymentId, setSelectedPaymentId] = useState<string>("");
-
-  const DEFAULT_METHODS: PaymentMethod[] = [
-    {
-      id: "default-wallet",
-      type: "wallet",
-      brand: Platform.OS === "ios" ? "Apple Pay" : "Google Pay",
-      last4: "",
-    },
-    {
-      id: "default-card",
-      type: "card",
-      brand: "Mastercard",
-      last4: "8829",
-      expiry: "08/25",
-      cardholderName: "Alex Morgan",
-    },
-  ];
 
   // Load preferred payment method from App Settings
   useEffect(() => {
@@ -139,9 +139,6 @@ export default function BookingCheckoutScreen() {
   const selectedDate = dateParam ?? "Not selected";
   const selectedTime = timeParam ? `${timeParam} ${periodParam ?? ""}`.trim() : "Not selected";
   const selectedDay = dayParam ?? "";
-  const walletPaymentLabel =
-    Platform.OS === "ios" ? "Apple Pay" : Platform.OS === "android" ? "Google Pay" : "Digital Wallet";
-  const walletPaymentBadge = Platform.OS === "ios" ? "iOS" : Platform.OS === "android" ? "GPay" : "Wallet";
   const isCompactScreen = width < 360;
   const isTabletLike = width >= 768;
   const horizontalPadding = isTabletLike ? Math.max((width - 620) / 2, 24) : isCompactScreen ? 12 : 16;

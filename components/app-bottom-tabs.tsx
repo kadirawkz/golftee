@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { usePathname, useRouter } from "expo-router";
 import { type ReactNode, useEffect } from "react";
-import { BackHandler, Platform, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { BackHandler, Platform, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "./animated-pressable";
 import { AppHeader } from "./app-header";
@@ -154,7 +154,7 @@ export function AppBottomTabs({ children }: AppBottomTabsProps) {
     });
 
     return () => subscription.remove();
-  }, [pathname]);
+  }, [pathname, router]);
 
   const handleHeaderBack = () => {
     if (pathname === "/login") {

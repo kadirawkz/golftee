@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { ScrollView, StyleSheet, Text, View, RefreshControl } from "react-native";
+import { ScrollView, Text, View, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { useResponsiveLayout } from "../hooks/useResponsiveLayout";

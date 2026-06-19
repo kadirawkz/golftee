@@ -183,7 +183,7 @@ export default function ProfileScreen() {
     } finally {
       setIsLoggingOut(false);
     }
-  }, [isLoggingOut, router]);
+  }, [isLoggingOut]);
   // Native calling and emailing triggers
   const handleCallConcierge = () => {
     Linking.openURL(SUPPORT.CONCIERGE_PHONE).catch(() => showToast("Device cannot place telephone calls"));

@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useCourseCatalog } from "../services/course-management";
 import { FavoriteCoursesSection } from "../components/favorite-courses-section";
@@ -10,7 +10,7 @@ import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
 import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../components/theme";
 
 export default function FavouritesScreen() {
-  const { colors, resolvedTheme } = useAppTheme();
+  const { resolvedTheme } = useAppTheme();
   const styles = useThemedStyles(themedStyles);
   const router = useRouter();
   const courseCatalog = useCourseCatalog();

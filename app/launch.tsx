@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Text, View } from "react-native";
 import { AppImage } from "../components/app-image";
 import { getIsLoggedIn } from "../services/auth";
 import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
