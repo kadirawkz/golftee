@@ -128,9 +128,7 @@ export default function Index() {
 
           {/* Logo & Title branding */}
           <Animated.View style={[styles.brandBlock, { transform: [{ translateY: logoTranslateY }] }]}>
-            <View style={styles.logoShell}>
-              <Image source={require("../assets/images/android-icon-foreground.png")} style={styles.logoImage} />
-            </View>
+            <Image source={require("../assets/images/splash-icon.png")} style={styles.logoImage} />
 
             <Text
               style={[
@@ -149,16 +147,6 @@ export default function Index() {
           <Animated.View style={[styles.carouselContainer, { opacity: Animated.multiply(fadeAnim, contentOpacity) }]}>
             <Text style={styles.carouselTitle}>{HIGHLIGHTS[slideIndex].title}</Text>
             <Text style={styles.carouselDesc}>{HIGHLIGHTS[slideIndex].desc}</Text>
-            
-            {/* Dots Indicator */}
-            <View style={styles.dotsRow}>
-              {HIGHLIGHTS.map((_, i) => (
-                <View
-                  key={i}
-                  style={[styles.indicatorDot, slideIndex === i && styles.indicatorDotActive]}
-                />
-              ))}
-            </View>
           </Animated.View>
 
           {/* Call To Actions */}

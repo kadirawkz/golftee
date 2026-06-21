@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
 import { useSyncExternalStore } from "react";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 
 // Configure how notifications are displayed when the app is in the foreground
@@ -47,6 +48,7 @@ let snapshot = DEFAULT_SNAPSHOT;
 const listeners = new Set<NotificationListener>();
 let currentUserId: string | null = null;
 let isBootstrapping = false;
+let realtimeChannel: RealtimeChannel | null = null;
 
 // Request notification permissions from the device
 export async function requestNotificationPermissions() {
@@ -191,6 +193,68 @@ export function setNotificationsUser(userId: string | null) {
       loading: false,
     };
     emitNotificationsChange();
+
+    if (realtimeChannel) {
+      void realtimeChannel.unsubscribe();
+      realtimeChannel = null;
+    }
+
+    if (userId) {
+      realtimeChannel = supabase
+        .channel(`notifications:${userId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "notifications",
+            filter: `user_id=eq.${userId}`,
+          },
+          (payload) => {
+            const { eventType, new: newRow, old: oldRow } = payload;
+            if (eventType === "INSERT" && newRow) {
+              const mapped = mapDbNotification(newRow);
+              if (!snapshot.notifications.some((n) => n.id === mapped.id)) {
+                const nextNotifications = [mapped, ...snapshot.notifications];
+                updateSnapshot({ notifications: nextNotifications });
+                void saveNotifications(nextNotifications);
+
+                // Show local system notification
+                void requestNotificationPermissions().then((hasPermission) => {
+                  if (hasPermission) {
+                    void Notifications.scheduleNotificationAsync({
+                      content: {
+                        title: mapped.title,
+                        body: mapped.message,
+                        data: {
+                          route: mapped.route,
+                          routeParams: mapped.routeParams,
+                        },
+                      },
+                      trigger: null,
+                    });
+                  }
+                });
+              }
+            } else if (eventType === "UPDATE" && newRow) {
+              const mapped = mapDbNotification(newRow);
+              const nextNotifications = snapshot.notifications.map((n) =>
+                n.id === mapped.id ? mapped : n
+              );
+              updateSnapshot({ notifications: nextNotifications });
+              void saveNotifications(nextNotifications);
+            } else if (eventType === "DELETE" && oldRow) {
+              const nextNotifications = snapshot.notifications.filter(
+                (n) => n.id !== oldRow.id
+              );
+              updateSnapshot({ notifications: nextNotifications });
+              void saveNotifications(nextNotifications);
+            }
+          }
+        )
+        .subscribe();
+    }
+
     void bootstrapNotifications();
   }
 }

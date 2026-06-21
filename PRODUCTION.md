@@ -54,6 +54,11 @@ Deploy the database schema, functions, constraints, and Row Level Security (RLS)
    ```
 4. **Seed Static Data (Locations, Courses, Tiers):**
    Apply [seed.sql](file:///d:/repos/golftee/supabase/seed.sql) to populate structural metadata. Ensure **no mock user records** are seeded into the production database.
+5. **Real-time Replication Enablement:**
+   Ensure the `supabase_realtime` publication is configured to include the `notifications` table so clients receive instant server updates:
+   ```sql
+   alter publication supabase_realtime add table public.notifications;
+   ```
 
 ### Security Reinforcement (Least Privilege)
 To safeguard user data, execute the revoke grants to restrict anonymous write access on structural catalog tables:

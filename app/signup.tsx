@@ -357,6 +357,8 @@ export default function SignupScreen() {
                   if (authNotice) setAuthNotice(null);
                 }}
                 editable={!isSubmitting}
+                returnKeyType="done"
+                onSubmitEditing={() => void handleSignup()}
                 accessibilityLabel="Username input"
                 accessibilityHint="Choose a unique username"
               />
@@ -384,6 +386,8 @@ export default function SignupScreen() {
                   if (authNotice) setAuthNotice(null);
                 }}
                 editable={!isSubmitting}
+                returnKeyType="done"
+                onSubmitEditing={() => void handleSignup()}
                 accessibilityLabel="Email Address input"
                 accessibilityHint="Enter your email address"
               />
@@ -409,6 +413,8 @@ export default function SignupScreen() {
                   if (authNotice) setAuthNotice(null);
                 }}
                 editable={!isSubmitting}
+                returnKeyType="done"
+                onSubmitEditing={() => void handleSignup()}
                 accessibilityLabel="Password input"
                 accessibilityHint="Create a strong password"
               />
@@ -434,6 +440,8 @@ export default function SignupScreen() {
                   if (authNotice) setAuthNotice(null);
                 }}
                 editable={!isSubmitting}
+                returnKeyType="done"
+                onSubmitEditing={() => void handleSignup()}
                 accessibilityLabel="Confirm Password input"
                 accessibilityHint="Re-enter your password"
               />
@@ -459,6 +467,8 @@ export default function SignupScreen() {
                   if (authNotice) setAuthNotice(null);
                 }}
                 editable={!isSubmitting}
+                returnKeyType="done"
+                onSubmitEditing={() => void handleSignup()}
                 accessibilityLabel="Handicap input, optional"
                 accessibilityHint="Enter a valid handicap between 0.0 and 54.0"
               />

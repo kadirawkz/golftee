@@ -1,6 +1,6 @@
 import type { NativeStackNavigationOptions } from "@react-navigation/native-stack";
 import { createContext, useContext, useEffect, useState } from "react";
-import { useColorScheme as useDeviceColorScheme, StyleSheet, ViewStyle, TextStyle, ImageStyle } from "react-native";
+import { useColorScheme as useDeviceColorScheme, StyleSheet, ViewStyle, TextStyle, ImageStyle, Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export type PressableMotionVariant = "button" | "cta" | "chip" | "card" | "icon" | "tab";
@@ -330,6 +330,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [themeMode, setThemeModeState] = useState<ThemeMode>("system");
   const [themeInitialized, setThemeInitialized] = useState(false);
   const deviceColorScheme = useDeviceColorScheme();
+  const [webColorScheme, setWebColorScheme] = useState<"light" | "dark">(() => {
+    if (Platform.OS === "web" && typeof window !== "undefined" && window.matchMedia) {
+      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    return "light";
+  });
 
   useEffect(() => {
     const loadTheme = async () => {
@@ -347,6 +353,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     void loadTheme();
   }, []);
 
+  useEffect(() => {
+    if (Platform.OS === "web" && typeof window !== "undefined" && window.matchMedia) {
+      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+      const handler = (e: MediaQueryListEvent) => {
+        setWebColorScheme(e.matches ? "dark" : "light");
+      };
+      mediaQuery.addEventListener("change", handler);
+      return () => mediaQuery.removeEventListener("change", handler);
+    }
+  }, []);
+
   const setThemeMode = async (mode: ThemeMode) => {
     setThemeModeState(mode);
     try {
@@ -356,7 +373,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const resolvedTheme = themeMode === "system" ? (deviceColorScheme ?? "light") : themeMode;
+  const resolvedTheme =
+    themeMode === "system"
+      ? Platform.OS === "web"
+        ? webColorScheme
+        : (deviceColorScheme ?? "light")
+      : themeMode;
   const colors = resolvedTheme === "dark" ? darkColors : lightColors;
 
   return (

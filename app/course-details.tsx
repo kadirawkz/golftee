@@ -449,7 +449,6 @@ export default function CourseDetailsScreen() {
             <View style={styles.experienceHeader}>
               <View style={styles.experienceTitleWrap}>
                 <Text style={styles.sectionTitle}>The Fairway Experience</Text>
-                <View style={styles.underline} />
               </View>
             </View>
             <Text style={styles.experienceText}>{experienceDescription}</Text>
@@ -529,18 +528,24 @@ export default function CourseDetailsScreen() {
       </ScrollView>
 
       <View
+        pointerEvents="box-none"
         style={[
           styles.floatingBooking,
           {
-            left: bookingHorizontalInset,
-            right: bookingHorizontalInset,
             bottom: bookingBottom,
             minHeight: bookingMinHeight,
           },
+          isTabletLike ? {
+            left: bookingHorizontalInset,
+            right: bookingHorizontalInset,
+          } : {
+            width: "86%",
+            maxWidth: 320,
+          }
         ]}
       >
-        <View style={[styles.bookingContent, isCompact && styles.bookingContentCompact]}>
-          <View style={styles.bookingPriceWrap}>
+        <View style={[styles.bookingContent, isCompact && styles.bookingContentCompact]} pointerEvents="box-none">
+          <View style={styles.bookingPriceWrap} pointerEvents="none">
             <Text style={styles.bookingLabel}>Starting at</Text>
             <Text style={styles.bookingPrice}>
               {course.price}
@@ -887,12 +892,6 @@ const themedStyles = createThemedStyleSheet((colors) => ({
   experienceTitleWrap: {
     gap: 4,
   },
-  underline: {
-    width: 50,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.accent,
-  },
   experienceText: {
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
@@ -1042,8 +1041,8 @@ const themedStyles = createThemedStyleSheet((colors) => ({
   },
   floatingBooking: {
     position: "absolute",
-    left: 16,
-    right: 16,
+    alignSelf: "center",
+    justifyContent: "center",
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 20,

@@ -210,7 +210,7 @@ export default function ProfileScreen() {
           <View style={styles.desktopLayoutRow}>
             <View style={styles.desktopColumnLeft}>
               {/* PREMIUM MINIMALIST PROFILE HEADER */}
-              <View style={styles.profileHeaderCard}>
+              <View style={[styles.profileHeaderCard, { marginHorizontal: 0 }]}>
                 <View style={styles.headerTopRow}>
                   <View style={styles.avatarWrapContainer}>
                     <Pressable style={styles.avatarWrap} onPress={() => router.navigate("/account")} variant="card">
@@ -686,11 +686,12 @@ export default function ProfileScreen() {
     paddingBottom: 160,
   },
   profileHeaderCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
     paddingHorizontal: 16,
     paddingVertical: 18,
     backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderColor: colors.borderSoft,
     marginBottom: 16,
   },
   headerTopRow: {
@@ -796,7 +797,6 @@ export default function ProfileScreen() {
     color: colors.textSoft,
   },
   statsPill: {
-    marginHorizontal: 16,
     borderRadius: 16,
     backgroundColor: colors.primarySoft,
     borderWidth: 1,
@@ -841,7 +841,6 @@ export default function ProfileScreen() {
     backgroundColor: colors.border,
   },
   handicapAdjusterWrap: {
-    marginHorizontal: 16,
     marginTop: -8,
     marginBottom: 20,
     backgroundColor: colors.primarySoft,
@@ -914,7 +913,6 @@ export default function ProfileScreen() {
     color: colors.surface,
   },
   metricsDashboardWrap: {
-    marginHorizontal: 16,
     backgroundColor: colors.surface,
     borderRadius: 16,
     borderWidth: 1,
@@ -1147,7 +1145,6 @@ export default function ProfileScreen() {
     letterSpacing: 0.5,
   },
   emptyBookingsCard: {
-    marginHorizontal: 16,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.borderSoft,
@@ -1171,12 +1168,11 @@ export default function ProfileScreen() {
     fontWeight: theme.typography.overline.fontWeight,
     letterSpacing: theme.typography.overline.letterSpacing,
     color: colors.muted,
-    marginHorizontal: 16,
+    marginHorizontal: 0,
     marginTop: 24,
     marginBottom: 10,
   },
   actionListContainer: {
-    marginHorizontal: 16,
     backgroundColor: colors.surface,
     borderRadius: 16,
     borderWidth: 1,

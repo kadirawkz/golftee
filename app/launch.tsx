@@ -36,9 +36,7 @@ export default function LaunchScreen() {
     <View style={styles.screen} accessibilityLabel="GolfTee app is loading" accessibilityRole="header">
       <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
       <View style={styles.logoContainer}>
-        <View style={styles.logoShell} accessibilityRole="image" accessibilityLabel="GolfTee logo">
-          <Image source={require("../assets/images/android-icon-foreground.png")} style={styles.logoImage} />
-        </View>
+        <Image source={require("../assets/images/splash-icon.png")} style={styles.logoImage} accessibilityRole="image" accessibilityLabel="GolfTee logo" />
         <Text
           style={[
             styles.logo,

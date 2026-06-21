@@ -123,6 +123,8 @@ export default function LoginScreen() {
                   if (authNotice) setAuthNotice(null);
                 }}
                 editable={!isSubmitting}
+                returnKeyType="done"
+                onSubmitEditing={() => void handleLogin()}
                 accessibilityLabel="Email Address input"
                 accessibilityHint="Enter your email address"
               />
@@ -148,6 +150,8 @@ export default function LoginScreen() {
                   if (authNotice) setAuthNotice(null);
                 }}
                 editable={!isSubmitting}
+                returnKeyType="done"
+                onSubmitEditing={() => void handleLogin()}
                 accessibilityLabel="Password input"
                 accessibilityHint="Enter your password"
               />

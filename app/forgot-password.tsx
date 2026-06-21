@@ -107,6 +107,8 @@ export default function ForgotPasswordScreen() {
                       setError(null);
                     }
                   }}
+                  returnKeyType="done"
+                  onSubmitEditing={() => void handleSendResetLink()}
                 />
               </View>
             </View>

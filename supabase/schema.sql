@@ -903,3 +903,7 @@ create policy "Users can delete their own notifications"
 grant select, insert, update, delete on table public.notifications to authenticated;
 grant select, insert, update, delete on table public.notifications to service_role;
 
+-- Enable Realtime replication for notifications
+alter publication supabase_realtime add table public.notifications;
+
+

@@ -14,6 +14,7 @@ It uses Supabase for authentication, profiles, favorites, course catalog data, t
 - Server-calculated booking pricing and backend-enforced slot validation
 - Supabase-backed course catalog and tee-slot templates (read-only from client)
 - Supabase-backed course detail content, amenities, and reviews
+- Real-time notifications synced instantly across devices using Supabase Realtime
 
 ## Tech stack
 
@@ -104,7 +105,6 @@ Before pushing, confirm:
 The following are intentionally out of scope for this phase:
 
 - Payments
-- Notifications
 - Media/file uploads
 - Analytics and advanced monitoring
 - Admin workflows requiring server-side secrets
