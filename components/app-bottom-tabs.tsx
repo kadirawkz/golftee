@@ -262,7 +262,7 @@ export function AppBottomTabs({ children }: AppBottomTabsProps) {
             {showNotificationsPanel && (
               <TouchableWithoutFeedback onPress={() => setShowNotificationsPanel(false)}>
                 <View style={{
-                  position: Platform.OS === "web" ? "fixed" : "absolute",
+                  position: (Platform.OS === "web" ? "fixed" : "absolute") as any,
                   top: Platform.OS === "web" ? 0 : -2000,
                   left: Platform.OS === "web" ? 0 : -2000,
                   right: Platform.OS === "web" ? 0 : -2000,
@@ -467,7 +467,7 @@ export function AppBottomTabs({ children }: AppBottomTabsProps) {
                   {/* Local Backdrop for account popup menu */}
                   <TouchableWithoutFeedback onPress={() => setShowAccountMenu(false)}>
                     <View style={{
-                      position: Platform.OS === "web" ? "fixed" : "absolute",
+                      position: (Platform.OS === "web" ? "fixed" : "absolute") as any,
                       top: Platform.OS === "web" ? 0 : -2000,
                       left: Platform.OS === "web" ? 0 : -2000,
                       right: Platform.OS === "web" ? 0 : -2000,
