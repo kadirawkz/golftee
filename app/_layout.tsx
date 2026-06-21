@@ -2,7 +2,8 @@ import "../utils/ignore-warnings";
 import { Stack, usePathname, useRouter } from "expo-router";
 import * as NavigationBar from "expo-navigation-bar";
 import * as SystemUI from "expo-system-ui";
-import { useEffect, useRef, useState } from "react";
+import * as SplashScreen from "expo-splash-screen";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -10,6 +11,8 @@ import { AppBottomTabs } from "../components/app-bottom-tabs";
 import { ensureAuthReady, useAuthSession } from "../services/auth";
 import { refreshCourseCatalog } from "../services/course-management";
 import { theme, ThemeProvider, useAppTheme } from "../components/theme";
+
+void SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   return (
@@ -23,7 +26,7 @@ function RootLayoutContent() {
   const router = useRouter();
   const pathname = usePathname();
   const auth = useAuthSession();
-  const { colors, resolvedTheme } = useAppTheme();
+  const { colors, resolvedTheme, themeInitialized } = useAppTheme();
   const [isReady, setIsReady] = useState(false);
   const routerRef = useRef(router);
   const systemBackground = theme.system.getBackground(pathname, colors);
@@ -83,7 +86,13 @@ function RootLayoutContent() {
     return () => clearTimeout(timer);
   }, [auth.initialized, auth.isAuthenticated, pathname]);
 
-  if (!isReady || !auth.initialized) {
+  const onLayoutRootView = useCallback(async () => {
+    if (isReady && auth.initialized && themeInitialized) {
+      await SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [isReady, auth.initialized, themeInitialized]);
+
+  if (!isReady || !auth.initialized || !themeInitialized) {
     return <View style={[styles.fallback, { backgroundColor: systemBackground }]} />;
   }
 
@@ -115,7 +124,30 @@ function RootLayoutContent() {
   return (
     <SafeAreaProvider>
       <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
-      <View style={[styles.root, { backgroundColor: systemBackground }]}>
+      {Platform.OS === "web" && (
+        <style dangerouslySetInnerHTML={{ __html: `
+          /* Custom styled scrollbars for a premium look */
+          ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+          }
+          ::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          ::-webkit-scrollbar-thumb {
+            background: ${resolvedTheme === 'dark' ? 'rgba(255, 255, 255, 0.22)' : 'rgba(0, 0, 0, 0.18)'};
+            border-radius: 999px;
+          }
+          ::-webkit-scrollbar-thumb:hover {
+            background: ${resolvedTheme === 'dark' ? 'rgba(255, 255, 255, 0.35)' : 'rgba(0, 0, 0, 0.3)'};
+          }
+          * {
+            scrollbar-width: thin;
+            scrollbar-color: ${resolvedTheme === 'dark' ? 'rgba(255, 255, 255, 0.22) transparent' : 'rgba(0, 0, 0, 0.18) transparent'};
+          }
+        `}} />
+      )}
+      <View style={[styles.root, { backgroundColor: systemBackground }]} onLayout={onLayoutRootView}>
         <AppBottomTabs>{stack}</AppBottomTabs>
       </View>
     </SafeAreaProvider>

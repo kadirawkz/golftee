@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useMemo, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Platform,  ActivityIndicator, ScrollView, StyleSheet, Text, View  } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
@@ -33,7 +33,7 @@ export default function ManageBookingScreen() {
   const { colors, resolvedTheme } = useAppTheme();
   const styles = useThemedStyles(themedStyles);
   const router = useRouter();
-  const { horizontalPadding, screenBottomPadding } = useResponsiveLayout();
+  const { horizontalPadding, screenBottomPadding, isTabletLike, maxContentWidth } = useResponsiveLayout();
   const { bookingId } = useLocalSearchParams<{ bookingId?: string | string[] }>();
   const resolvedBookingId = Array.isArray(bookingId) ? bookingId[0] : bookingId;
   const bookingState = useBookingState();
@@ -89,12 +89,146 @@ export default function ManageBookingScreen() {
     );
   }
 
+  const renderHeroSection = () => (
+    <View style={styles.heroCard}>
+      <AppImage source={getCourseImage(course.image)} style={styles.heroImage} />
+      <View style={styles.heroOverlay} />
+      <View style={styles.heroContent}>
+        <View style={styles.confirmedPill}>
+          <Text style={styles.confirmedPillText}>{booking.status.toUpperCase()}</Text>
+        </View>
+        <Text style={styles.heroTitle}>{course.title}</Text>
+        <Text style={styles.heroSubtitle}>Booking code {booking.booking_code}</Text>
+      </View>
+    </View>
+  );
+
+  const renderDetailsSection = () => (
+    <>
+      <View style={styles.metaGrid}>
+        <View style={styles.metaCard}>
+          <Ionicons name="calendar-outline" size={22} color={colors.primary} />
+          <Text style={styles.metaTitle}>DATE</Text>
+          <Text style={styles.metaMain}>{formatBookingDate(booking.tee_date)}</Text>
+        </View>
+
+        <View style={styles.metaCard}>
+          <Ionicons name="time-outline" size={22} color={colors.primary} />
+          <Text style={styles.metaTitle}>TEE TIME</Text>
+          <Text style={styles.metaMain}>{formatBookingTime(booking.tee_time)}</Text>
+        </View>
+      </View>
+
+      <View style={styles.partyCard}>
+        <View>
+          <Text style={styles.metaTitle}>PARTY SIZE</Text>
+          <Text style={styles.metaMain}>{booking.players} Players</Text>
+        </View>
+        <View style={styles.avatarRow}>
+          {Array.from({ length: visiblePlayerBubbles }).map((_, index) => {
+            if (index === PARTY_BUBBLE_STYLES.length && overflowPlayers > 0) {
+              return (
+                <View key={`overflow-${overflowPlayers}`} style={[styles.avatarBubble, styles.avatarMore]}>
+                  <Text style={styles.avatarMoreText}>{`+${overflowPlayers}`}</Text>
+                </View>
+              );
+            }
+
+            const bubbleStyle = PARTY_BUBBLE_STYLES[index] ?? PARTY_BUBBLE_STYLES[PARTY_BUBBLE_STYLES.length - 1];
+            return <View key={`player-${index + 1}`} style={[styles.avatarBubble, styles[bubbleStyle]]} />;
+          })}
+        </View>
+      </View>
+    </>
+  );
+
+  const renderQrSection = () => (
+    <View style={styles.qrSection}>
+      <Text style={styles.qrTitle}>Check-in at Pro Shop</Text>
+      <Text style={styles.qrSubtitle}>Scan this code upon arrival to confirm your tee time.</Text>
+      <View style={styles.qrImageWrap}>
+        <AppImage source={{ uri: CHECKIN_QR_IMAGE }} style={styles.qrImage} />
+      </View>
+      <Text style={styles.qrId}>ID: {booking.booking_code}</Text>
+    </View>
+  );
+
+  const renderPriceSection = () => (
+    <View style={styles.priceCard}>
+      <Text style={styles.priceTitle}>Booking Costs</Text>
+      <Text style={styles.priceRow}>Green Fees: ${booking.green_fee.toFixed(2)}</Text>
+      <Text style={styles.priceRow}>Service Fee: ${booking.service_fee.toFixed(2)}</Text>
+      <Text style={styles.priceRow}>Caddy Fee: ${booking.caddy_fee.toFixed(2)}</Text>
+      <Text style={styles.priceRow}>Taxes: ${booking.taxes.toFixed(2)}</Text>
+      <Text style={styles.priceTotal}>Total: ${getBookingTotal(booking).toFixed(2)}</Text>
+    </View>
+  );
+
+  const renderActionsSection = () => (
+    <View style={styles.actionList}>
+      <Pressable style={styles.primaryAction} variant="cta">
+        <Ionicons name="calendar-outline" size={22} color={colors.surface} />
+        <Text style={styles.primaryActionText}>Add to Calendar</Text>
+      </Pressable>
+
+      <Pressable
+        style={styles.secondaryAction}
+        onPress={() =>
+          router.navigate({
+            pathname: "/tee-time-booking",
+            params: { bookingId: booking.id, id: course.id },
+          })
+        }
+        disabled={!canModifyBooking}
+        variant="button"
+      >
+        <Ionicons name="create-outline" size={22} color={colors.primary} />
+        <Text style={styles.secondaryActionText}>{canModifyBooking ? "Modify Booking" : "Booking Locked"}</Text>
+      </Pressable>
+
+      <Pressable
+        style={styles.dangerAction}
+        onPress={() => void handleCancelBooking()}
+        disabled={isCancelling || !canCancelBooking}
+        variant="button"
+      >
+        {isCancelling ? (
+          <ActivityIndicator size="small" color={colors.danger} />
+        ) : (
+          <Ionicons name="close-circle" size={22} color={colors.danger} />
+        )}
+        <Text style={styles.dangerActionText}>
+          {!canCancelBooking ? "Cancellation Closed" : "Cancel Reservation"}
+        </Text>
+      </Pressable>
+    </View>
+  );
+
+  const renderCourseDetailsLink = () => (
+    <Pressable
+      style={styles.detailsCard}
+      onPress={() => router.navigate({ pathname: "/course-details", params: { id: course.id } })}
+      variant="card"
+    >
+      <View style={styles.detailsLeft}>
+        <View style={styles.detailsIconWrap}>
+          <Ionicons name="information-circle" size={22} color={colors.primary} />
+        </View>
+        <View>
+          <Text style={styles.detailsTitle}>Course Details</Text>
+          <Text style={styles.detailsSubtitle}>Directions, amenities, and course rules</Text>
+        </View>
+      </View>
+      <Ionicons name="chevron-forward" size={20} color={colors.textSoft} />
+    </Pressable>
+  );
+
   return (
     <SafeAreaView style={styles.screen} edges={["bottom"]}>
       <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
 
       <ScrollView
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator={Platform.OS === "web"}
         contentContainerStyle={[
           styles.scrollContent,
           { paddingHorizontal: horizontalPadding, paddingBottom: screenBottomPadding },
@@ -102,130 +236,40 @@ export default function ManageBookingScreen() {
         bounces={false}
         overScrollMode="never"
       >
-        <View style={styles.heroCard}>
-          <AppImage source={getCourseImage(course.image)} style={styles.heroImage} />
-          <View style={styles.heroOverlay} />
-          <View style={styles.heroContent}>
-            <View style={styles.confirmedPill}>
-              <Text style={styles.confirmedPillText}>{booking.status.toUpperCase()}</Text>
+        <View style={[styles.contentBlock, { maxWidth: maxContentWidth }]}>
+          {isTabletLike ? (
+            <View style={styles.desktopLayoutRow}>
+              <View style={styles.desktopColumnLeft}>
+                {renderHeroSection()}
+                {renderDetailsSection()}
+                {renderQrSection()}
+              </View>
+
+              <View style={styles.desktopColumnRight}>
+                {renderPriceSection()}
+                {notice ? <Text style={styles.noticeText}>{notice}</Text> : null}
+                {!canModifyBooking && booking.status === "confirmed" ? (
+                  <Text style={styles.noticeText}>This booking is now read-only because the tee time has passed.</Text>
+                ) : null}
+                {renderActionsSection()}
+                {renderCourseDetailsLink()}
+              </View>
             </View>
-            <Text style={styles.heroTitle}>{course.title}</Text>
-            <Text style={styles.heroSubtitle}>Booking code {booking.booking_code}</Text>
-          </View>
+          ) : (
+            <>
+              {renderHeroSection()}
+              {renderDetailsSection()}
+              {renderQrSection()}
+              {renderPriceSection()}
+              {notice ? <Text style={styles.noticeText}>{notice}</Text> : null}
+              {!canModifyBooking && booking.status === "confirmed" ? (
+                <Text style={styles.noticeText}>This booking is now read-only because the tee time has passed.</Text>
+              ) : null}
+              {renderActionsSection()}
+              {renderCourseDetailsLink()}
+            </>
+          )}
         </View>
-
-        <View style={styles.metaGrid}>
-          <View style={styles.metaCard}>
-            <Ionicons name="calendar-outline" size={22} color={colors.primary} />
-            <Text style={styles.metaTitle}>DATE</Text>
-            <Text style={styles.metaMain}>{formatBookingDate(booking.tee_date)}</Text>
-          </View>
-
-          <View style={styles.metaCard}>
-            <Ionicons name="time-outline" size={22} color={colors.primary} />
-            <Text style={styles.metaTitle}>TEE TIME</Text>
-            <Text style={styles.metaMain}>{formatBookingTime(booking.tee_time)}</Text>
-          </View>
-        </View>
-
-        <View style={styles.partyCard}>
-          <View>
-            <Text style={styles.metaTitle}>PARTY SIZE</Text>
-            <Text style={styles.metaMain}>{booking.players} Players</Text>
-          </View>
-          <View style={styles.avatarRow}>
-            {Array.from({ length: visiblePlayerBubbles }).map((_, index) => {
-              if (index === PARTY_BUBBLE_STYLES.length && overflowPlayers > 0) {
-                return (
-                  <View key={`overflow-${overflowPlayers}`} style={[styles.avatarBubble, styles.avatarMore]}>
-                    <Text style={styles.avatarMoreText}>{`+${overflowPlayers}`}</Text>
-                  </View>
-                );
-              }
-
-              const bubbleStyle = PARTY_BUBBLE_STYLES[index] ?? PARTY_BUBBLE_STYLES[PARTY_BUBBLE_STYLES.length - 1];
-              return <View key={`player-${index + 1}`} style={[styles.avatarBubble, styles[bubbleStyle]]} />;
-            })}
-          </View>
-        </View>
-
-        <View style={styles.qrSection}>
-          <Text style={styles.qrTitle}>Check-in at Pro Shop</Text>
-          <Text style={styles.qrSubtitle}>Scan this code upon arrival to confirm your tee time.</Text>
-          <View style={styles.qrImageWrap}>
-            <AppImage source={{ uri: CHECKIN_QR_IMAGE }} style={styles.qrImage} />
-          </View>
-          <Text style={styles.qrId}>ID: {booking.booking_code}</Text>
-        </View>
-
-        <View style={styles.priceCard}>
-          <Text style={styles.priceTitle}>Booking Costs</Text>
-          <Text style={styles.priceRow}>Green Fees: ${booking.green_fee.toFixed(2)}</Text>
-          <Text style={styles.priceRow}>Service Fee: ${booking.service_fee.toFixed(2)}</Text>
-          <Text style={styles.priceRow}>Caddy Fee: ${booking.caddy_fee.toFixed(2)}</Text>
-          <Text style={styles.priceRow}>Taxes: ${booking.taxes.toFixed(2)}</Text>
-          <Text style={styles.priceTotal}>Total: ${getBookingTotal(booking).toFixed(2)}</Text>
-        </View>
-
-        {notice ? <Text style={styles.noticeText}>{notice}</Text> : null}
-        {!canModifyBooking && booking.status === "confirmed" ? (
-          <Text style={styles.noticeText}>This booking is now read-only because the tee time has passed.</Text>
-        ) : null}
-
-        <View style={styles.actionList}>
-          <Pressable style={styles.primaryAction} variant="cta">
-            <Ionicons name="calendar-outline" size={22} color={colors.surface} />
-            <Text style={styles.primaryActionText}>Add to Calendar</Text>
-          </Pressable>
-
-          <Pressable
-            style={styles.secondaryAction}
-            onPress={() =>
-              router.navigate({
-                pathname: "/tee-time-booking",
-                params: { bookingId: booking.id, id: course.id },
-              })
-            }
-            disabled={!canModifyBooking}
-            variant="button"
-          >
-            <Ionicons name="create-outline" size={22} color={colors.primary} />
-            <Text style={styles.secondaryActionText}>{canModifyBooking ? "Modify Booking" : "Booking Locked"}</Text>
-          </Pressable>
-
-          <Pressable
-            style={styles.dangerAction}
-            onPress={() => void handleCancelBooking()}
-            disabled={isCancelling || !canCancelBooking}
-            variant="button"
-          >
-            {isCancelling ? (
-              <ActivityIndicator size="small" color={colors.danger} />
-            ) : (
-              <Ionicons name="close-circle" size={22} color={colors.danger} />
-            )}
-            <Text style={styles.dangerActionText}>
-              {!canCancelBooking ? "Cancellation Closed" : "Cancel Reservation"}
-            </Text>
-          </Pressable>
-        </View>
-
-        <Pressable
-          style={styles.detailsCard}
-          onPress={() => router.navigate({ pathname: "/course-details", params: { id: course.id } })}
-          variant="card"
-        >
-          <View style={styles.detailsLeft}>
-            <View style={styles.detailsIconWrap}>
-              <Ionicons name="information-circle" size={22} color={colors.primary} />
-            </View>
-            <View>
-              <Text style={styles.detailsTitle}>Course Details</Text>
-              <Text style={styles.detailsSubtitle}>Directions, amenities, and course rules</Text>
-            </View>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.textSoft} />
-        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -534,5 +578,25 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
     marginTop: 1,
+  },
+  contentBlock: {
+    width: "100%",
+    alignItems: "center",
+  },
+  desktopLayoutRow: {
+    flexDirection: "row",
+    gap: 24,
+    width: "100%",
+    alignItems: "flex-start",
+  },
+  desktopColumnLeft: {
+    flex: 1.2,
+    gap: 16,
+    width: "100%",
+  },
+  desktopColumnRight: {
+    flex: 1,
+    gap: 16,
+    width: "100%",
   },
 }));

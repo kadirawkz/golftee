@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
-import { Animated, Dimensions, StyleSheet, Text, View } from "react-native";
+import { Animated, Dimensions, Image, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
@@ -101,7 +101,7 @@ export default function Index() {
       <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
 
       <View style={styles.background}>
-        <AppImage source={require("../assets/images/get-started-background.jpg")} style={styles.backgroundImage} />
+        <AppImage source={require("../assets/images/get-started-background.webp")} style={styles.backgroundImage} />
         <View style={[
           styles.dimLayer,
           { backgroundColor: resolvedTheme === "dark" ? "rgba(7, 32, 24, 0.78)" : "rgba(244, 248, 246, 0.78)" }
@@ -129,7 +129,7 @@ export default function Index() {
           {/* Logo & Title branding */}
           <Animated.View style={[styles.brandBlock, { transform: [{ translateY: logoTranslateY }] }]}>
             <View style={styles.logoShell}>
-              <AppImage source={require("../assets/images/icon.png")} style={styles.logoImage} />
+              <Image source={require("../assets/images/icon.png")} style={styles.logoImage} />
             </View>
 
             <Text
@@ -331,16 +331,22 @@ const themedStyles = createThemedStyleSheet((colors) => ({
   },
   bottomArea: {
     marginBottom: 16,
+    width: "100%",
+    alignItems: "center",
   },
   loggedActionsWrap: {
     width: "100%",
     gap: 12,
+    alignItems: "center",
   },
   ctaButton: {
     height: 54,
     borderRadius: theme.radius.pill,
     alignItems: "center",
     justifyContent: "center",
+    width: "100%",
+    maxWidth: 320,
+    alignSelf: "center",
   },
   primaryCta: {
     backgroundColor: colors.primary,

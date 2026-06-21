@@ -4,6 +4,7 @@ import { AnimatedPressable as Pressable } from "./animated-pressable";
 import { AppImage } from "./app-image";
 import { getCourseImage } from "../lib/image-mapping";
 import { createThemedStyleSheet, useThemedStyles, useAppTheme } from "./theme";
+import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
 
 type CourseCardProps = {
   title: string;
@@ -43,6 +44,7 @@ export function CourseCard({
   const { colors } = useAppTheme();
   const styles = useThemedStyles(themedStyles);
   const isSmallCompact = variant === "compact" && size === "small";
+  const { isTabletLike } = useResponsiveLayout();
 
   const resolvedActionIconColor = compactActionIconColor ?? colors.text;
 
@@ -57,7 +59,7 @@ export function CourseCard({
     <>
       {variant === "featured" ? (
         <>
-          <View style={styles.featuredImageWrap}>
+          <View style={[styles.featuredImageWrap, isTabletLike && { height: 240 }]}>
             <AppImage source={getCourseImage(image)} style={styles.image} />
             <View style={styles.imageOverlay} />
             <View style={styles.featuredChipRow}>

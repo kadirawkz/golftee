@@ -2,12 +2,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
-import {
+import { Image,
+    Platform, 
     ScrollView,
     Text,
     TextInput,
     View,
-} from "react-native";
+ } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { sendPasswordResetEmail } from "../services/auth";
@@ -22,7 +23,7 @@ export default function ForgotPasswordScreen() {
   const { colors, resolvedTheme } = useAppTheme();
   const styles = useThemedStyles(themedStyles);
   const router = useRouter();
-  const { horizontalPadding, screenBottomPadding } = useResponsiveLayout();
+  const { horizontalPadding, screenBottomPadding, isTabletLike } = useResponsiveLayout();
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -69,118 +70,160 @@ export default function ForgotPasswordScreen() {
     setError(null);
   };
 
+  const forgotForm = (
+    <View style={isTabletLike ? { width: "100%", maxWidth: 420 } : undefined}>
+      <View style={styles.heroCard}>
+        <Text style={styles.eyebrow}>{heroEyebrow}</Text>
+        <Text style={styles.subtitle}>{heroSubtitle}</Text>
+      </View>
+
+      <View style={styles.panel}>
+        {!isResetSent ? (
+          <>
+            <View style={styles.infoCard}>
+              <View style={styles.infoIconWrap}>
+                <Ionicons name="mail-open-outline" size={18} color={colors.primary} />
+              </View>
+              <Text style={styles.infoText}>
+                We will send reset instructions to the email used for your GolfTee account.
+              </Text>
+            </View>
+
+            <View style={styles.inputShell}>
+              <Text style={[styles.inputLabel, error && styles.inputLabelError]}>EMAIL ADDRESS</Text>
+              <View style={styles.inputRow}>
+                <Ionicons name="mail-outline" size={18} color={colors.muted} />
+                <TextInput
+                  placeholder="name@example.com"
+                  placeholderTextColor={colors.muted}
+                  style={[styles.inputField, error && styles.inputFieldError]}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  value={email}
+                  onChangeText={(text) => {
+                    setEmail(text);
+                    if (error) {
+                      setError(null);
+                    }
+                  }}
+                />
+              </View>
+            </View>
+
+            {error ? (
+              <View style={styles.errorRow}>
+                <View style={styles.errorDot} />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
+
+            <Pressable
+              style={styles.primaryButton}
+              onPress={() => void handleSendResetLink()}
+              disabled={isSubmitting}
+              variant="cta"
+            >
+              <Text style={styles.primaryButtonText}>
+                {isSubmitting ? "Sending Link..." : "Send Reset Link"}
+              </Text>
+              <Ionicons name="arrow-forward" size={20} color={colors.surface} />
+            </Pressable>
+          </>
+        ) : (
+          <>
+            <View style={styles.successCard}>
+              <View style={styles.successIconWrap}>
+                <Ionicons name="checkmark-circle" size={28} color={colors.successText} />
+              </View>
+              <Text style={styles.successTitle}>Reset Instructions Sent</Text>
+              <Text style={styles.successText}>
+                If your email is registered, you will receive a password reset link shortly.
+              </Text>
+              <View style={styles.successMeta}>
+                <Text style={styles.successMetaLabel}>EMAIL</Text>
+                <Text style={styles.successMetaValue}>{email}</Text>
+              </View>
+            </View>
+
+            <Pressable style={styles.primaryButton} onPress={() => router.replace("/login")} variant="cta">
+              <Text style={styles.primaryButtonText}>Back to Login</Text>
+              <Ionicons name="arrow-forward" size={20} color={colors.surface} />
+            </Pressable>
+
+            <Pressable style={styles.secondaryButton} onPress={handleTryAnotherEmail} variant="button">
+              <Text style={styles.secondaryButtonText}>Use Another Email</Text>
+            </Pressable>
+          </>
+        )}
+      </View>
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
       <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
 
-      <View style={styles.authTopBar}>
-        <Pressable style={styles.authBackButton} onPress={() => router.replace("/login")} variant="icon">
-          <Ionicons name="arrow-back" size={22} color={colors.primary} />
-        </Pressable>
-        <Text style={styles.authTopTitle}>{title}</Text>
-        <View style={styles.authTopSpacer} />
-      </View>
-
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[
-          styles.contentContainer,
-          { paddingHorizontal: horizontalPadding, paddingBottom: Math.max(screenBottomPadding - 8, 120) },
-        ]}
-        showsVerticalScrollIndicator={false}
-        bounces={false}
-        overScrollMode="never"
-        keyboardShouldPersistTaps="handled"
-        contentInsetAdjustmentBehavior="never"
-        automaticallyAdjustContentInsets={false}
-        automaticallyAdjustKeyboardInsets={false}
-      >
-        <View style={styles.heroCard}>
-          <Text style={styles.eyebrow}>{heroEyebrow}</Text>
-          <Text style={styles.subtitle}>{heroSubtitle}</Text>
-        </View>
-
-        <View style={styles.panel}>
-          {!isResetSent ? (
-            <>
-              <View style={styles.infoCard}>
-                <View style={styles.infoIconWrap}>
-                  <Ionicons name="mail-open-outline" size={18} color={colors.primary} />
-                </View>
-                <Text style={styles.infoText}>
-                  We will send reset instructions to the email used for your GolfTee account.
-                </Text>
-              </View>
-
-              <View style={styles.inputShell}>
-                <Text style={[styles.inputLabel, error && styles.inputLabelError]}>EMAIL ADDRESS</Text>
-                <View style={styles.inputRow}>
-                  <Ionicons name="mail-outline" size={18} color={colors.muted} />
-                  <TextInput
-                    placeholder="name@example.com"
-                    placeholderTextColor={colors.muted}
-                    style={[styles.inputField, error && styles.inputFieldError]}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    value={email}
-                    onChangeText={(text) => {
-                      setEmail(text);
-                      if (error) {
-                        setError(null);
-                      }
-                    }}
-                  />
-                </View>
-              </View>
-
-              {error ? (
-                <View style={styles.errorRow}>
-                  <View style={styles.errorDot} />
-                  <Text style={styles.errorText}>{error}</Text>
-                </View>
-              ) : null}
-
+      {isTabletLike ? (
+        <View style={styles.desktopContainer}>
+          <View style={styles.desktopHeroCol}>
+            <View style={styles.logoCircleLarge}>
+              <Image source={require("../assets/images/icon.png")} style={styles.logoImageLarge} />
+            </View>
+            <Text style={styles.desktopBrandingTitle}>GolfTee</Text>
+            <Text style={styles.desktopBrandingDesc}>
+              {"Sri Lanka's Premier Tee Time Booking and Course Management Platform"}
+            </Text>
+          </View>
+          <View style={styles.desktopFormCol}>
+            <View style={styles.desktopHeaderRow}>
               <Pressable
-                style={styles.primaryButton}
-                onPress={() => void handleSendResetLink()}
-                disabled={isSubmitting}
-                variant="cta"
+                style={styles.authBackButton}
+                onPress={() => router.replace("/login")}
+                variant="icon"
               >
-                <Text style={styles.primaryButtonText}>
-                  {isSubmitting ? "Sending Link..." : "Send Reset Link"}
-                </Text>
-                <Ionicons name="arrow-forward" size={20} color={colors.surface} />
+                <Ionicons name="arrow-back" size={22} color={colors.primary} />
               </Pressable>
-            </>
-          ) : (
-            <>
-              <View style={styles.successCard}>
-                <View style={styles.successIconWrap}>
-                  <Ionicons name="checkmark-circle" size={28} color={colors.successText} />
-                </View>
-                <Text style={styles.successTitle}>Reset Instructions Sent</Text>
-                <Text style={styles.successText}>
-                  If your email is registered, you will receive a password reset link shortly.
-                </Text>
-                <View style={styles.successMeta}>
-                  <Text style={styles.successMetaLabel}>EMAIL</Text>
-                  <Text style={styles.successMetaValue}>{email}</Text>
-                </View>
-              </View>
-
-              <Pressable style={styles.primaryButton} onPress={() => router.replace("/login")} variant="cta">
-                <Text style={styles.primaryButtonText}>Back to Login</Text>
-                <Ionicons name="arrow-forward" size={20} color={colors.surface} />
-              </Pressable>
-
-              <Pressable style={styles.secondaryButton} onPress={handleTryAnotherEmail} variant="button">
-                <Text style={styles.secondaryButtonText}>Use Another Email</Text>
-              </Pressable>
-            </>
-          )}
+            </View>
+            <ScrollView
+              style={styles.scroll}
+              contentContainerStyle={styles.desktopScrollContent}
+              showsVerticalScrollIndicator={Platform.OS === "web"}
+              bounces={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {forgotForm}
+            </ScrollView>
+          </View>
         </View>
-      </ScrollView>
+      ) : (
+        <>
+          <View style={styles.authTopBar}>
+            <Pressable style={styles.authBackButton} onPress={() => router.replace("/login")} variant="icon">
+              <Ionicons name="arrow-back" size={22} color={colors.primary} />
+            </Pressable>
+            <Text style={styles.authTopTitle}>{title}</Text>
+            <View style={styles.authTopSpacer} />
+          </View>
+
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={[
+              styles.contentContainer,
+              { paddingHorizontal: horizontalPadding, paddingBottom: Math.max(screenBottomPadding - 8, 120) },
+            ]}
+            showsVerticalScrollIndicator={Platform.OS === "web"}
+            bounces={false}
+            overScrollMode="never"
+            keyboardShouldPersistTaps="handled"
+            contentInsetAdjustmentBehavior="never"
+            automaticallyAdjustContentInsets={false}
+            automaticallyAdjustKeyboardInsets={false}
+          >
+            {forgotForm}
+          </ScrollView>
+        </>
+      )}
     </SafeAreaView>
   );
 }
@@ -415,5 +458,66 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     lineHeight: theme.typography.subtitle.lineHeight,
     color: colors.text,
     fontWeight: "700",
+  },
+  desktopContainer: {
+    flex: 1,
+    flexDirection: "row",
+  },
+  desktopHeroCol: {
+    flex: 1.1,
+    backgroundColor: colors.surfaceSoft,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 40,
+    borderRightWidth: 1,
+    borderColor: colors.border,
+  },
+  logoCircleLarge: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.surface,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 20,
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 3,
+  },
+  logoImageLarge: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  desktopBrandingTitle: {
+    fontSize: 32,
+    fontWeight: "900",
+    color: colors.text,
+    marginBottom: 12,
+  },
+  desktopBrandingDesc: {
+    fontSize: 16,
+    color: colors.textSoft,
+    textAlign: "center",
+    maxWidth: 380,
+    lineHeight: 24,
+  },
+  desktopFormCol: {
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 40,
+  },
+  desktopScrollContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 40,
+  },
+  desktopHeaderRow: {
+    position: "absolute",
+    top: 24,
+    left: 24,
+    zIndex: 10,
   },
 }));

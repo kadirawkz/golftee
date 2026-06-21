@@ -141,8 +141,8 @@ export default function BookingCheckoutScreen() {
   const selectedDay = dayParam ?? "";
   const isCompactScreen = width < 360;
   const isTabletLike = width >= 768;
-  const horizontalPadding = isTabletLike ? Math.max((width - 620) / 2, 24) : isCompactScreen ? 12 : 16;
-  const contentMaxWidth = isTabletLike ? 620 : 999;
+  const horizontalPadding = isTabletLike ? Math.max((width - 1000) / 2, 24) : isCompactScreen ? 12 : 16;
+  const contentMaxWidth = isTabletLike ? 1000 : 999;
 
   const handlePlaceBooking = async () => {
     if (isSubmitting || !dateKeyParam || !timeParam || !periodParam) {
@@ -185,198 +185,263 @@ export default function BookingCheckoutScreen() {
     }
   };
 
+  const renderPaymentMethodSection = () => (
+    <View style={styles.section}>
+      <View style={styles.sectionHeaderRow}>
+        <Text style={styles.sectionTitle}>Payment Method</Text>
+        <Pressable onPress={() => router.navigate("/payment-methods")} variant="chip">
+          <Text style={styles.manageMethodsLink}>Manage</Text>
+        </Pressable>
+      </View>
+
+      {paymentMethods.length === 0 ? (
+        <Pressable
+          style={styles.paymentCard}
+          onPress={() => router.navigate("/payment-methods")}
+          variant="card"
+        >
+          <View style={styles.paymentLeft}>
+            <View style={styles.paymentIconWrap}>
+              <Ionicons name="add" size={22} color={colors.primary} />
+            </View>
+            <View>
+              <Text style={styles.paymentName}>Add Payment Method</Text>
+              <Text style={styles.paymentSub}>No saved payment options found</Text>
+            </View>
+          </View>
+        </Pressable>
+      ) : (
+        paymentMethods.map((method) => {
+          const isSelected = method.id === selectedPaymentId;
+          const isWallet = method.type === "wallet";
+
+          return (
+            <Pressable
+              key={method.id}
+              style={[styles.paymentCard, isSelected && styles.paymentCardActive]}
+              onPress={() => handlePaymentChange(method.id)}
+              variant="card"
+            >
+              <View style={styles.paymentLeft}>
+                <View
+                  style={[
+                    styles.paymentIconWrap,
+                    isWallet && method.brand === "Apple Pay" && styles.appleIcon,
+                    isWallet && method.brand === "Google Pay" && styles.walletIconWrap,
+                  ]}
+                >
+                  {isWallet ? (
+                    <Ionicons
+                      name={method.brand === "Apple Pay" ? "logo-apple" : "logo-google"}
+                      size={20}
+                      color={method.brand === "Apple Pay" ? "#FFFFFF" : colors.primary}
+                    />
+                  ) : (
+                    <Ionicons name="card" size={22} color={colors.primary} />
+                  )}
+                </View>
+                <View>
+                  <Text style={styles.paymentName}>
+                    {isWallet ? method.brand : `•••• ${method.last4}`}
+                  </Text>
+                  <Text style={styles.paymentSub}>
+                    {isWallet ? "Digital Wallet Checkout" : `${method.brand} - Exp. ${method.expiry}`}
+                  </Text>
+                </View>
+              </View>
+              <View style={isSelected ? styles.radioOuterActive : styles.radioOuter}>
+                {isSelected && <View style={styles.radioInnerActive} />}
+              </View>
+            </Pressable>
+          );
+        })
+      )}
+    </View>
+  );
+
+  const renderPriceCard = () => (
+    <View style={styles.priceCard}>
+      <Text style={styles.priceTitle}>Price Summary</Text>
+
+      <View style={styles.priceRow}>
+        <Text style={styles.priceLabel}>Green Fees ({players} Players)</Text>
+        <Text style={styles.priceValue}>${subtotal.toFixed(2)}</Text>
+      </View>
+      <View style={styles.priceRow}>
+        <Text style={styles.priceLabel}>Service Fee</Text>
+        <Text style={styles.priceValue}>${serviceFee.toFixed(2)}</Text>
+      </View>
+      <View style={styles.priceRow}>
+        <Text style={styles.priceLabel}>Caddy Fee</Text>
+        <Text style={styles.priceValue}>${caddyFee.toFixed(2)}</Text>
+      </View>
+      <View style={[styles.priceRow, styles.priceBorderBottom]}>
+        <Text style={styles.priceLabel}>Taxes & Fees</Text>
+        <Text style={styles.priceValue}>${taxesAndFees.toFixed(2)}</Text>
+      </View>
+
+      <View style={[styles.priceRow, styles.totalRow]}>
+        <Text style={styles.totalLabel}>Total Amount</Text>
+        <Text
+          style={[
+            styles.totalAmount,
+            {
+              fontSize: scaleFont(styles.totalAmount.fontSize),
+              lineHeight: scaleLineHeight(styles.totalAmount.lineHeight),
+            },
+          ]}
+        >
+          ${totalAmount.toFixed(2)}
+        </Text>
+      </View>
+    </View>
+  );
+
+  const renderCtaButton = () => (
+    <View style={isTabletLike ? styles.desktopCtaInner : styles.footerCtaInner}>
+      <Pressable style={[styles.placeButton]} onPress={() => void handlePlaceBooking()} disabled={isSubmitting} variant="cta">
+        {isSubmitting ? (
+          <ActivityIndicator size="small" color={colors.surface} />
+        ) : (
+          <>
+            <Text style={styles.placeButtonText}>{bookingIdParam ? "Save Booking Changes" : "Place Booking"}</Text>
+            <Ionicons name="arrow-forward" size={20} color={colors.surface} />
+          </>
+        )}
+      </Pressable>
+      <Text style={styles.footerPolicy}>
+        BY CLICKING PLACE BOOKING, YOU AGREE TO THE CLUB&apos;S CANCELLATION POLICY.
+      </Text>
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.screen} edges={["bottom"]}>
       <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
       <ScrollView
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator={Platform.OS === "web"}
         contentContainerStyle={[
           styles.scrollContent,
           {
             paddingHorizontal: horizontalPadding,
-            paddingBottom: 170 + insets.bottom,
+            paddingBottom: isTabletLike ? 40 : 170 + insets.bottom,
           },
         ]}
         bounces={false}
         overScrollMode="never"
       >
         <View style={[styles.contentBlock, { maxWidth: contentMaxWidth }]}>
-        <View style={styles.headlineWrap}>
-          <Text style={styles.kicker}>SECURE CHECKOUT</Text>
-          <Text
-            style={[
-              styles.headline,
-              isCompactScreen && styles.headlineCompact,
-              {
-                fontSize: scaleFont(styles.headline.fontSize),
-                lineHeight: scaleLineHeight(styles.headline.lineHeight),
-              },
-            ]}
-          >
-            Confirm Your Booking
-          </Text>
-        </View>
-
-        <View style={styles.courseHero}>
-          <AppImage source={getCourseImage(course.image)} style={styles.courseHeroImage} />
-          <View style={styles.courseHeroOverlay} />
-          <View style={styles.courseHeroContent}>
-            <Text style={styles.courseName}>{course.title}</Text>
-            <View style={styles.heroLocationRow}>
-              <Ionicons name="location" size={14} color="rgba(255, 255, 255, 0.8)" />
-              <Text style={styles.heroLocation}>{course.location}</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.detailCard}>
-          <Text style={styles.detailTitle}>Booking Details</Text>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Date</Text>
-            <Text style={styles.detailValue}>{selectedDate}</Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Day</Text>
-            <Text style={styles.detailValue}>{selectedDay || "-"}</Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Tee Time</Text>
-            <Text style={styles.detailValue}>{selectedTime}</Text>
-          </View>
-          <View style={[styles.detailRow, styles.detailRowLast]}>
-            <Text style={styles.detailLabel}>Players</Text>
-            <Text style={styles.detailValue}>{players}</Text>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>Payment Method</Text>
-              <Pressable onPress={() => router.navigate("/payment-methods")} variant="chip">
-                <Text style={styles.manageMethodsLink}>Manage</Text>
-              </Pressable>
-            </View>
-
-            {paymentMethods.length === 0 ? (
-              <Pressable
-                style={styles.paymentCard}
-                onPress={() => router.navigate("/payment-methods")}
-                variant="card"
-              >
-                <View style={styles.paymentLeft}>
-                  <View style={styles.paymentIconWrap}>
-                    <Ionicons name="add" size={22} color={colors.primary} />
-                  </View>
-                  <View>
-                    <Text style={styles.paymentName}>Add Payment Method</Text>
-                    <Text style={styles.paymentSub}>No saved payment options found</Text>
-                  </View>
-                </View>
-              </Pressable>
-            ) : (
-              paymentMethods.map((method) => {
-                const isSelected = method.id === selectedPaymentId;
-                const isWallet = method.type === "wallet";
-
-                return (
-                  <Pressable
-                    key={method.id}
-                    style={[styles.paymentCard, isSelected && styles.paymentCardActive]}
-                    onPress={() => handlePaymentChange(method.id)}
-                    variant="card"
-                  >
-                    <View style={styles.paymentLeft}>
-                      <View
-                        style={[
-                          styles.paymentIconWrap,
-                          isWallet && method.brand === "Apple Pay" && styles.appleIcon,
-                          isWallet && method.brand === "Google Pay" && styles.walletIconWrap,
-                        ]}
-                      >
-                        {isWallet ? (
-                          <Ionicons
-                            name={method.brand === "Apple Pay" ? "logo-apple" : "logo-google"}
-                            size={20}
-                            color={method.brand === "Apple Pay" ? "#FFFFFF" : colors.primary}
-                          />
-                        ) : (
-                          <Ionicons name="card" size={22} color={colors.primary} />
-                        )}
-                      </View>
-                      <View>
-                        <Text style={styles.paymentName}>
-                          {isWallet ? method.brand : `•••• ${method.last4}`}
-                        </Text>
-                        <Text style={styles.paymentSub}>
-                          {isWallet ? "Digital Wallet Checkout" : `${method.brand} - Exp. ${method.expiry}`}
-                        </Text>
-                      </View>
-                    </View>
-                    <View style={isSelected ? styles.radioOuterActive : styles.radioOuter}>
-                      {isSelected && <View style={styles.radioInnerActive} />}
-                    </View>
-                  </Pressable>
-                );
-              })
-            )}
-          </View>
-
-        <View style={styles.priceCard}>
-          <Text style={styles.priceTitle}>Price Summary</Text>
-
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Green Fees ({players} Players)</Text>
-            <Text style={styles.priceValue}>${subtotal.toFixed(2)}</Text>
-          </View>
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Service Fee</Text>
-            <Text style={styles.priceValue}>${serviceFee.toFixed(2)}</Text>
-          </View>
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Caddy Fee</Text>
-            <Text style={styles.priceValue}>${caddyFee.toFixed(2)}</Text>
-          </View>
-          <View style={[styles.priceRow, styles.priceBorderBottom]}>
-            <Text style={styles.priceLabel}>Taxes & Fees</Text>
-            <Text style={styles.priceValue}>${taxesAndFees.toFixed(2)}</Text>
-          </View>
-
-          <View style={[styles.priceRow, styles.totalRow]}>
-            <Text style={styles.totalLabel}>Total Amount</Text>
+          <View style={styles.headlineWrap}>
+            <Text style={styles.kicker}>SECURE CHECKOUT</Text>
             <Text
               style={[
-                styles.totalAmount,
+                styles.headline,
+                isCompactScreen && styles.headlineCompact,
                 {
-                  fontSize: scaleFont(styles.totalAmount.fontSize),
-                  lineHeight: scaleLineHeight(styles.totalAmount.lineHeight),
+                  fontSize: scaleFont(styles.headline.fontSize),
+                  lineHeight: scaleLineHeight(styles.headline.lineHeight),
                 },
               ]}
             >
-              ${totalAmount.toFixed(2)}
+              Confirm Your Booking
             </Text>
           </View>
-        </View>
-        {notice ? <Text style={styles.noticeText}>{notice}</Text> : null}
+
+          {isTabletLike ? (
+            <View style={styles.desktopLayoutRow}>
+              <View style={styles.desktopColumnLeft}>
+                <View style={styles.courseHero}>
+                  <AppImage source={getCourseImage(course.image)} style={styles.courseHeroImage} />
+                  <View style={styles.courseHeroOverlay} />
+                  <View style={styles.courseHeroContent}>
+                    <Text style={styles.courseName}>{course.title}</Text>
+                    <View style={styles.heroLocationRow}>
+                      <Ionicons name="location" size={14} color="rgba(255, 255, 255, 0.8)" />
+                      <Text style={styles.heroLocation}>{course.location}</Text>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={styles.detailCard}>
+                  <Text style={styles.detailTitle}>Booking Details</Text>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Date</Text>
+                    <Text style={styles.detailValue}>{selectedDate}</Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Day</Text>
+                    <Text style={styles.detailValue}>{selectedDay || "-"}</Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Tee Time</Text>
+                    <Text style={styles.detailValue}>{selectedTime}</Text>
+                  </View>
+                  <View style={[styles.detailRow, styles.detailRowLast]}>
+                    <Text style={styles.detailLabel}>Players</Text>
+                    <Text style={styles.detailValue}>{players}</Text>
+                  </View>
+                </View>
+
+                {renderPaymentMethodSection()}
+              </View>
+
+              <View style={styles.desktopColumnRight}>
+                {renderPriceCard()}
+                {notice ? <Text style={styles.noticeText}>{notice}</Text> : null}
+                <View style={styles.desktopCtaCard}>
+                  {renderCtaButton()}
+                </View>
+              </View>
+            </View>
+          ) : (
+            <>
+              <View style={styles.courseHero}>
+                <AppImage source={getCourseImage(course.image)} style={styles.courseHeroImage} />
+                <View style={styles.courseHeroOverlay} />
+                <View style={styles.courseHeroContent}>
+                  <Text style={styles.courseName}>{course.title}</Text>
+                  <View style={styles.heroLocationRow}>
+                    <Ionicons name="location" size={14} color="rgba(255, 255, 255, 0.8)" />
+                    <Text style={styles.heroLocation}>{course.location}</Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.detailCard}>
+                <Text style={styles.detailTitle}>Booking Details</Text>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Date</Text>
+                  <Text style={styles.detailValue}>{selectedDate}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Day</Text>
+                  <Text style={styles.detailValue}>{selectedDay || "-"}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Tee Time</Text>
+                  <Text style={styles.detailValue}>{selectedTime}</Text>
+                </View>
+                <View style={[styles.detailRow, styles.detailRowLast]}>
+                  <Text style={styles.detailLabel}>Players</Text>
+                  <Text style={styles.detailValue}>{players}</Text>
+                </View>
+              </View>
+
+              {renderPaymentMethodSection()}
+              {renderPriceCard()}
+              {notice ? <Text style={styles.noticeText}>{notice}</Text> : null}
+            </>
+          )}
         </View>
       </ScrollView>
 
-      <View style={[styles.footerCtaWrap, { paddingHorizontal: horizontalPadding, paddingBottom: insets.bottom + 12 }]}>
-        <View style={[styles.footerCtaInner, { maxWidth: contentMaxWidth }]}>
-          <Pressable style={[styles.placeButton]} onPress={() => void handlePlaceBooking()} disabled={isSubmitting} variant="cta">
-            {isSubmitting ? (
-              <ActivityIndicator size="small" color={colors.surface} />
-            ) : (
-              <>
-                <Text style={styles.placeButtonText}>{bookingIdParam ? "Save Booking Changes" : "Place Booking"}</Text>
-                <Ionicons name="arrow-forward" size={20} color={colors.surface} />
-              </>
-            )}
-          </Pressable>
-          <Text style={styles.footerPolicy}>
-            BY CLICKING PLACE BOOKING, YOU AGREE TO THE CLUB&apos;S CANCELLATION POLICY.
-          </Text>
+      {!isTabletLike && (
+        <View style={[styles.footerCtaWrap, { paddingHorizontal: horizontalPadding, paddingBottom: insets.bottom + 12 }]}>
+          <View style={[styles.footerCtaInner, { maxWidth: contentMaxWidth }]}>
+            {renderCtaButton()}
+          </View>
         </View>
-      </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -697,5 +762,29 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     lineHeight: theme.typography.caption.lineHeight + 2,
     fontWeight: "600",
     letterSpacing: 0.6,
+  },
+  desktopLayoutRow: {
+    flexDirection: "row",
+    gap: 24,
+    width: "100%",
+    alignItems: "flex-start",
+  },
+  desktopColumnLeft: {
+    flex: 1.2,
+    gap: 16,
+  },
+  desktopColumnRight: {
+    flex: 1,
+    gap: 16,
+  },
+  desktopCtaCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 16,
+  },
+  desktopCtaInner: {
+    gap: 12,
   },
 }));

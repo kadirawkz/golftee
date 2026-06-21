@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Platform,  ScrollView, StyleSheet, Text, View  } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
@@ -15,7 +15,7 @@ export default function BookingHistoryScreen() {
   const { colors, resolvedTheme } = useAppTheme();
   const styles = useThemedStyles(themedStyles);
   const router = useRouter();
-  const { horizontalPadding, screenBottomPadding } = useResponsiveLayout();
+  const { horizontalPadding, screenBottomPadding, isTabletLike } = useResponsiveLayout();
   const bookingState = useBookingState();
   const historyBookings = bookingState.bookings.filter(isHistoricalBooking).reverse();
   const completedBookings = historyBookings.filter((booking) => booking.status === "completed");
@@ -28,7 +28,7 @@ export default function BookingHistoryScreen() {
       <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
 
       <ScrollView
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator={Platform.OS === "web"}
         contentContainerStyle={[
           styles.scrollContent,
           { paddingHorizontal: horizontalPadding, paddingBottom: Math.max(screenBottomPadding - 20, 120) },
@@ -58,16 +58,16 @@ export default function BookingHistoryScreen() {
           </Text>
         ) : null}
 
-        <View style={styles.list}>
+        <View style={isTabletLike ? styles.desktopList : styles.list}>
           {historyBookings.map((booking) => {
             const course = getManagedCourseById(booking.course_id);
             const badgeText =
               booking.status === "cancelled" ? "CANCELLED" : booking.status === "completed" ? "COMPLETED" : "PAST";
 
-            return (
+            const cardContent = (
               <Pressable
                 key={booking.id}
-                style={styles.historyCard}
+                style={[styles.historyCard, isTabletLike && styles.desktopCard]}
                 onPress={() => router.navigate({ pathname: "/manage-booking", params: { bookingId: booking.id } })}
                 variant="card"
               >
@@ -116,6 +116,15 @@ export default function BookingHistoryScreen() {
                 </View>
               </Pressable>
             );
+
+            if (isTabletLike) {
+              return (
+                <View key={booking.id} style={styles.desktopCardWrapper}>
+                  {cardContent}
+                </View>
+              );
+            }
+            return cardContent;
           })}
         </View>
       </ScrollView>
@@ -279,5 +288,19 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     lineHeight: theme.typography.bodySm.lineHeight,
     color: colors.textSoft,
     fontWeight: "600",
+  },
+  desktopList: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 16,
+    width: "100%",
+  },
+  desktopCardWrapper: {
+    width: "48.5%",
+    minWidth: 320,
+    flexGrow: 1,
+  },
+  desktopCard: {
+    flex: 1,
   },
 }));

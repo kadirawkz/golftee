@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
+import { Platform, 
   ActivityIndicator,
   Animated,
   Easing,
@@ -14,7 +14,7 @@ import {
   TextInput,
   View,
   RefreshControl,
-} from "react-native";
+ } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
@@ -286,7 +286,7 @@ export default function BookingsScreen() {
   const { colors, resolvedTheme } = useAppTheme();
   const styles = useThemedStyles(themedStyles);
   const router = useRouter();
-  const { horizontalPadding, screenBottomPadding } = useResponsiveLayout();
+  const { horizontalPadding, screenBottomPadding, isTabletLike } = useResponsiveLayout();
   const bookingState = useBookingState();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -487,7 +487,7 @@ export default function BookingsScreen() {
           </View>
 
           {/* Quick Filters */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterChipsRow}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={Platform.OS === "web"} contentContainerStyle={styles.filterChipsRow}>
             <Pressable
               style={[styles.filterChip, statusFilter === "all" && styles.filterChipActive]}
               onPress={() => setStatusFilter("all")}
@@ -523,7 +523,7 @@ export default function BookingsScreen() {
       )}
 
       <ScrollView
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator={Platform.OS === "web"}
         contentContainerStyle={[
           styles.scrollContent,
           { paddingHorizontal: horizontalPadding, paddingBottom: screenBottomPadding },
@@ -545,14 +545,28 @@ export default function BookingsScreen() {
         {activeTab === "upcoming" && !bookingState.loading && (
           <View style={styles.sectionWrap}>
             {filteredUpcoming.length > 0 ? (
-              filteredUpcoming.map((booking) => (
-                <BookingCard
-                  key={booking.id}
-                  booking={booking}
-                  onPressManage={handleManageBooking}
-                  showToast={showToast}
-                />
-              ))
+              isTabletLike ? (
+                <View style={styles.desktopGrid}>
+                  {filteredUpcoming.map((booking) => (
+                    <View key={booking.id} style={styles.desktopCardWrapper}>
+                      <BookingCard
+                        booking={booking}
+                        onPressManage={handleManageBooking}
+                        showToast={showToast}
+                      />
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                filteredUpcoming.map((booking) => (
+                  <BookingCard
+                    key={booking.id}
+                    booking={booking}
+                    onPressManage={handleManageBooking}
+                    showToast={showToast}
+                  />
+                ))
+              )
             ) : (
               <View style={styles.emptyContainer}>
                 <Ionicons name="calendar-outline" size={48} color={colors.muted} />
@@ -574,14 +588,28 @@ export default function BookingsScreen() {
         {activeTab === "history" && !bookingState.loading && (
           <View style={styles.sectionWrap}>
             {filteredHistory.length > 0 ? (
-              filteredHistory.map((booking) => (
-                <BookingCard
-                  key={booking.id}
-                  booking={booking}
-                  onPressManage={handleManageBooking}
-                  showToast={showToast}
-                />
-              ))
+              isTabletLike ? (
+                <View style={styles.desktopGrid}>
+                  {filteredHistory.map((booking) => (
+                    <View key={booking.id} style={styles.desktopCardWrapper}>
+                      <BookingCard
+                        booking={booking}
+                        onPressManage={handleManageBooking}
+                        showToast={showToast}
+                      />
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                filteredHistory.map((booking) => (
+                  <BookingCard
+                    key={booking.id}
+                    booking={booking}
+                    onPressManage={handleManageBooking}
+                    showToast={showToast}
+                  />
+                ))
+              )
             ) : (
               <View style={styles.emptyContainer}>
                 <Ionicons name="journal-outline" size={48} color={colors.muted} />
@@ -597,50 +625,104 @@ export default function BookingsScreen() {
           <View style={styles.insightsContainer}>
             <Text style={styles.insightsHeadline}>Your Performance & Stats</Text>
 
-            <View style={styles.statsGrid}>
-              <View style={styles.statBox}>
-                <Ionicons name="golf-outline" size={24} color={colors.primary} />
-                <Text style={styles.statNumber}>{insightsStats.roundsPlayed}</Text>
-                <Text style={styles.statLabel}>Rounds Played</Text>
-              </View>
-              <View style={styles.statBox}>
-                <Ionicons name="card-outline" size={24} color={colors.accentWarm} />
-                <Text style={styles.statNumber}>${insightsStats.totalSpent.toFixed(0)}</Text>
-                <Text style={styles.statLabel}>Total Spend</Text>
-              </View>
-            </View>
-
-            {insightsStats.favCourse ? (
-              <View style={styles.favoriteCourseCard}>
-                <Text style={styles.favoriteCourseTag}>FAVOURITE COURSE</Text>
-                <AppImage source={getCourseImage(insightsStats.favCourse.image)} style={styles.favCourseImage} />
-                <View style={styles.favCourseDetails}>
-                  <Text style={styles.favCourseTitle}>{insightsStats.favCourse.title}</Text>
-                  <Text style={styles.favCourseLocation}>{insightsStats.favCourse.location}</Text>
-                  <View style={styles.favCourseStatRow}>
-                    <Ionicons name="repeat" size={14} color={colors.accentWarm} />
-                    <Text style={styles.favCourseStatText}>Played {insightsStats.favCount} times</Text>
+            {isTabletLike ? (
+              <View style={styles.desktopInsightsRow}>
+                <View style={styles.desktopStatsGridCol}>
+                  <View style={styles.statsGrid}>
+                    <View style={styles.statBox}>
+                      <Ionicons name="golf-outline" size={24} color={colors.primary} />
+                      <Text style={styles.statNumber}>{insightsStats.roundsPlayed}</Text>
+                      <Text style={styles.statLabel}>Rounds Played</Text>
+                    </View>
+                    <View style={styles.statBox}>
+                      <Ionicons name="card-outline" size={24} color={colors.accentWarm} />
+                      <Text style={styles.statNumber}>${insightsStats.totalSpent.toFixed(0)}</Text>
+                      <Text style={styles.statLabel}>Total Spend</Text>
+                    </View>
                   </View>
-                  <Pressable
-                    style={styles.bookFavBtn}
-                    onPress={() =>
-                      router.navigate({
-                        pathname: "/tee-time-booking",
-                        params: { id: insightsStats.favCourse!.id },
-                      })
-                    }
-                    variant="cta"
-                  >
-                    <Text style={styles.bookFavText}>Book Again</Text>
-                  </Pressable>
                 </View>
+
+                {insightsStats.favCourse ? (
+                  <View style={[styles.favoriteCourseCard, { flex: 1 }]}>
+                    <Text style={styles.favoriteCourseTag}>FAVOURITE COURSE</Text>
+                    <AppImage source={getCourseImage(insightsStats.favCourse.image)} style={styles.favCourseImage} />
+                    <View style={styles.favCourseDetails}>
+                      <Text style={styles.favCourseTitle}>{insightsStats.favCourse.title}</Text>
+                      <Text style={styles.favCourseLocation}>{insightsStats.favCourse.location}</Text>
+                      <View style={styles.favCourseStatRow}>
+                        <Ionicons name="repeat" size={14} color={colors.accentWarm} />
+                        <Text style={styles.favCourseStatText}>Played {insightsStats.favCount} times</Text>
+                      </View>
+                      <Pressable
+                        style={styles.bookFavBtn}
+                        onPress={() =>
+                          router.navigate({
+                            pathname: "/tee-time-booking",
+                            params: { id: insightsStats.favCourse!.id },
+                          })
+                        }
+                        variant="cta"
+                      >
+                        <Text style={styles.bookFavText}>Book Again</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={[styles.emptyContainer, { flex: 1 }]}>
+                    <Ionicons name="analytics-outline" size={48} color={colors.muted} />
+                    <Text style={styles.emptyTextTitle}>Insights Unavailable</Text>
+                    <Text style={styles.emptyTextDesc}>Complete some rounds to see your personal statistics here.</Text>
+                  </View>
+                )}
               </View>
             ) : (
-              <View style={styles.emptyContainer}>
-                <Ionicons name="analytics-outline" size={48} color={colors.muted} />
-                <Text style={styles.emptyTextTitle}>Insights Unavailable</Text>
-                <Text style={styles.emptyTextDesc}>Complete some rounds to see your personal statistics here.</Text>
-              </View>
+              <>
+                <View style={styles.statsGrid}>
+                  <View style={styles.statBox}>
+                    <Ionicons name="golf-outline" size={24} color={colors.primary} />
+                    <Text style={styles.statNumber}>{insightsStats.roundsPlayed}</Text>
+                    <Text style={styles.statLabel}>Rounds Played</Text>
+                  </View>
+                  <View style={styles.statBox}>
+                    <Ionicons name="card-outline" size={24} color={colors.accentWarm} />
+                    <Text style={styles.statNumber}>${insightsStats.totalSpent.toFixed(0)}</Text>
+                    <Text style={styles.statLabel}>Total Spend</Text>
+                  </View>
+                </View>
+
+                {insightsStats.favCourse ? (
+                  <View style={styles.favoriteCourseCard}>
+                    <Text style={styles.favoriteCourseTag}>FAVOURITE COURSE</Text>
+                    <AppImage source={getCourseImage(insightsStats.favCourse.image)} style={styles.favCourseImage} />
+                    <View style={styles.favCourseDetails}>
+                      <Text style={styles.favCourseTitle}>{insightsStats.favCourse.title}</Text>
+                      <Text style={styles.favCourseLocation}>{insightsStats.favCourse.location}</Text>
+                      <View style={styles.favCourseStatRow}>
+                        <Ionicons name="repeat" size={14} color={colors.accentWarm} />
+                        <Text style={styles.favCourseStatText}>Played {insightsStats.favCount} times</Text>
+                      </View>
+                      <Pressable
+                        style={styles.bookFavBtn}
+                        onPress={() =>
+                          router.navigate({
+                            pathname: "/tee-time-booking",
+                            params: { id: insightsStats.favCourse!.id },
+                          })
+                        }
+                        variant="cta"
+                      >
+                        <Text style={styles.bookFavText}>Book Again</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={styles.emptyContainer}>
+                    <Ionicons name="analytics-outline" size={48} color={colors.muted} />
+                    <Text style={styles.emptyTextTitle}>Insights Unavailable</Text>
+                    <Text style={styles.emptyTextDesc}>Complete some rounds to see your personal statistics here.</Text>
+                  </View>
+                )}
+              </>
             )}
           </View>
         )}
@@ -1055,5 +1137,25 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     fontSize: theme.typography.bodySm.fontSize,
     fontWeight: "700",
     color: colors.successText,
+  },
+  desktopGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 16,
+    width: "100%",
+  },
+  desktopCardWrapper: {
+    width: "48.5%",
+    minWidth: 320,
+    flexGrow: 1,
+  },
+  desktopInsightsRow: {
+    flexDirection: "row",
+    gap: 20,
+    alignItems: "flex-start",
+    width: "100%",
+  },
+  desktopStatsGridCol: {
+    flex: 1,
   },
 }));

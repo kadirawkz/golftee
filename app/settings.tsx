@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import {
+import { Platform, 
   ActivityIndicator,
   ScrollView,
   Switch,
@@ -9,7 +9,7 @@ import {
   TextInput,
   View,
   Modal,
-} from "react-native";
+ } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
@@ -31,7 +31,7 @@ function SectionHeader({ title, caption }: { title: string; caption?: string }) 
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { horizontalPadding, screenBottomPadding } = useResponsiveLayout();
+  const { horizontalPadding, screenBottomPadding, isTabletLike } = useResponsiveLayout();
   const { themeMode, setThemeMode, colors, resolvedTheme } = useAppTheme();
   const styles = useThemedStyles(themedStyles);
 
@@ -152,7 +152,7 @@ export default function SettingsScreen() {
     <SafeAreaView style={styles.screen} edges={["bottom"]}>
       <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
       <ScrollView
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator={Platform.OS === "web"}
         contentContainerStyle={[
           styles.scrollContent,
           { paddingHorizontal: horizontalPadding, paddingBottom: Math.max(screenBottomPadding - 20, 120) },
@@ -161,156 +161,309 @@ export default function SettingsScreen() {
         overScrollMode="never"
         contentInsetAdjustmentBehavior="never"
       >
+        {isTabletLike ? (
+          <View style={styles.desktopLayoutRow}>
+            <View style={styles.desktopColumnLeft}>
+              {/* Notifications */}
+              <View style={styles.section}>
+                <SectionHeader title="Notifications" caption="Control device reminder triggers." />
+                <View style={styles.card}>
+                  <View style={styles.row}>
+                    <View style={styles.iconPrimary}>
+                      <Ionicons name="notifications-outline" size={18} color={colors.text} />
+                    </View>
+                    <View style={styles.rowCopy}>
+                      <Text style={styles.rowTitle}>Booking Alerts</Text>
+                      <Text style={styles.rowDescription}>Reminders 24h, 12h, and 2h before rounds.</Text>
+                    </View>
+                    <Switch
+                      value={bookingAlerts}
+                      onValueChange={handleToggleBookingAlerts}
+                      trackColor={{ false: colors.borderStrong, true: colors.accent }}
+                      thumbColor="#FFFFFF"
+                    />
+                  </View>
 
+                  <View style={styles.row}>
+                    <View style={styles.iconPrimary}>
+                      <Ionicons name="megaphone-outline" size={18} color={colors.text} />
+                    </View>
+                    <View style={styles.rowCopy}>
+                      <Text style={styles.rowTitle}>System Notifications</Text>
+                      <Text style={styles.rowDescription}>In-app confirmations and profile change logs.</Text>
+                    </View>
+                    <Switch
+                      value={systemAlerts}
+                      onValueChange={handleToggleSystemAlerts}
+                      trackColor={{ false: colors.borderStrong, true: colors.accent }}
+                      thumbColor="#FFFFFF"
+                    />
+                  </View>
+                </View>
+              </View>
 
-        {/* Notifications */}
-        <View style={styles.section}>
-          <SectionHeader title="Notifications" caption="Control device reminder triggers." />
-          <View style={styles.card}>
-            <View style={styles.row}>
-              <View style={styles.iconPrimary}>
-                <Ionicons name="notifications-outline" size={18} color={colors.text} />
-              </View>
-              <View style={styles.rowCopy}>
-                <Text style={styles.rowTitle}>Booking Alerts</Text>
-                <Text style={styles.rowDescription}>Reminders 24h, 12h, and 2h before rounds.</Text>
-              </View>
-              <Switch
-                value={bookingAlerts}
-                onValueChange={handleToggleBookingAlerts}
-                trackColor={{ false: colors.borderStrong, true: colors.accent }}
-                thumbColor="#FFFFFF"
-              />
-            </View>
-
-            <View style={styles.row}>
-              <View style={styles.iconPrimary}>
-                <Ionicons name="megaphone-outline" size={18} color={colors.text} />
-              </View>
-              <View style={styles.rowCopy}>
-                <Text style={styles.rowTitle}>System Notifications</Text>
-                <Text style={styles.rowDescription}>In-app confirmations and profile change logs.</Text>
-              </View>
-              <Switch
-                value={systemAlerts}
-                onValueChange={handleToggleSystemAlerts}
-                trackColor={{ false: colors.borderStrong, true: colors.accent }}
-                thumbColor="#FFFFFF"
-              />
-            </View>
-          </View>
-        </View>
-
-        {/* App Theme Selection */}
-        <View style={styles.section}>
-          <SectionHeader title="App Theme" caption="Toggle between light and dark visual aesthetics." />
-          <View style={styles.card}>
-            <View style={styles.prefSelectorRow}>
-              <Text style={styles.prefLabel}>THEME MODE</Text>
-              <View style={styles.chipGroup}>
-                {(["system", "light", "dark"] as const).map((mode) => {
-                  const active = themeMode === mode;
-                  return (
-                    <Pressable
-                      key={mode}
-                      style={[styles.prefChip, active && styles.prefChipActive]}
-                      onPress={() => void setThemeMode(mode)}
-                      variant="chip"
-                    >
-                      <Text style={[styles.prefChipText, active && styles.prefChipTextActive]}>
-                        {mode === "system"
-                          ? "System"
-                          : mode === "light"
-                          ? "Light Theme"
-                          : "Dark Theme"}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Booking Defaults */}
-        <View style={styles.section}>
-          <SectionHeader title="Booking Defaults" caption="Pre-fill tee time checkout details." />
-          <View style={styles.card}>
-            <View style={styles.prefSelectorRow}>
-              <Text style={styles.prefLabel}>DEFAULT PLAYERS</Text>
-              <View style={styles.chipGroup}>
-                {[1, 2, 3, 4].map((count) => {
-                  const active = defaultPlayers === count;
-                  return (
-                    <Pressable
-                      key={count}
-                      style={[styles.prefChip, active && styles.prefChipActive]}
-                      onPress={() => void handleSelectDefaultPlayers(count)}
-                      variant="chip"
-                    >
-                      <Text style={[styles.prefChipText, active && styles.prefChipTextActive]}>
-                        {count} {count === 1 ? "Player" : "Players"}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
+              {/* App Theme Selection */}
+              <View style={styles.section}>
+                <SectionHeader title="App Theme" caption="Toggle between light and dark visual aesthetics." />
+                <View style={styles.card}>
+                  <View style={styles.prefSelectorRow}>
+                    <Text style={styles.prefLabel}>THEME MODE</Text>
+                    <View style={styles.chipGroup}>
+                      {(["system", "light", "dark"] as const).map((mode) => {
+                        const active = themeMode === mode;
+                        return (
+                          <Pressable
+                            key={mode}
+                            style={[styles.prefChip, active && styles.prefChipActive]}
+                            onPress={() => void setThemeMode(mode)}
+                            variant="chip"
+                          >
+                            <Text style={[styles.prefChipText, active && styles.prefChipTextActive]}>
+                              {mode === "system"
+                                ? "System"
+                                : mode === "light"
+                                ? "Light Theme"
+                                : "Dark Theme"}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </View>
+                </View>
               </View>
             </View>
 
-            <Pressable
-              style={[styles.row, { borderTopWidth: 1, borderColor: colors.borderSoft }]}
-              onPress={() => router.navigate("/payment-methods")}
-              variant="card"
-            >
-              <View style={styles.iconSecondary}>
-                <Ionicons name="card-outline" size={18} color={colors.text} />
+            <View style={styles.desktopColumnRight}>
+              {/* Booking Defaults */}
+              <View style={styles.section}>
+                <SectionHeader title="Booking Defaults" caption="Pre-fill tee time checkout details." />
+                <View style={styles.card}>
+                  <View style={styles.prefSelectorRow}>
+                    <Text style={styles.prefLabel}>DEFAULT PLAYERS</Text>
+                    <View style={styles.chipGroup}>
+                      {[1, 2, 3, 4].map((count) => {
+                        const active = defaultPlayers === count;
+                        return (
+                          <Pressable
+                            key={count}
+                            style={[styles.prefChip, active && styles.prefChipActive]}
+                            onPress={() => void handleSelectDefaultPlayers(count)}
+                            variant="chip"
+                          >
+                            <Text style={[styles.prefChipText, active && styles.prefChipTextActive]}>
+                              {count} {count === 1 ? "Player" : "Players"}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </View>
+
+                  <Pressable
+                    style={[styles.row, { borderTopWidth: 1, borderColor: colors.borderSoft }]}
+                    onPress={() => router.navigate("/payment-methods")}
+                    variant="card"
+                  >
+                    <View style={styles.iconSecondary}>
+                      <Ionicons name="card-outline" size={18} color={colors.text} />
+                    </View>
+                    <View style={styles.rowCopy}>
+                      <Text style={styles.rowTitle}>Payment Methods</Text>
+                      <Text style={styles.rowDescription}>Manage cards and digital wallets.</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+                  </Pressable>
+                </View>
               </View>
-              <View style={styles.rowCopy}>
-                <Text style={styles.rowTitle}>Payment Methods</Text>
-                <Text style={styles.rowDescription}>Manage cards and digital wallets.</Text>
+
+              {/* Security & Support */}
+              <View style={styles.section}>
+                <SectionHeader title="Privacy & Security" caption="Manage account access controls." />
+                <View style={styles.card}>
+                  <Pressable
+                    style={styles.row}
+                    onPress={() => setIsPasswordModalVisible(true)}
+                    variant="card"
+                  >
+                    <View style={styles.iconSecondary}>
+                      <Ionicons name="key-outline" size={18} color={colors.text} />
+                    </View>
+                    <View style={styles.rowCopy}>
+                      <Text style={styles.rowTitle}>Change Password</Text>
+                      <Text style={styles.rowDescription}>Update Supabase password securely.</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+                  </Pressable>
+
+                  <Pressable
+                    style={styles.row}
+                    onPress={() => setIsFaqModalVisible(true)}
+                    variant="card"
+                  >
+                    <View style={styles.iconSecondary}>
+                      <Ionicons name="help-circle-outline" size={18} color={colors.text} />
+                    </View>
+                    <View style={styles.rowCopy}>
+                      <Text style={styles.rowTitle}>FAQs & Information</Text>
+                      <Text style={styles.rowDescription}>Booking rules & cancellation policies.</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+                  </Pressable>
+                </View>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.muted} />
-            </Pressable>
+            </View>
           </View>
-        </View>
+        ) : (
+          <>
+            {/* Notifications */}
+            <View style={styles.section}>
+              <SectionHeader title="Notifications" caption="Control device reminder triggers." />
+              <View style={styles.card}>
+                <View style={styles.row}>
+                  <View style={styles.iconPrimary}>
+                    <Ionicons name="notifications-outline" size={18} color={colors.text} />
+                  </View>
+                  <View style={styles.rowCopy}>
+                    <Text style={styles.rowTitle}>Booking Alerts</Text>
+                    <Text style={styles.rowDescription}>Reminders 24h, 12h, and 2h before rounds.</Text>
+                  </View>
+                  <Switch
+                    value={bookingAlerts}
+                    onValueChange={handleToggleBookingAlerts}
+                    trackColor={{ false: colors.borderStrong, true: colors.accent }}
+                    thumbColor="#FFFFFF"
+                  />
+                </View>
 
-        {/* Security & Support */}
-        <View style={styles.section}>
-          <SectionHeader title="Privacy & Security" caption="Manage account access controls." />
-          <View style={styles.card}>
-            <Pressable
-              style={styles.row}
-              onPress={() => setIsPasswordModalVisible(true)}
-              variant="card"
-            >
-              <View style={styles.iconSecondary}>
-                <Ionicons name="key-outline" size={18} color={colors.text} />
+                <View style={styles.row}>
+                  <View style={styles.iconPrimary}>
+                    <Ionicons name="megaphone-outline" size={18} color={colors.text} />
+                  </View>
+                  <View style={styles.rowCopy}>
+                    <Text style={styles.rowTitle}>System Notifications</Text>
+                    <Text style={styles.rowDescription}>In-app confirmations and profile change logs.</Text>
+                  </View>
+                  <Switch
+                    value={systemAlerts}
+                    onValueChange={handleToggleSystemAlerts}
+                    trackColor={{ false: colors.borderStrong, true: colors.accent }}
+                    thumbColor="#FFFFFF"
+                  />
+                </View>
               </View>
-              <View style={styles.rowCopy}>
-                <Text style={styles.rowTitle}>Change Password</Text>
-                <Text style={styles.rowDescription}>Update Supabase password securely.</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.muted} />
-            </Pressable>
+            </View>
 
-            <Pressable
-              style={styles.row}
-              onPress={() => setIsFaqModalVisible(true)}
-              variant="card"
-            >
-              <View style={styles.iconSecondary}>
-                <Ionicons name="help-circle-outline" size={18} color={colors.text} />
+            {/* App Theme Selection */}
+            <View style={styles.section}>
+              <SectionHeader title="App Theme" caption="Toggle between light and dark visual aesthetics." />
+              <View style={styles.card}>
+                <View style={styles.prefSelectorRow}>
+                  <Text style={styles.prefLabel}>THEME MODE</Text>
+                  <View style={styles.chipGroup}>
+                    {(["system", "light", "dark"] as const).map((mode) => {
+                      const active = themeMode === mode;
+                      return (
+                        <Pressable
+                          key={mode}
+                          style={[styles.prefChip, active && styles.prefChipActive]}
+                          onPress={() => void setThemeMode(mode)}
+                          variant="chip"
+                        >
+                          <Text style={[styles.prefChipText, active && styles.prefChipTextActive]}>
+                            {mode === "system"
+                              ? "System"
+                              : mode === "light"
+                              ? "Light Theme"
+                              : "Dark Theme"}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
               </View>
-              <View style={styles.rowCopy}>
-                <Text style={styles.rowTitle}>FAQs & Information</Text>
-                <Text style={styles.rowDescription}>Booking rules & cancellation policies.</Text>
+            </View>
+
+            {/* Booking Defaults */}
+            <View style={styles.section}>
+              <SectionHeader title="Booking Defaults" caption="Pre-fill tee time checkout details." />
+              <View style={styles.card}>
+                <View style={styles.prefSelectorRow}>
+                  <Text style={styles.prefLabel}>DEFAULT PLAYERS</Text>
+                  <View style={styles.chipGroup}>
+                    {[1, 2, 3, 4].map((count) => {
+                      const active = defaultPlayers === count;
+                      return (
+                        <Pressable
+                          key={count}
+                          style={[styles.prefChip, active && styles.prefChipActive]}
+                          onPress={() => void handleSelectDefaultPlayers(count)}
+                          variant="chip"
+                        >
+                          <Text style={[styles.prefChipText, active && styles.prefChipTextActive]}>
+                            {count} {count === 1 ? "Player" : "Players"}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                <Pressable
+                  style={[styles.row, { borderTopWidth: 1, borderColor: colors.borderSoft }]}
+                  onPress={() => router.navigate("/payment-methods")}
+                  variant="card"
+                >
+                  <View style={styles.iconSecondary}>
+                    <Ionicons name="card-outline" size={18} color={colors.text} />
+                  </View>
+                  <View style={styles.rowCopy}>
+                    <Text style={styles.rowTitle}>Payment Methods</Text>
+                    <Text style={styles.rowDescription}>Manage cards and digital wallets.</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+                </Pressable>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.muted} />
-            </Pressable>
-          </View>
-        </View>
+            </View>
 
+            {/* Security & Support */}
+            <View style={styles.section}>
+              <SectionHeader title="Privacy & Security" caption="Manage account access controls." />
+              <View style={styles.card}>
+                <Pressable
+                  style={styles.row}
+                  onPress={() => setIsPasswordModalVisible(true)}
+                  variant="card"
+                >
+                  <View style={styles.iconSecondary}>
+                    <Ionicons name="key-outline" size={18} color={colors.text} />
+                  </View>
+                  <View style={styles.rowCopy}>
+                    <Text style={styles.rowTitle}>Change Password</Text>
+                    <Text style={styles.rowDescription}>Update Supabase password securely.</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+                </Pressable>
 
+                <Pressable
+                  style={styles.row}
+                  onPress={() => setIsFaqModalVisible(true)}
+                  variant="card"
+                >
+                  <View style={styles.iconSecondary}>
+                    <Ionicons name="help-circle-outline" size={18} color={colors.text} />
+                  </View>
+                  <View style={styles.rowCopy}>
+                    <Text style={styles.rowTitle}>FAQs & Information</Text>
+                    <Text style={styles.rowDescription}>Booking rules & cancellation policies.</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+                </Pressable>
+              </View>
+            </View>
+          </>
+        )}
       </ScrollView>
 
       {/* Change Password Modal */}
@@ -417,7 +570,7 @@ export default function SettingsScreen() {
               </Pressable>
             </View>
 
-            <ScrollView contentContainerStyle={styles.faqScroll} showsVerticalScrollIndicator={false}>
+            <ScrollView contentContainerStyle={styles.faqScroll} showsVerticalScrollIndicator={Platform.OS === "web"}>
               <View style={styles.faqCard}>
                 <Text style={styles.faqQuestion}>How do I cancel a booking?</Text>
                 <Text style={styles.faqAnswer}>
@@ -752,5 +905,19 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     fontSize: 12,
     lineHeight: 19,
     color: colors.textSoft,
+  },
+  desktopLayoutRow: {
+    flexDirection: "row",
+    gap: 24,
+    width: "100%",
+    alignItems: "flex-start",
+  },
+  desktopColumnLeft: {
+    flex: 1,
+    gap: 18,
+  },
+  desktopColumnRight: {
+    flex: 1,
+    gap: 18,
   },
 }));

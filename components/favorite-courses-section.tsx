@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Text, View } from "react-native";
+import { Text, View, useWindowDimensions } from "react-native";
 import { AnimatedPressable as Pressable } from "./animated-pressable";
 import { CourseCard } from "./course-card";
 import { CourseRecord } from "../services/course-data";
@@ -35,6 +35,8 @@ export function FavoriteCoursesSection({
   const isSmall = size === "small";
   const { colors } = useAppTheme();
   const styles = useThemedStyles(themedStyles);
+  const { width } = useWindowDimensions();
+  const isTabletLike = width >= 768;
 
   return (
     <View style={[styles.section, isSmall && styles.sectionSmall]}>
@@ -55,7 +57,7 @@ export function FavoriteCoursesSection({
       ) : null}
 
       {courses.length ? (
-        <View style={styles.list}>
+        <View style={isTabletLike ? styles.listGrid : styles.list}>
           {courses.map((course) => (
             <CourseCard
               key={course.id}
@@ -72,6 +74,7 @@ export function FavoriteCoursesSection({
               compactActionIcon={cardActionIcon}
               onPressCompactAction={onPressCardAction ? () => onPressCardAction(course.id) : undefined}
               onPress={() => onPressCourse(course.id)}
+              cardStyle={isTabletLike ? styles.gridCardItem : undefined}
             />
           ))}
         </View>
@@ -89,6 +92,7 @@ export function FavoriteCoursesSection({
     </View>
   );
 }
+
 
 const themedStyles = createThemedStyleSheet((colors) => ({
   section: {
@@ -157,6 +161,15 @@ const themedStyles = createThemedStyleSheet((colors) => ({
   },
   list: {
     gap: 12,
+  },
+  listGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 16,
+  },
+  gridCardItem: {
+    width: "48%",
+    minWidth: 280,
   },
   emptyCard: {
     flexDirection: "row",

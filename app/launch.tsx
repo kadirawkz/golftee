@@ -1,8 +1,7 @@
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
-import { ActivityIndicator, Text, View } from "react-native";
-import { AppImage } from "../components/app-image";
+import { ActivityIndicator, Image, Text, View } from "react-native";
 import { getIsLoggedIn } from "../services/auth";
 import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
 import { useAppTheme, useThemedStyles, createThemedStyleSheet, theme } from "../components/theme";
@@ -15,35 +14,21 @@ export default function LaunchScreen() {
 
   useEffect(() => {
     let active = true;
-    let timeout: ReturnType<typeof setTimeout> | null = null;
 
     const redirectFromLaunch = async () => {
-      const start = Date.now();
       const isLoggedIn = await getIsLoggedIn();
 
       if (!active) {
         return;
       }
 
-      const elapsed = Date.now() - start;
-      const remainingDelay = Math.max(900 - elapsed, 0);
-
-      timeout = setTimeout(() => {
-        if (!active) {
-          return;
-        }
-
-        router.replace(isLoggedIn ? "/home" : "/splash");
-      }, remainingDelay);
+      router.replace(isLoggedIn ? "/home" : "/splash");
     };
 
     void redirectFromLaunch();
 
     return () => {
       active = false;
-      if (timeout) {
-        clearTimeout(timeout);
-      }
     };
   }, [router]);
 
@@ -52,7 +37,7 @@ export default function LaunchScreen() {
       <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
       <View style={styles.logoContainer}>
         <View style={styles.logoShell} accessibilityRole="image" accessibilityLabel="GolfTee logo">
-          <AppImage source={require("../assets/images/icon.png")} style={styles.logoImage} />
+          <Image source={require("../assets/images/icon.png")} style={styles.logoImage} />
         </View>
         <Text
           style={[

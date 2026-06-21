@@ -2,14 +2,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState, useEffect } from "react";
-import {
+import { Image,
+  Platform, 
   ScrollView,
   Text,
   TextInput,
   useWindowDimensions,
   View,
   Linking,
-} from "react-native";
+ } from "react-native";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getAuthConfigurationError, signUpWithEmail, resendVerificationEmail } from "../services/auth";
@@ -54,7 +55,6 @@ export default function SignupScreen() {
   const isTabletLike = width >= 768;
   const supabaseConfigurationError = getAuthConfigurationError();
   const horizontalPadding = isTabletLike ? Math.max((width - 500) / 2, 24) : isCompactScreen ? 16 : 24;
-  const contentMaxWidth = isTabletLike ? 500 : "100%";
 
   const clearError = (key: string) => {
     setErrors((prev) => {
@@ -192,7 +192,7 @@ export default function SignupScreen() {
           <ScrollView
             style={styles.scroll}
             contentContainerStyle={styles.successScrollContent}
-            showsVerticalScrollIndicator={false}
+            showsVerticalScrollIndicator={Platform.OS === "web"}
           >
             <View style={styles.successCard}>
               <View style={styles.successIconWrap}>
@@ -326,219 +326,259 @@ export default function SignupScreen() {
     );
   }
 
+  const signupForm = (
+    <View style={[styles.mainLayout, isTabletLike && { maxWidth: 420 }]}>
+      <View style={styles.heroCard}>
+        <Text style={styles.eyebrow}>GET STARTED</Text>
+        <Text style={[styles.subtitle, isCompactScreen && styles.subtitleCompact]}>
+          Create a free account to book tee times, track statistics, and find your favorite golf courses.
+        </Text>
+      </View>
+
+      <View style={styles.panel}>
+        <View style={styles.formGroup}>
+          {/* Username Input */}
+          <View style={[styles.inputShell, errors.username && styles.inputShellError]}>
+            <Text style={[styles.inputLabel, errors.username && styles.inputLabelError]}>
+              USERNAME
+            </Text>
+            <View style={styles.inputRow}>
+              <Ionicons name="person-outline" size={18} color={errors.username ? colors.danger : colors.muted} />
+              <TextInput
+                placeholder="Choose a username"
+                placeholderTextColor={colors.muted}
+                style={[styles.inputField, errors.username && styles.inputFieldError]}
+                autoCapitalize="none"
+                autoCorrect={false}
+                value={username}
+                onChangeText={(text) => {
+                  setUsername(text);
+                  clearError("username");
+                  if (authNotice) setAuthNotice(null);
+                }}
+                editable={!isSubmitting}
+                accessibilityLabel="Username input"
+                accessibilityHint="Choose a unique username"
+              />
+            </View>
+          </View>
+
+          {/* Email Input */}
+          <View style={[styles.inputShell, errors.email && styles.inputShellError]}>
+            <Text style={[styles.inputLabel, errors.email && styles.inputLabelError]}>
+              EMAIL ADDRESS
+            </Text>
+            <View style={styles.inputRow}>
+              <Ionicons name="mail-outline" size={18} color={errors.email ? colors.danger : colors.muted} />
+              <TextInput
+                placeholder="name@example.com"
+                placeholderTextColor={colors.muted}
+                style={[styles.inputField, errors.email && styles.inputFieldError]}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                value={email}
+                onChangeText={(text) => {
+                  setEmail(text);
+                  clearError("email");
+                  if (authNotice) setAuthNotice(null);
+                }}
+                editable={!isSubmitting}
+                accessibilityLabel="Email Address input"
+                accessibilityHint="Enter your email address"
+              />
+            </View>
+          </View>
+
+          {/* Password Input */}
+          <View style={[styles.inputShell, errors.password && styles.inputShellError]}>
+            <Text style={[styles.inputLabel, errors.password && styles.inputLabelError]}>
+              PASSWORD
+            </Text>
+            <View style={styles.inputRow}>
+              <Ionicons name="lock-closed-outline" size={18} color={errors.password ? colors.danger : colors.muted} />
+              <TextInput
+                placeholder="Create a password"
+                placeholderTextColor={colors.muted}
+                style={[styles.inputField, errors.password && styles.inputFieldError]}
+                secureTextEntry
+                value={password}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  clearError("password");
+                  if (authNotice) setAuthNotice(null);
+                }}
+                editable={!isSubmitting}
+                accessibilityLabel="Password input"
+                accessibilityHint="Create a strong password"
+              />
+            </View>
+          </View>
+
+          {/* Confirm Password Input */}
+          <View style={[styles.inputShell, errors.confirmPassword && styles.inputShellError]}>
+            <Text style={[styles.inputLabel, errors.confirmPassword && styles.inputLabelError]}>
+              CONFIRM PASSWORD
+            </Text>
+            <View style={styles.inputRow}>
+              <Ionicons name="shield-checkmark-outline" size={18} color={errors.confirmPassword ? colors.danger : colors.muted} />
+              <TextInput
+                placeholder="Re-enter your password"
+                placeholderTextColor={colors.muted}
+                style={[styles.inputField, errors.confirmPassword && styles.inputFieldError]}
+                secureTextEntry
+                value={confirmPassword}
+                onChangeText={(text) => {
+                  setConfirmPassword(text);
+                  clearError("confirmPassword");
+                  if (authNotice) setAuthNotice(null);
+                }}
+                editable={!isSubmitting}
+                accessibilityLabel="Confirm Password input"
+                accessibilityHint="Re-enter your password"
+              />
+            </View>
+          </View>
+
+          {/* Handicap Input (Optional) */}
+          <View style={[styles.inputShell, errors.handicap && styles.inputShellError]}>
+            <Text style={[styles.inputLabel, errors.handicap && styles.inputLabelError]}>
+              HANDICAP (OPTIONAL)
+            </Text>
+            <View style={styles.inputRow}>
+              <Ionicons name="golf-outline" size={18} color={errors.handicap ? colors.danger : colors.muted} />
+              <TextInput
+                placeholder="e.g. 12.4"
+                placeholderTextColor={colors.muted}
+                style={[styles.inputField, errors.handicap && styles.inputFieldError]}
+                keyboardType="decimal-pad"
+                value={handicap}
+                onChangeText={(text) => {
+                  setHandicap(text);
+                  clearError("handicap");
+                  if (authNotice) setAuthNotice(null);
+                }}
+                editable={!isSubmitting}
+                accessibilityLabel="Handicap input, optional"
+                accessibilityHint="Enter a valid handicap between 0.0 and 54.0"
+              />
+            </View>
+          </View>
+        </View>
+
+        {feedbackMessage ? (
+          <View style={styles.errorRow}>
+            <View style={styles.errorDot} />
+            <Text style={styles.errorText}>{feedbackMessage}</Text>
+          </View>
+        ) : null}
+
+        <Pressable
+          style={styles.signupButton}
+          onPress={() => void handleSignup()}
+          disabled={isSubmitting || Boolean(supabaseConfigurationError)}
+          variant="cta"
+          accessibilityRole="button"
+          accessibilityState={{ disabled: isSubmitting }}
+          accessibilityLabel={isSubmitting ? "Creating Account" : "Create GolfTee Account"}
+          accessibilityHint="Submits account registration form"
+        >
+          <Text style={styles.signupButtonText}>
+            {isSubmitting ? "Creating Account..." : "Create GolfTee Account"}
+          </Text>
+          <Ionicons name="arrow-forward" size={20} color={colors.surface} />
+        </Pressable>
+
+        {/* Separator to login */}
+        <View style={styles.loginPrompt}>
+          <Text style={styles.loginPromptText}>Already have an account? </Text>
+          <Pressable
+            onPress={() => router.replace("/login")}
+            variant="chip"
+            disabled={isSubmitting}
+            accessibilityRole="link"
+            accessibilityLabel="Log In link"
+            accessibilityHint="Navigates to the login screen"
+          >
+            <Text style={styles.loginLinkText}>Log In</Text>
+          </Pressable>
+        </View>
+      </View>
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
       <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
 
-      <View style={styles.authTopBar}>
-        <Pressable
-          style={styles.authBackButton}
-          onPress={() => router.replace("/login")}
-          variant="icon"
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-          accessibilityHint="Navigates to the login screen"
-        >
-          <Ionicons name="arrow-back" size={22} color={colors.primary} />
-        </Pressable>
-        <Text style={styles.authTopTitle}>Create Account</Text>
-        <View style={styles.authTopSpacer} />
-      </View>
-
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[
-          styles.contentContainer,
-          {
-            paddingHorizontal: horizontalPadding,
-          },
-        ]}
-        showsVerticalScrollIndicator={false}
-        bounces={false}
-        overScrollMode="never"
-        keyboardShouldPersistTaps="handled"
-        automaticallyAdjustContentInsets={false}
-        automaticallyAdjustKeyboardInsets={false}
-      >
-        <View style={[styles.mainLayout, { maxWidth: contentMaxWidth }]}>
-          <View style={styles.heroCard}>
-            <Text style={styles.eyebrow}>GET STARTED</Text>
-            <Text style={[styles.subtitle, isCompactScreen && styles.subtitleCompact]}>
-              Create a free account to book tee times, track statistics, and find your favorite golf courses.
+      {isTabletLike ? (
+        <View style={styles.desktopContainer}>
+          <View style={styles.desktopHeroCol}>
+            <View style={styles.logoCircleLarge}>
+              <Image source={require("../assets/images/icon.png")} style={styles.logoImageLarge} />
+            </View>
+            <Text style={styles.desktopBrandingTitle}>GolfTee</Text>
+            <Text style={styles.desktopBrandingDesc}>
+              {"Sri Lanka's Premier Tee Time Booking and Course Management Platform"}
             </Text>
           </View>
-
-          <View style={styles.panel}>
-            <View style={styles.formGroup}>
-              {/* Username Input */}
-              <View style={[styles.inputShell, errors.username && styles.inputShellError]}>
-                <Text style={[styles.inputLabel, errors.username && styles.inputLabelError]}>
-                  USERNAME
-                </Text>
-                <View style={styles.inputRow}>
-                  <Ionicons name="person-outline" size={18} color={errors.username ? colors.danger : colors.muted} />
-                  <TextInput
-                    placeholder="Choose a username"
-                    placeholderTextColor={colors.muted}
-                    style={[styles.inputField, errors.username && styles.inputFieldError]}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    value={username}
-                    onChangeText={(text) => {
-                      setUsername(text);
-                      clearError("username");
-                      if (authNotice) setAuthNotice(null);
-                    }}
-                    editable={!isSubmitting}
-                    accessibilityLabel="Username input"
-                    accessibilityHint="Choose a unique username"
-                  />
-                </View>
-              </View>
-
-              {/* Email Input */}
-              <View style={[styles.inputShell, errors.email && styles.inputShellError]}>
-                <Text style={[styles.inputLabel, errors.email && styles.inputLabelError]}>
-                  EMAIL ADDRESS
-                </Text>
-                <View style={styles.inputRow}>
-                  <Ionicons name="mail-outline" size={18} color={errors.email ? colors.danger : colors.muted} />
-                  <TextInput
-                    placeholder="name@example.com"
-                    placeholderTextColor={colors.muted}
-                    style={[styles.inputField, errors.email && styles.inputFieldError]}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    value={email}
-                    onChangeText={(text) => {
-                      setEmail(text);
-                      clearError("email");
-                      if (authNotice) setAuthNotice(null);
-                    }}
-                    editable={!isSubmitting}
-                    accessibilityLabel="Email Address input"
-                    accessibilityHint="Enter your email address"
-                  />
-                </View>
-              </View>
-
-              {/* Password Input */}
-              <View style={[styles.inputShell, errors.password && styles.inputShellError]}>
-                <Text style={[styles.inputLabel, errors.password && styles.inputLabelError]}>
-                  PASSWORD
-                </Text>
-                <View style={styles.inputRow}>
-                  <Ionicons name="lock-closed-outline" size={18} color={errors.password ? colors.danger : colors.muted} />
-                  <TextInput
-                    placeholder="Create a password"
-                    placeholderTextColor={colors.muted}
-                    style={[styles.inputField, errors.password && styles.inputFieldError]}
-                    secureTextEntry
-                    value={password}
-                    onChangeText={(text) => {
-                      setPassword(text);
-                      clearError("password");
-                      if (authNotice) setAuthNotice(null);
-                    }}
-                    editable={!isSubmitting}
-                    accessibilityLabel="Password input"
-                    accessibilityHint="Create a strong password"
-                  />
-                </View>
-              </View>
-
-              {/* Confirm Password Input */}
-              <View style={[styles.inputShell, errors.confirmPassword && styles.inputShellError]}>
-                <Text style={[styles.inputLabel, errors.confirmPassword && styles.inputLabelError]}>
-                  CONFIRM PASSWORD
-                </Text>
-                <View style={styles.inputRow}>
-                  <Ionicons name="shield-checkmark-outline" size={18} color={errors.confirmPassword ? colors.danger : colors.muted} />
-                  <TextInput
-                    placeholder="Re-enter your password"
-                    placeholderTextColor={colors.muted}
-                    style={[styles.inputField, errors.confirmPassword && styles.inputFieldError]}
-                    secureTextEntry
-                    value={confirmPassword}
-                    onChangeText={(text) => {
-                      setConfirmPassword(text);
-                      clearError("confirmPassword");
-                      if (authNotice) setAuthNotice(null);
-                    }}
-                    editable={!isSubmitting}
-                    accessibilityLabel="Confirm Password input"
-                    accessibilityHint="Re-enter your password"
-                  />
-                </View>
-              </View>
-
-              {/* Handicap Input (Optional) */}
-              <View style={[styles.inputShell, errors.handicap && styles.inputShellError]}>
-                <Text style={[styles.inputLabel, errors.handicap && styles.inputLabelError]}>
-                  HANDICAP (OPTIONAL)
-                </Text>
-                <View style={styles.inputRow}>
-                  <Ionicons name="golf-outline" size={18} color={errors.handicap ? colors.danger : colors.muted} />
-                  <TextInput
-                    placeholder="e.g. 12.4"
-                    placeholderTextColor={colors.muted}
-                    style={[styles.inputField, errors.handicap && styles.inputFieldError]}
-                    keyboardType="decimal-pad"
-                    value={handicap}
-                    onChangeText={(text) => {
-                      setHandicap(text);
-                      clearError("handicap");
-                      if (authNotice) setAuthNotice(null);
-                    }}
-                    editable={!isSubmitting}
-                    accessibilityLabel="Handicap input, optional"
-                    accessibilityHint="Enter a valid handicap between 0.0 and 54.0"
-                  />
-                </View>
-              </View>
-            </View>
-
-            {feedbackMessage ? (
-              <View style={styles.errorRow}>
-                <View style={styles.errorDot} />
-                <Text style={styles.errorText}>{feedbackMessage}</Text>
-              </View>
-            ) : null}
-
-            <Pressable
-              style={styles.signupButton}
-              onPress={() => void handleSignup()}
-              disabled={isSubmitting || Boolean(supabaseConfigurationError)}
-              variant="cta"
-              accessibilityRole="button"
-              accessibilityState={{ disabled: isSubmitting }}
-              accessibilityLabel={isSubmitting ? "Creating Account" : "Create GolfTee Account"}
-              accessibilityHint="Submits account registration form"
-            >
-              <Text style={styles.signupButtonText}>
-                {isSubmitting ? "Creating Account..." : "Create GolfTee Account"}
-              </Text>
-              <Ionicons name="arrow-forward" size={20} color={colors.surface} />
-            </Pressable>
-
-            {/* Separator to login */}
-            <View style={styles.loginPrompt}>
-              <Text style={styles.loginPromptText}>Already have an account? </Text>
+          <View style={styles.desktopFormCol}>
+            <View style={styles.desktopHeaderRow}>
               <Pressable
+                style={styles.authBackButton}
                 onPress={() => router.replace("/login")}
-                variant="chip"
-                disabled={isSubmitting}
-                accessibilityRole="link"
-                accessibilityLabel="Log In link"
-                accessibilityHint="Navigates to the login screen"
+                variant="icon"
               >
-                <Text style={styles.loginLinkText}>Log In</Text>
+                <Ionicons name="arrow-back" size={22} color={colors.primary} />
               </Pressable>
             </View>
+            <ScrollView
+              style={styles.scroll}
+              contentContainerStyle={styles.desktopScrollContent}
+              showsVerticalScrollIndicator={Platform.OS === "web"}
+              bounces={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {signupForm}
+            </ScrollView>
           </View>
         </View>
-      </ScrollView>
+      ) : (
+        <>
+          <View style={styles.authTopBar}>
+            <Pressable
+              style={styles.authBackButton}
+              onPress={() => router.replace("/login")}
+              variant="icon"
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+              accessibilityHint="Navigates to the login screen"
+            >
+              <Ionicons name="arrow-back" size={22} color={colors.primary} />
+            </Pressable>
+            <Text style={styles.authTopTitle}>Create Account</Text>
+            <View style={styles.authTopSpacer} />
+          </View>
+
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={[
+              styles.contentContainer,
+              {
+                paddingHorizontal: horizontalPadding,
+              },
+            ]}
+            showsVerticalScrollIndicator={Platform.OS === "web"}
+            bounces={false}
+            overScrollMode="never"
+            keyboardShouldPersistTaps="handled"
+            automaticallyAdjustContentInsets={false}
+            automaticallyAdjustKeyboardInsets={false}
+          >
+            {signupForm}
+          </ScrollView>
+        </>
+      )}
     </SafeAreaView>
   );
 }
@@ -927,5 +967,66 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     fontSize: theme.typography.subtitle.fontSize,
     color: colors.primary,
     fontWeight: "700",
+  },
+  desktopContainer: {
+    flex: 1,
+    flexDirection: "row",
+  },
+  desktopHeroCol: {
+    flex: 1.1,
+    backgroundColor: colors.surfaceSoft,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 40,
+    borderRightWidth: 1,
+    borderColor: colors.border,
+  },
+  logoCircleLarge: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.surface,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 20,
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 3,
+  },
+  logoImageLarge: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  desktopBrandingTitle: {
+    fontSize: 32,
+    fontWeight: "900",
+    color: colors.text,
+    marginBottom: 12,
+  },
+  desktopBrandingDesc: {
+    fontSize: 16,
+    color: colors.textSoft,
+    textAlign: "center",
+    maxWidth: 380,
+    lineHeight: 24,
+  },
+  desktopFormCol: {
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 40,
+  },
+  desktopScrollContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 40,
+  },
+  desktopHeaderRow: {
+    position: "absolute",
+    top: 24,
+    left: 24,
+    zIndex: 10,
   },
 }));

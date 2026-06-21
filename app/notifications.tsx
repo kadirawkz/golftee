@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { ScrollView, Text, View, RefreshControl } from "react-native";
+import { Platform,  ScrollView, Text, View, RefreshControl  } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
@@ -129,7 +129,7 @@ export default function NotificationsScreen() {
   const styles = useThemedStyles(themedStyles);
   const router = useRouter();
   const { filter } = useLocalSearchParams<{ filter?: NotificationFilter }>();
-  const { horizontalPadding, screenBottomPadding } = useResponsiveLayout();
+  const { horizontalPadding, screenBottomPadding, isTabletLike } = useResponsiveLayout();
   const { notifications } = useNotificationState();
   const [activeFilter, setActiveFilter] = useState<NotificationFilter>("all");
   const [refreshing, setRefreshing] = useState(false);
@@ -254,7 +254,7 @@ export default function NotificationsScreen() {
       <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
 
       <ScrollView
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator={Platform.OS === "web"}
         contentContainerStyle={[
           styles.scrollContent,
           { paddingHorizontal: horizontalPadding, paddingBottom: screenBottomPadding },
@@ -297,7 +297,7 @@ export default function NotificationsScreen() {
 
         <ScrollView
           horizontal
-          showsHorizontalScrollIndicator={false}
+          showsHorizontalScrollIndicator={Platform.OS === "web"}
           contentContainerStyle={styles.filterRow}
           bounces={false}
           overScrollMode="never"
@@ -325,16 +325,25 @@ export default function NotificationsScreen() {
            {unreadNotifications.length > 0 ? (
             <View style={styles.groupSection}>
               <Text style={styles.sectionLabel}>Unread</Text>
-              <View style={styles.notificationsList}>
-                {unreadNotifications.map((notification) => (
-                  <NotificationCard
-                    key={notification.id}
-                    notification={notification}
-                    onMarkRead={handleMarkRead}
-                    onAction={handleNotificationAction}
-                    onDelete={handleDelete}
-                  />
-                ))}
+              <View style={isTabletLike ? styles.desktopList : styles.notificationsList}>
+                {unreadNotifications.map((notification) => {
+                  const card = (
+                    <NotificationCard
+                      key={notification.id}
+                      notification={notification}
+                      onMarkRead={handleMarkRead}
+                      onAction={handleNotificationAction}
+                      onDelete={handleDelete}
+                    />
+                  );
+                  return isTabletLike ? (
+                    <View key={notification.id} style={styles.desktopCardWrapper}>
+                      {card}
+                    </View>
+                  ) : (
+                    card
+                  );
+                })}
               </View>
             </View>
           ) : null}
@@ -342,16 +351,25 @@ export default function NotificationsScreen() {
           {earlierNotifications.length > 0 ? (
             <View style={styles.groupSection}>
               <Text style={styles.sectionLabel}>{unreadNotifications.length > 0 ? "Earlier" : "All Notifications"}</Text>
-              <View style={styles.notificationsList}>
-                {earlierNotifications.map((notification) => (
-                  <NotificationCard
-                    key={notification.id}
-                    notification={notification}
-                    onMarkRead={handleMarkRead}
-                    onAction={handleNotificationAction}
-                    onDelete={handleDelete}
-                  />
-                ))}
+              <View style={isTabletLike ? styles.desktopList : styles.notificationsList}>
+                {earlierNotifications.map((notification) => {
+                  const card = (
+                    <NotificationCard
+                      key={notification.id}
+                      notification={notification}
+                      onMarkRead={handleMarkRead}
+                      onAction={handleNotificationAction}
+                      onDelete={handleDelete}
+                    />
+                  );
+                  return isTabletLike ? (
+                    <View key={notification.id} style={styles.desktopCardWrapper}>
+                      {card}
+                    </View>
+                  ) : (
+                    card
+                  );
+                })}
               </View>
             </View>
           ) : null}
@@ -598,5 +616,16 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     color: colors.textSoft,
     textAlign: "center",
     maxWidth: 280,
+  },
+  desktopList: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 16,
+    width: "100%",
+  },
+  desktopCardWrapper: {
+    width: "48.5%",
+    minWidth: 320,
+    flexGrow: 1,
   },
 }));

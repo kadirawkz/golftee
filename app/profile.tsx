@@ -3,7 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
+import { Platform, 
   ActivityIndicator,
   Animated,
   Linking,
@@ -13,7 +13,7 @@ import {
   Text,
   TextInput,
   View,
-} from "react-native";
+ } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
@@ -68,7 +68,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const auth = useAuthSession();
   const bookingState = useBookingState();
-  const { screenBottomPadding } = useResponsiveLayout();
+  const { screenBottomPadding, isTabletLike, horizontalPadding } = useResponsiveLayout();
 
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
@@ -201,220 +201,414 @@ export default function ProfileScreen() {
       <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
 
       <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: screenBottomPadding }]}
+        showsVerticalScrollIndicator={Platform.OS === "web"}
+        contentContainerStyle={[styles.scrollContent, { paddingHorizontal: horizontalPadding, paddingBottom: screenBottomPadding }]}
         bounces={false}
         overScrollMode="never"
       >
-        {/* PREMIUM MINIMALIST PROFILE HEADER */}
-        <View style={styles.profileHeaderCard}>
-          <View style={styles.headerTopRow}>
-            <View style={styles.avatarWrapContainer}>
-              <Pressable style={styles.avatarWrap} onPress={() => router.navigate("/account")} variant="card">
-                {auth.profile?.avatar_url ? (
-                  <AppImage source={{ uri: auth.profile.avatar_url }} style={styles.avatarImage} />
-                ) : (
-                  <View style={styles.avatarInitialContainer}>
-                    <Text style={styles.avatarInitialText}>
-                      {(memberName || "G")[0].toUpperCase()}
-                    </Text>
+        {isTabletLike ? (
+          <View style={styles.desktopLayoutRow}>
+            <View style={styles.desktopColumnLeft}>
+              {/* PREMIUM MINIMALIST PROFILE HEADER */}
+              <View style={styles.profileHeaderCard}>
+                <View style={styles.headerTopRow}>
+                  <View style={styles.avatarWrapContainer}>
+                    <Pressable style={styles.avatarWrap} onPress={() => router.navigate("/account")} variant="card">
+                      {auth.profile?.avatar_url ? (
+                        <AppImage source={{ uri: auth.profile.avatar_url }} style={styles.avatarImage} />
+                      ) : (
+                        <View style={styles.avatarInitialContainer}>
+                          <Text style={styles.avatarInitialText}>
+                            {(memberName || "G")[0].toUpperCase()}
+                          </Text>
+                        </View>
+                      )}
+                    </Pressable>
                   </View>
-                )}
-              </Pressable>
-            </View>
 
-            <View style={styles.headerNameBlock}>
-              <View style={styles.tierBadgeRow}>
-                <Text style={styles.headerWelcomeText}>MEMBER PROFILE</Text>
-                <View style={styles.passTierBadge}>
-                  <Text style={styles.passTierText}>{membershipTier}</Text>
+                  <View style={styles.headerNameBlock}>
+                    <View style={styles.tierBadgeRow}>
+                      <Text style={styles.headerWelcomeText}>MEMBER PROFILE</Text>
+                      <View style={styles.passTierBadge}>
+                        <Text style={styles.passTierText}>{membershipTier}</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.headerNameText} numberOfLines={1}>{memberName}</Text>
+                    <Text style={styles.headerSinceText}>Active member since {memberSince}</Text>
+                  </View>
+
+                  <Pressable
+                    style={styles.settingsHeaderBtn}
+                    onPress={() => router.navigate("/account")}
+                    variant="icon"
+                  >
+                    <Ionicons name="create-outline" size={22} color={colors.primary} />
+                  </Pressable>
                 </View>
               </View>
-              <Text style={styles.headerNameText} numberOfLines={1}>{memberName}</Text>
-              <Text style={styles.headerSinceText}>Active member since {memberSince}</Text>
+
+              {/* STATS OVERVIEW SECTION */}
+              <View style={styles.statsPill}>
+                <Pressable
+                  style={styles.statCol}
+                  onPress={() => setIsEditingHandicap(!isEditingHandicap)}
+                  variant="chip"
+                >
+                  <Text style={styles.statLabel}>HANDICAP</Text>
+                  <View style={styles.statValueRow}>
+                    <Text style={styles.statValue}>{handicapValue}</Text>
+                    <Ionicons name="pencil" size={10} color={colors.primary} style={styles.miniPencil} />
+                  </View>
+                </Pressable>
+                <View style={styles.statDivider} />
+                <View style={styles.statCol}>
+                  <Text style={styles.statLabel}>AVG PAR</Text>
+                  <Text style={styles.statValue}>74</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statCol}>
+                  <Text style={styles.statLabel}>TOTAL ROUNDS</Text>
+                  <Text style={styles.statValue}>{bookingState.bookings.length}</Text>
+                </View>
+              </View>
+
+              {/* INLINE HANDICAP ADJUSTER */}
+              {isEditingHandicap && (
+                <View style={styles.handicapAdjusterWrap}>
+                  <Text style={styles.adjusterTitle}>Adjust Handicap</Text>
+                  <View style={styles.adjusterRow}>
+                    <Pressable
+                      style={styles.adjusterBtn}
+                      onPress={() => handleUpdateHandicap("decrement")}
+                      variant="chip"
+                    >
+                      <Ionicons name="remove" size={18} color={colors.primary} />
+                    </Pressable>
+                    <TextInput
+                      style={styles.handicapInput}
+                      keyboardType="numeric"
+                      value={handicapInput}
+                      onChangeText={setHandicapInput}
+                    />
+                    <Pressable
+                      style={styles.adjusterBtn}
+                      onPress={() => handleUpdateHandicap("increment")}
+                      variant="chip"
+                    >
+                      <Ionicons name="add" size={18} color={colors.primary} />
+                    </Pressable>
+                  </View>
+                  <View style={styles.adjusterActions}>
+                    <Pressable
+                      style={[styles.btnMini, styles.btnCancel]}
+                      onPress={() => setIsEditingHandicap(false)}
+                      variant="chip"
+                    >
+                      <Text style={styles.btnCancelText}>Cancel</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.btnMini, styles.btnSave]}
+                      onPress={() => handleUpdateHandicap("save")}
+                      disabled={savingHandicap}
+                      variant="cta"
+                    >
+                      {savingHandicap ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Text style={styles.btnSaveText}>Save</Text>
+                      )}
+                    </Pressable>
+                  </View>
+                </View>
+              )}
             </View>
 
-            <Pressable
-              style={styles.settingsHeaderBtn}
-              onPress={() => router.navigate("/account")}
-              variant="icon"
-            >
-              <Ionicons name="create-outline" size={22} color={colors.primary} />
-            </Pressable>
-          </View>
-        </View>
+            <View style={styles.desktopColumnRight}>
+              {/* PERFORMANCE DASHBOARD */}
+              <View style={[styles.metricsDashboardWrap, { marginHorizontal: 0 }]}>
+                <View style={styles.dashboardHeader}>
+                  <View style={styles.dashboardTitleRow}>
+                    <Ionicons name="analytics" size={18} color={colors.primary} />
+                    <Text style={styles.dashboardTitle}>Performance Stats</Text>
+                  </View>
+                  <Pressable style={styles.metricsEditBtn} onPress={() => setIsEditingMetrics(true)} variant="chip">
+                    <Ionicons name="create-outline" size={16} color={colors.primary} />
+                    <Text style={styles.metricsEditBtnText}>Edit</Text>
+                  </Pressable>
+                </View>
+                <View style={styles.metricsGrid}>
+                  <View style={styles.metricCard}>
+                    <View style={[styles.metricIconWrap, { backgroundColor: `${colors.primary}12` }]}>
+                      <Ionicons name="speedometer-outline" size={18} color={colors.primary} />
+                    </View>
+                    <Text style={styles.metricValText}>{longestDrive} yds</Text>
+                    <Text style={styles.metricLabelText}>Longest Drive</Text>
+                  </View>
+                  <View style={styles.metricCard}>
+                    <View style={[styles.metricIconWrap, { backgroundColor: `${colors.accentWarm}12` }]}>
+                      <Ionicons name="disc-outline" size={18} color={colors.accentWarm} />
+                    </View>
+                    <Text style={styles.metricValText}>{girPercentage}%</Text>
+                    <Text style={styles.metricLabelText}>GIR Ratio</Text>
+                  </View>
+                  <View style={styles.metricCard}>
+                    <View style={[styles.metricIconWrap, { backgroundColor: `${colors.primary}12` }]}>
+                      <Ionicons name="flag-outline" size={18} color={colors.primary} />
+                    </View>
+                    <Text style={styles.metricValText}>{puttingAverage}</Text>
+                    <Text style={styles.metricLabelText}>Putting Avg</Text>
+                  </View>
+                </View>
+              </View>
 
-        {/* STATS OVERVIEW SECTION */}
-        <View style={styles.statsPill}>
-          <Pressable
-            style={styles.statCol}
-            onPress={() => setIsEditingHandicap(!isEditingHandicap)}
-            variant="chip"
-          >
-            <Text style={styles.statLabel}>HANDICAP</Text>
-            <View style={styles.statValueRow}>
-              <Text style={styles.statValue}>{handicapValue}</Text>
-              <Ionicons name="pencil" size={10} color={colors.primary} style={styles.miniPencil} />
-            </View>
-          </Pressable>
-          <View style={styles.statDivider} />
-          <View style={styles.statCol}>
-            <Text style={styles.statLabel}>AVG PAR</Text>
-            <Text style={styles.statValue}>74</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statCol}>
-            <Text style={styles.statLabel}>TOTAL ROUNDS</Text>
-            <Text style={styles.statValue}>{bookingState.bookings.length}</Text>
-          </View>
-        </View>
+              {/* QUICK ACTIONS LIST */}
+              <Text style={[styles.actionGridLabel, { marginHorizontal: 0 }]}>ACCOUNT QUICK INTERACTIONS</Text>
+              <View style={[styles.actionListContainer, { marginHorizontal: 0 }]}>
+                <Pressable style={styles.actionListItem} onPress={handleCallConcierge} variant="card">
+                  <View style={styles.actionListLeft}>
+                    <View style={[styles.actionListIconWrap, { backgroundColor: colors.primarySoft }]}>
+                      <Ionicons name="call" size={18} color={colors.primary} />
+                    </View>
+                    <View>
+                      <Text style={styles.actionListTitle}>Club Concierge</Text>
+                      <Text style={styles.actionListSubtitle}>Priority support dialer</Text>
+                    </View>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+                </Pressable>
 
-        {/* INLINE HANDICAP ADJUSTER */}
-        {isEditingHandicap && (
-          <View style={styles.handicapAdjusterWrap}>
-            <Text style={styles.adjusterTitle}>Adjust Handicap</Text>
-            <View style={styles.adjusterRow}>
-              <Pressable
-                style={styles.adjusterBtn}
-                onPress={() => handleUpdateHandicap("decrement")}
-                variant="chip"
-              >
-                <Ionicons name="remove" size={18} color={colors.primary} />
-              </Pressable>
-              <TextInput
-                style={styles.handicapInput}
-                keyboardType="numeric"
-                value={handicapInput}
-                onChangeText={setHandicapInput}
-              />
-              <Pressable
-                style={styles.adjusterBtn}
-                onPress={() => handleUpdateHandicap("increment")}
-                variant="chip"
-              >
-                <Ionicons name="add" size={18} color={colors.primary} />
-              </Pressable>
-            </View>
-            <View style={styles.adjusterActions}>
-              <Pressable
-                style={[styles.btnMini, styles.btnCancel]}
-                onPress={() => setIsEditingHandicap(false)}
-                variant="chip"
-              >
-                <Text style={styles.btnCancelText}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.btnMini, styles.btnSave]}
-                onPress={() => handleUpdateHandicap("save")}
-                disabled={savingHandicap}
-                variant="cta"
-              >
-                {savingHandicap ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.btnSaveText}>Save</Text>
-                )}
-              </Pressable>
+                <Pressable style={[styles.actionListItem, { borderBottomWidth: 0 }]} onPress={handleEmailSupport} variant="card">
+                  <View style={styles.actionListLeft}>
+                    <View style={[styles.actionListIconWrap, { backgroundColor: `${colors.accentSoft}70` }]}>
+                      <Ionicons name="mail" size={18} color={colors.accentWarm} />
+                    </View>
+                    <View>
+                      <Text style={styles.actionListTitle}>Support Desk</Text>
+                      <Text style={styles.actionListSubtitle}>Inquiries & assistance</Text>
+                    </View>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+                </Pressable>
+              </View>
+
+              {/* LOG OUT SEPARATION */}
+              <View style={[styles.logoutBtnContainer, { marginHorizontal: 0 }]}>
+                {logoutError ? <Text style={styles.actionErrorText}>{logoutError}</Text> : null}
+                <Pressable style={styles.logoutButton} onPress={() => void handleLogout()} disabled={isLoggingOut} variant="button">
+                  <Ionicons name="log-out-outline" size={18} color={colors.danger} />
+                  <Text style={styles.logoutButtonText}>{isLoggingOut ? "LOGGING OUT..." : "LOG OUT ACCOUNT"}</Text>
+                </Pressable>
+              </View>
             </View>
           </View>
+        ) : (
+          <>
+            {/* PREMIUM MINIMALIST PROFILE HEADER */}
+            <View style={styles.profileHeaderCard}>
+              <View style={styles.headerTopRow}>
+                <View style={styles.avatarWrapContainer}>
+                  <Pressable style={styles.avatarWrap} onPress={() => router.navigate("/account")} variant="card">
+                    {auth.profile?.avatar_url ? (
+                      <AppImage source={{ uri: auth.profile.avatar_url }} style={styles.avatarImage} />
+                    ) : (
+                      <View style={styles.avatarInitialContainer}>
+                        <Text style={styles.avatarInitialText}>
+                          {(memberName || "G")[0].toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
+                  </Pressable>
+                </View>
+
+                <View style={styles.headerNameBlock}>
+                  <View style={styles.tierBadgeRow}>
+                    <Text style={styles.headerWelcomeText}>MEMBER PROFILE</Text>
+                    <View style={styles.passTierBadge}>
+                      <Text style={styles.passTierText}>{membershipTier}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.headerNameText} numberOfLines={1}>{memberName}</Text>
+                  <Text style={styles.headerSinceText}>Active member since {memberSince}</Text>
+                </View>
+
+                <Pressable
+                  style={styles.settingsHeaderBtn}
+                  onPress={() => router.navigate("/account")}
+                  variant="icon"
+                >
+                  <Ionicons name="create-outline" size={22} color={colors.primary} />
+                </Pressable>
+              </View>
+            </View>
+
+            {/* STATS OVERVIEW SECTION */}
+            <View style={styles.statsPill}>
+              <Pressable
+                style={styles.statCol}
+                onPress={() => setIsEditingHandicap(!isEditingHandicap)}
+                variant="chip"
+              >
+                <Text style={styles.statLabel}>HANDICAP</Text>
+                <View style={styles.statValueRow}>
+                  <Text style={styles.statValue}>{handicapValue}</Text>
+                  <Ionicons name="pencil" size={10} color={colors.primary} style={styles.miniPencil} />
+                </View>
+              </Pressable>
+              <View style={styles.statDivider} />
+              <View style={styles.statCol}>
+                <Text style={styles.statLabel}>AVG PAR</Text>
+                <Text style={styles.statValue}>74</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statCol}>
+                <Text style={styles.statLabel}>TOTAL ROUNDS</Text>
+                <Text style={styles.statValue}>{bookingState.bookings.length}</Text>
+              </View>
+            </View>
+
+            {/* INLINE HANDICAP ADJUSTER */}
+            {isEditingHandicap && (
+              <View style={styles.handicapAdjusterWrap}>
+                <Text style={styles.adjusterTitle}>Adjust Handicap</Text>
+                <View style={styles.adjusterRow}>
+                  <Pressable
+                    style={styles.adjusterBtn}
+                    onPress={() => handleUpdateHandicap("decrement")}
+                    variant="chip"
+                  >
+                    <Ionicons name="remove" size={18} color={colors.primary} />
+                  </Pressable>
+                  <TextInput
+                    style={styles.handicapInput}
+                    keyboardType="numeric"
+                    value={handicapInput}
+                    onChangeText={setHandicapInput}
+                  />
+                  <Pressable
+                    style={styles.adjusterBtn}
+                    onPress={() => handleUpdateHandicap("increment")}
+                    variant="chip"
+                  >
+                    <Ionicons name="add" size={18} color={colors.primary} />
+                  </Pressable>
+                </View>
+                <View style={styles.adjusterActions}>
+                  <Pressable
+                    style={[styles.btnMini, styles.btnCancel]}
+                    onPress={() => setIsEditingHandicap(false)}
+                    variant="chip"
+                  >
+                    <Text style={styles.btnCancelText}>Cancel</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.btnMini, styles.btnSave]}
+                    onPress={() => handleUpdateHandicap("save")}
+                    disabled={savingHandicap}
+                    variant="cta"
+                  >
+                    {savingHandicap ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.btnSaveText}>Save</Text>
+                    )}
+                  </Pressable>
+                </View>
+              </View>
+            )}
+
+            {/* PERFORMANCE DASHBOARD */}
+            <View style={styles.metricsDashboardWrap}>
+              <View style={styles.dashboardHeader}>
+                <View style={styles.dashboardTitleRow}>
+                  <Ionicons name="analytics" size={18} color={colors.primary} />
+                  <Text style={styles.dashboardTitle}>Performance Stats</Text>
+                </View>
+                <Pressable style={styles.metricsEditBtn} onPress={() => setIsEditingMetrics(true)} variant="chip">
+                  <Ionicons name="create-outline" size={16} color={colors.primary} />
+                  <Text style={styles.metricsEditBtnText}>Edit</Text>
+                </Pressable>
+              </View>
+              <View style={styles.metricsGrid}>
+                <View style={styles.metricCard}>
+                  <View style={[styles.metricIconWrap, { backgroundColor: `${colors.primary}12` }]}>
+                    <Ionicons name="speedometer-outline" size={18} color={colors.primary} />
+                  </View>
+                  <Text style={styles.metricValText}>{longestDrive} yds</Text>
+                  <Text style={styles.metricLabelText}>Longest Drive</Text>
+                </View>
+                <View style={styles.metricCard}>
+                  <View style={[styles.metricIconWrap, { backgroundColor: `${colors.accentWarm}12` }]}>
+                    <Ionicons name="disc-outline" size={18} color={colors.accentWarm} />
+                  </View>
+                  <Text style={styles.metricValText}>{girPercentage}%</Text>
+                  <Text style={styles.metricLabelText}>GIR Ratio</Text>
+                </View>
+                <View style={styles.metricCard}>
+                  <View style={[styles.metricIconWrap, { backgroundColor: `${colors.primary}12` }]}>
+                    <Ionicons name="flag-outline" size={18} color={colors.primary} />
+                  </View>
+                  <Text style={styles.metricValText}>{puttingAverage}</Text>
+                  <Text style={styles.metricLabelText}>Putting Avg</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* QUICK ACTIONS LIST */}
+            <Text style={styles.actionGridLabel}>ACCOUNT QUICK INTERACTIONS</Text>
+            <View style={styles.actionListContainer}>
+              {/* Item 1: Club Concierge */}
+              <Pressable style={styles.actionListItem} onPress={handleCallConcierge} variant="card">
+                <View style={styles.actionListLeft}>
+                  <View style={[styles.actionListIconWrap, { backgroundColor: colors.primarySoft }]}>
+                    <Ionicons name="call" size={18} color={colors.primary} />
+                  </View>
+                  <View>
+                    <Text style={styles.actionListTitle}>Club Concierge</Text>
+                    <Text style={styles.actionListSubtitle}>Priority support dialer</Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+              </Pressable>
+
+              {/* Item 2: Support Email */}
+              <Pressable style={styles.actionListItem} onPress={handleEmailSupport} variant="card">
+                <View style={styles.actionListLeft}>
+                  <View style={[styles.actionListIconWrap, { backgroundColor: `${colors.accentSoft}70` }]}>
+                    <Ionicons name="mail" size={18} color={colors.accentWarm} />
+                  </View>
+                  <View>
+                    <Text style={styles.actionListTitle}>Support Desk</Text>
+                    <Text style={styles.actionListSubtitle}>Inquiries & assistance</Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+              </Pressable>
+
+              {/* Item 4: App Settings */}
+              <Pressable style={[styles.actionListItem, { borderBottomWidth: 0 }]} onPress={() => router.navigate("/settings")} variant="card">
+                <View style={styles.actionListLeft}>
+                  <View style={[styles.actionListIconWrap, { backgroundColor: colors.primarySoft }]}>
+                    <Ionicons name="settings" size={18} color={colors.primary} />
+                  </View>
+                  <View>
+                    <Text style={styles.actionListTitle}>App Settings</Text>
+                    <Text style={styles.actionListSubtitle}>Alerts & preferences</Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+              </Pressable>
+            </View>
+
+            {/* LOG OUT SEPARATION */}
+            <View style={styles.logoutBtnContainer}>
+              {logoutError ? <Text style={styles.actionErrorText}>{logoutError}</Text> : null}
+              <Pressable style={styles.logoutButton} onPress={() => void handleLogout()} disabled={isLoggingOut} variant="button">
+                <Ionicons name="log-out-outline" size={18} color={colors.danger} />
+                <Text style={styles.logoutButtonText}>{isLoggingOut ? "LOGGING OUT..." : "LOG OUT ACCOUNT"}</Text>
+              </Pressable>
+            </View>
+          </>
         )}
-
-        {/* PERFORMANCE DASHBOARD */}
-        <View style={styles.metricsDashboardWrap}>
-          <View style={styles.dashboardHeader}>
-            <View style={styles.dashboardTitleRow}>
-              <Ionicons name="analytics" size={18} color={colors.primary} />
-              <Text style={styles.dashboardTitle}>Performance Stats</Text>
-            </View>
-            <Pressable style={styles.metricsEditBtn} onPress={() => setIsEditingMetrics(true)} variant="chip">
-              <Ionicons name="create-outline" size={16} color={colors.primary} />
-              <Text style={styles.metricsEditBtnText}>Edit</Text>
-            </Pressable>
-          </View>
-          <View style={styles.metricsGrid}>
-            <View style={styles.metricCard}>
-              <View style={[styles.metricIconWrap, { backgroundColor: `${colors.primary}12` }]}>
-                <Ionicons name="speedometer-outline" size={18} color={colors.primary} />
-              </View>
-              <Text style={styles.metricValText}>{longestDrive} yds</Text>
-              <Text style={styles.metricLabelText}>Longest Drive</Text>
-            </View>
-            <View style={styles.metricCard}>
-              <View style={[styles.metricIconWrap, { backgroundColor: `${colors.accentWarm}12` }]}>
-                <Ionicons name="disc-outline" size={18} color={colors.accentWarm} />
-              </View>
-              <Text style={styles.metricValText}>{girPercentage}%</Text>
-              <Text style={styles.metricLabelText}>GIR Ratio</Text>
-            </View>
-            <View style={styles.metricCard}>
-              <View style={[styles.metricIconWrap, { backgroundColor: `${colors.primary}12` }]}>
-                <Ionicons name="flag-outline" size={18} color={colors.primary} />
-              </View>
-              <Text style={styles.metricValText}>{puttingAverage}</Text>
-              <Text style={styles.metricLabelText}>Putting Avg</Text>
-            </View>
-          </View>
-        </View>
-
-
-
-        {/* QUICK ACTIONS LIST */}
-        <Text style={styles.actionGridLabel}>ACCOUNT QUICK INTERACTIONS</Text>
-        <View style={styles.actionListContainer}>
-          {/* Item 1: Club Concierge */}
-          <Pressable style={styles.actionListItem} onPress={handleCallConcierge} variant="card">
-            <View style={styles.actionListLeft}>
-              <View style={[styles.actionListIconWrap, { backgroundColor: colors.primarySoft }]}>
-                <Ionicons name="call" size={18} color={colors.primary} />
-              </View>
-              <View>
-                <Text style={styles.actionListTitle}>Club Concierge</Text>
-                <Text style={styles.actionListSubtitle}>Priority support dialer</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={colors.muted} />
-          </Pressable>
-
-          {/* Item 2: Support Email */}
-          <Pressable style={styles.actionListItem} onPress={handleEmailSupport} variant="card">
-            <View style={styles.actionListLeft}>
-              <View style={[styles.actionListIconWrap, { backgroundColor: `${colors.accentSoft}70` }]}>
-                <Ionicons name="mail" size={18} color={colors.accentWarm} />
-              </View>
-              <View>
-                <Text style={styles.actionListTitle}>Support Desk</Text>
-                <Text style={styles.actionListSubtitle}>Inquiries & assistance</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={colors.muted} />
-          </Pressable>
-
-
-          {/* Item 4: App Settings */}
-          <Pressable style={[styles.actionListItem, { borderBottomWidth: 0 }]} onPress={() => router.navigate("/settings")} variant="card">
-            <View style={styles.actionListLeft}>
-              <View style={[styles.actionListIconWrap, { backgroundColor: colors.primarySoft }]}>
-                <Ionicons name="settings" size={18} color={colors.primary} />
-              </View>
-              <View>
-                <Text style={styles.actionListTitle}>App Settings</Text>
-                <Text style={styles.actionListSubtitle}>Alerts & preferences</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={colors.muted} />
-          </Pressable>
-        </View>
-
-
-
-        {/* LOG OUT SEPARATION */}
-        <View style={styles.logoutBtnContainer}>
-          {logoutError ? <Text style={styles.actionErrorText}>{logoutError}</Text> : null}
-          <Pressable style={styles.logoutButton} onPress={() => void handleLogout()} disabled={isLoggingOut} variant="button">
-            <Ionicons name="log-out-outline" size={18} color={colors.danger} />
-            <Text style={styles.logoutButtonText}>{isLoggingOut ? "LOGGING OUT..." : "LOG OUT ACCOUNT"}</Text>
-          </Pressable>
-        </View>
       </ScrollView>
 
       {/* Golfer Metrics Editor Modal */}
@@ -1221,5 +1415,19 @@ export default function ProfileScreen() {
     lineHeight: theme.typography.bodySm.lineHeight,
     fontWeight: "700",
     color: colors.successText,
+  },
+  desktopLayoutRow: {
+    flexDirection: "row",
+    gap: 24,
+    width: "100%",
+    alignItems: "flex-start",
+  },
+  desktopColumnLeft: {
+    flex: 1,
+    gap: 16,
+  },
+  desktopColumnRight: {
+    flex: 1.2,
+    gap: 16,
   },
 }));

@@ -321,12 +321,14 @@ export interface ThemeContextType {
   resolvedTheme: "light" | "dark";
   colors: ThemeColors;
   setThemeMode: (mode: ThemeMode) => Promise<void>;
+  themeInitialized: boolean;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [themeMode, setThemeModeState] = useState<ThemeMode>("system");
+  const [themeInitialized, setThemeInitialized] = useState(false);
   const deviceColorScheme = useDeviceColorScheme();
 
   useEffect(() => {
@@ -338,6 +340,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (err) {
         console.warn("Failed to load theme preference", err);
+      } finally {
+        setThemeInitialized(true);
       }
     };
     void loadTheme();
@@ -356,7 +360,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const colors = resolvedTheme === "dark" ? darkColors : lightColors;
 
   return (
-    <ThemeContext.Provider value={{ themeMode, resolvedTheme, colors, setThemeMode }}>
+    <ThemeContext.Provider value={{ themeMode, resolvedTheme, colors, setThemeMode, themeInitialized }}>
       {children}
     </ThemeContext.Provider>
   );

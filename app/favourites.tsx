@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { Platform,  ScrollView, Text, View  } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useCourseCatalog } from "../services/course-management";
 import { FavoriteCoursesSection } from "../components/favorite-courses-section";
@@ -33,7 +33,7 @@ export default function FavouritesScreen() {
       <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
 
       <ScrollView
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator={Platform.OS === "web"}
         contentContainerStyle={[
           styles.scrollContent,
           { paddingHorizontal: horizontalPadding, paddingBottom: screenBottomPadding },

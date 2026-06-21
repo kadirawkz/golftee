@@ -3,7 +3,7 @@ import * as Location from "expo-location";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, InteractionManager, Linking, Platform, ScrollView, StyleSheet, Text, TextInput, View, Modal, TouchableWithoutFeedback, Animated, BackHandler } from "react-native";
+import { FlatList, InteractionManager, Linking, Platform, ScrollView, Text, TextInput, View, TouchableWithoutFeedback, Animated, BackHandler } from "react-native";
 import { WebView } from "react-native-webview";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
@@ -16,6 +16,7 @@ import {
 } from "../services/course-data";
 import { useCourseCatalog } from "../services/course-management";
 import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../components/theme";
+import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
 
 const PRICE_RANGES = [
   { label: "All Prices", min: 0, max: 999 },
@@ -60,6 +61,7 @@ export default function ExploreScreen() {
   const styles = useThemedStyles(themedStyles);
   const router = useRouter();
   const courseCatalog = useCourseCatalog();
+  const { isTabletLike, horizontalPadding } = useResponsiveLayout();
   const { section, scrollOffset, view, courseId } = useLocalSearchParams<{
     section?: string;
     scrollOffset?: string;
@@ -77,7 +79,20 @@ export default function ExploreScreen() {
   const [selectedRating, setSelectedRating] = useState(0);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(450)).current;
+  const slideAnim = useRef(new Animated.Value(-20)).current;
+
+  const injectJS = (js: string) => {
+    if (Platform.OS === 'web') {
+      const iframe = document.getElementById('map-iframe') as HTMLIFrameElement | null;
+      if (iframe?.contentWindow) {
+        iframe.contentWindow.postMessage({ type: 'injectJavaScript', code: js }, '*');
+      }
+    } else {
+      webViewRef.current?.injectJavaScript(js);
+    }
+  };
+
+
 
   const openFilterModal = () => {
     setShowFilterDropdown(true);
@@ -104,7 +119,7 @@ export default function ExploreScreen() {
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
-        toValue: 450,
+        toValue: -20,
         duration: 200,
         useNativeDriver: true,
       }),
@@ -190,9 +205,9 @@ export default function ExploreScreen() {
     setLocationNotice({ kind: "none", title: "", body: "" });
     setSelectedCourseId(null);
 
-    if (showInteractiveMapRef.current && webViewRef.current) {
+    if (showInteractiveMapRef.current && (Platform.OS === 'web' || webViewRef.current)) {
       const js = `updateUserLocation(${coordinates.latitude}, ${coordinates.longitude});`;
-      webViewRef.current.injectJavaScript(js);
+      injectJS(js);
       hasCenteredOnUser.current = true;
     }
   };
@@ -352,9 +367,9 @@ export default function ExploreScreen() {
       return;
     }
 
-    if (webViewRef.current) {
+    if (Platform.OS === 'web' || webViewRef.current) {
       const js = `updateUserLocation(${userLocation.latitude}, ${userLocation.longitude});`;
-      webViewRef.current.injectJavaScript(js);
+      injectJS(js);
       hasCenteredOnUser.current = true;
     }
   }, [locationState, showInteractiveMap, userLocation]);
@@ -435,8 +450,8 @@ export default function ExploreScreen() {
   }, [selectedCourse, cardAnim]);
 
   const centerSelectedCourse = useCallback(() => {
-    if (selectedCourse && webViewRef.current) {
-      webViewRef.current.injectJavaScript(`selectMarker("${selectedCourse.id}", ${selectedCourse.coordinates.latitude}, ${selectedCourse.coordinates.longitude});`);
+    if (selectedCourse && (Platform.OS === 'web' || webViewRef.current)) {
+      injectJS(`selectMarker("${selectedCourse.id}", ${selectedCourse.coordinates.latitude}, ${selectedCourse.coordinates.longitude});`);
     }
   }, [selectedCourse]);
 
@@ -450,8 +465,8 @@ export default function ExploreScreen() {
     setSelectedCourseId(course.id);
     
     setTimeout(() => {
-      if (webViewRef.current) {
-        webViewRef.current.injectJavaScript(`selectMarker("${course.id}", ${course.coordinates.latitude}, ${course.coordinates.longitude});`);
+      if (Platform.OS === 'web' || webViewRef.current) {
+        injectJS(`selectMarker("${course.id}", ${course.coordinates.latitude}, ${course.coordinates.longitude});`);
       }
     }, 200);
   }, [displayedCoursesById]);
@@ -508,39 +523,39 @@ export default function ExploreScreen() {
     [openCourseDetails, styles.courseCard, styles.courseCardItem]
   );
 
-  // Reset map ready status when interactive map is hidden
+  // Reset map ready status when viewMode changes or interactive map is hidden
   useEffect(() => {
-    if (!showInteractiveMap) {
+    if (viewMode !== "map" || !showInteractiveMap) {
       setIsMapReady(false);
     }
-  }, [showInteractiveMap]);
+  }, [viewMode, showInteractiveMap]);
 
   // Update selected marker in WebView when selectedCourseId changes from list interaction
   useEffect(() => {
-    if (webViewRef.current && isMapReady) {
+    if ((Platform.OS === 'web' || webViewRef.current) && isMapReady) {
       if (selectedCourseId) {
         const course = displayedCoursesById.get(selectedCourseId);
         if (course) {
           const js = `selectMarker("${course.id}", ${course.coordinates.latitude}, ${course.coordinates.longitude});`;
-          webViewRef.current.injectJavaScript(js);
+          injectJS(js);
         }
       } else {
-        webViewRef.current.injectJavaScript('deselectMarker();');
+        injectJS('deselectMarker();');
       }
     }
   }, [selectedCourseId, displayedCoursesById, isMapReady]);
 
   // Update user location marker in WebView when it resolves
   useEffect(() => {
-    if (webViewRef.current && isMapReady && locationState === "ready") {
+    if ((Platform.OS === 'web' || webViewRef.current) && isMapReady && locationState === "ready") {
       const js = `updateUserLocation(${userLocation.latitude}, ${userLocation.longitude});`;
-      webViewRef.current.injectJavaScript(js);
+      injectJS(js);
     }
   }, [userLocation, locationState, isMapReady]);
 
   // Update courses list in WebView when courses list or map readiness changes
   useEffect(() => {
-    if (webViewRef.current && isMapReady) {
+    if ((Platform.OS === 'web' || webViewRef.current) && isMapReady) {
       const coursesPayload = displayedCoursesWithDistance.map((c) => ({
         id: c.id,
         title: c.title,
@@ -550,11 +565,11 @@ export default function ExploreScreen() {
         distanceKm: c.distanceKm,
       }));
       const js = `updateCourses('${JSON.stringify(coursesPayload).replace(/'/g, "\\'")}', ${selectedCourseId ? `"${selectedCourseId}"` : "null"});`;
-      webViewRef.current.injectJavaScript(js);
+      injectJS(js);
     }
   }, [displayedCoursesWithDistance, isMapReady, selectedCourseId]);
 
-  const handleWebViewMessage = (event: any) => {
+  const handleWebViewMessage = useCallback((event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
       if (data.type === 'MAP_READY') {
@@ -569,7 +584,29 @@ export default function ExploreScreen() {
     } catch (err) {
       console.warn("WebView message parse failed", err);
     }
-  };
+  }, [openCourseDetails]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+
+    const handleWebMessage = (event: MessageEvent) => {
+      try {
+        if (typeof event.data === 'string') {
+          const parsed = JSON.parse(event.data);
+          if (parsed && typeof parsed.type === 'string') {
+            handleWebViewMessage({ nativeEvent: { data: event.data } });
+          }
+        }
+      } catch {
+        // Ignore non-JSON messages (webpack hot reloads, etc)
+      }
+    };
+
+    window.addEventListener('message', handleWebMessage);
+    return () => {
+      window.removeEventListener('message', handleWebMessage);
+    };
+  }, [handleWebViewMessage]);
 
   const leafletHtml = useMemo(() => {
     return `
@@ -619,7 +656,26 @@ export default function ExploreScreen() {
 <body>
   <div id="map"></div>
   <script>
-    var map = L.map('map', { zoomControl: false }).setView([7.8731, 80.7718], 7.5);
+    var sendReactNativeMessage = function(msg) {
+      if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+        window.ReactNativeWebView.postMessage(JSON.stringify(msg));
+      } else {
+        window.parent.postMessage(JSON.stringify(msg), '*');
+      }
+    };
+
+    window.addEventListener('message', function(event) {
+      try {
+        var msg = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        if (msg && msg.type === 'injectJavaScript') {
+          eval(msg.code);
+        }
+      } catch (e) {
+        // Ignore errors
+      }
+    });
+
+    var map = L.map('map', { zoomControl: false }).setView([7.8731, 80.7718], 7.0);
     
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
@@ -656,7 +712,7 @@ export default function ExploreScreen() {
     var selectedCourseId = null;
 
     function handlePopupClick(courseId) {
-      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'VIEW_DETAILS', courseId: courseId }));
+      sendReactNativeMessage({ type: 'VIEW_DETAILS', courseId: courseId });
     }
 
     function selectMarker(id, lat, lng) {
@@ -712,7 +768,7 @@ export default function ExploreScreen() {
           .addTo(map);
           
         marker.on('click', function() {
-          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'SELECT_COURSE', courseId: course.id }));
+          sendReactNativeMessage({ type: 'SELECT_COURSE', courseId: course.id });
         });
         
         markers[course.id] = marker;
@@ -728,22 +784,241 @@ export default function ExploreScreen() {
     map.on('click', function(e) {
       if (e.sourceTarget === map) {
         selectedCourseId = null;
-        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'DESELECT_COURSE' }));
+        sendReactNativeMessage({ type: 'DESELECT_COURSE' });
       }
     });
 
     // Notify React Native that the Leaflet script and map are ready
-    window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MAP_READY' }));
+    sendReactNativeMessage({ type: 'MAP_READY' });
   </script>
 </body>
 </html>
     `;
   }, []);
+  const renderMapView = () => (
+    <View style={[styles.mapContainer, isTabletLike && { flex: 1, height: "100%" }]}>
+      <View
+        style={[
+          styles.mapViewWrapper,
+          isTabletLike && {
+            left: horizontalPadding,
+            right: horizontalPadding,
+            top: 12,
+            bottom: 24,
+            borderRadius: 20,
+            borderWidth: 1,
+            borderColor: colors.border,
+            overflow: "hidden",
+          }
+        ]}
+      >
+        {showInteractiveMap ? (
+          Platform.OS === 'web' ? (
+            <iframe
+              id="map-iframe"
+              style={{ width: '100%', height: '100%', border: 'none' }}
+              srcDoc={leafletHtml}
+            />
+          ) : (
+            <WebView
+              ref={webViewRef}
+              style={styles.map}
+              source={{ html: leafletHtml }}
+              onMessage={handleWebViewMessage}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              originWhitelist={['*']}
+              scalesPageToFit={true}
+            />
+          )
+        ) : (
+          <View style={styles.mapPlaceholder}>
+            <Ionicons name="map-outline" size={24} color={colors.muted} />
+            <Text style={styles.mapPlaceholderTitle}>Loading map...</Text>
+            <Text style={styles.mapPlaceholderText}>Course results are ready. Interactive map follows right after the screen settles.</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Floating Map Header */}
+      <View
+        style={[
+          styles.mapViewHeaderFloating,
+          {
+            left: isTabletLike ? horizontalPadding + 16 : horizontalPadding,
+            right: isTabletLike ? horizontalPadding + 16 : horizontalPadding,
+            top: isTabletLike ? 28 : 12,
+          }
+        ]}
+      >
+        <View style={{ flex: 1 }}>
+          <Text style={styles.mapViewTitle}>Sri Lanka Course Map</Text>
+          <Text style={styles.mapViewSubtitle} numberOfLines={1}>{locationLabel}</Text>
+        </View>
+        <View style={styles.mapViewBadge}>
+          <Ionicons name="location" size={12} color={colors.primary} />
+          <Text style={styles.mapViewBadgeText}>{displayedCoursesWithDistance.length} pins</Text>
+        </View>
+      </View>
+
+      {/* Floating Location Trigger */}
+      <Pressable
+        style={[
+          styles.useLocationButtonFloating,
+          locationState === "loading" && styles.useLocationButtonDisabled,
+          {
+            bottom: selectedCourse ? (isTabletLike ? 204 : 244) : (isTabletLike ? 44 : 96),
+            right: isTabletLike ? horizontalPadding + 20 : horizontalPadding
+          }
+        ]}
+        onPress={() => void requestUserLocation()}
+        disabled={locationState === "loading"}
+        variant="button"
+        accessibilityRole="button"
+        accessibilityLabel="Use my location"
+        accessibilityHint="Centers map on your current location"
+      >
+        <Ionicons
+          name={locationState === "ready" ? "locate" : "locate-outline"}
+          size={20}
+          color={colors.primary}
+        />
+      </Pressable>
+
+      {/* Floating Bottom Overlays Container */}
+      <View
+        style={[
+          styles.floatingBottomContainer,
+          {
+            left: isTabletLike ? horizontalPadding + 20 : horizontalPadding,
+            right: isTabletLike ? horizontalPadding + 20 : horizontalPadding,
+            bottom: isTabletLike ? 44 : 84
+          }
+        ]}
+      >
+        {locationNotice.kind !== "none" ? (
+          <View style={[styles.locationNoticeCard, { position: "relative" }]}>
+            <View style={[styles.locationNoticeHeader, { paddingRight: 24 }]}>
+              <View style={styles.locationNoticeIconWrap}>
+                <Ionicons
+                  name={locationNotice.kind === "permissionBlocked" ? "settings-outline" : "locate-outline"}
+                  size={16}
+                  color={colors.primary}
+                />
+              </View>
+              <View style={styles.locationNoticeCopy}>
+                <Text style={styles.locationNoticeTitle}>{locationNotice.title}</Text>
+                <Text style={styles.locationNoticeBody}>{locationNotice.body}</Text>
+              </View>
+            </View>
+            <Pressable style={styles.locationNoticeAction} onPress={handleLocationNoticePrimaryAction} variant="chip">
+              <Text style={styles.locationNoticeActionText}>
+                {locationNotice.kind === "permissionBlocked" ? "Open Settings" : "Retry"}
+              </Text>
+            </Pressable>
+            {/* Close Button */}
+            <Pressable
+              style={styles.closeCardButton}
+              onPress={() => setLocationNotice({ kind: "none", title: "", body: "" })}
+              variant="icon"
+            >
+              <Ionicons name="close" size={18} color={colors.text} />
+            </Pressable>
+          </View>
+        ) : null}
+
+        <Animated.View
+          style={[
+            styles.floatingCourseCard,
+            {
+              opacity: cardAnim,
+              transform: [{
+                translateY: cardAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [40, 0]
+                })
+              }],
+              pointerEvents: selectedCourse ? 'auto' : 'none',
+            },
+          ]}
+        >
+          {selectedCourse ? (
+            <Pressable
+              style={styles.mapCardInner}
+              onPress={centerSelectedCourse}
+              variant="card"
+            >
+              {/* Top Row: Course Info & Dismiss */}
+              <View style={styles.mapCardHeaderRow}>
+                <View style={styles.mapCardInfo}>
+                  <Text style={styles.selectedCourseLabel}>SELECTED COURSE</Text>
+                  <Text style={styles.selectedCourseTitle} numberOfLines={1}>{selectedCourse.title}</Text>
+                  
+                  <View style={styles.mapCardMetaRow}>
+                    <View style={styles.mapCardMetaItem}>
+                      <Ionicons name="location" size={12} color={colors.textSoft} />
+                      <Text style={styles.mapCardMetaText} numberOfLines={1}>
+                        {selectedCourse.location} ({selectedCourse.distanceKm.toFixed(0)} km)
+                      </Text>
+                    </View>
+                    <View style={styles.mapCardMetaDivider} />
+                    <View style={styles.mapCardMetaItem}>
+                      <Ionicons name="star" size={12} color={colors.accentWarm} />
+                      <Text style={styles.mapCardMetaText}>{selectedCourse.rating}</Text>
+                    </View>
+                  </View>
+                </View>
+
+                <Pressable
+                  style={styles.mapCardCloseBtn}
+                  onPress={() => setSelectedCourseId(null)}
+                  variant="icon"
+                >
+                  <Ionicons name="close" size={18} color={colors.text} />
+                </Pressable>
+              </View>
+
+              {/* Mid Row: Price and Actions */}
+              <View style={styles.mapCardFooterRow}>
+                <View style={styles.mapCardPriceBlock}>
+                  <Text style={styles.mapCardPriceLabel}>STARTING AT</Text>
+                  <Text style={styles.mapCardPriceVal}>{selectedCourse.price}</Text>
+                </View>
+
+                <View style={styles.mapCardActions}>
+                  <Pressable
+                    style={[styles.mapCardBtn, styles.mapCardBtnSecondary]}
+                    onPress={() => openCourseDetails(selectedCourse.id)}
+                    variant="chip"
+                  >
+                    <Text style={styles.mapCardBtnSecondaryText}>Details</Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={[styles.mapCardBtn, styles.mapCardBtnPrimary]}
+                    onPress={() => router.navigate({
+                      pathname: "/tee-time-booking",
+                      params: { id: selectedCourse.id }
+                    })}
+                    variant="cta"
+                  >
+                    <Ionicons name="calendar-outline" size={14} color={colors.surface} />
+                    <Text style={styles.mapCardBtnPrimaryText}>Book Now</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </Pressable>
+          ) : null}
+        </Animated.View>
+      </View>
+    </View>
+  );
+
   const listViewHeader = (
     <>
       <ScrollView
         horizontal
-        showsHorizontalScrollIndicator={false}
+        showsHorizontalScrollIndicator={Platform.OS === "web"}
         contentContainerStyle={styles.filterRow}
         bounces={false}
         overScrollMode="never"
@@ -785,7 +1060,7 @@ export default function ExploreScreen() {
         {nearestCourses.length > 0 ? (
           <ScrollView
             horizontal
-            showsHorizontalScrollIndicator={false}
+            showsHorizontalScrollIndicator={Platform.OS === "web"}
             contentContainerStyle={styles.trendingList}
             bounces={false}
             overScrollMode="never"
@@ -826,7 +1101,7 @@ export default function ExploreScreen() {
       <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
 
       {/* Sticky Header with Search and Toggle */}
-      <View style={styles.topStickyHeader}>
+      <View style={[styles.topStickyHeader, { paddingHorizontal: horizontalPadding }]}>
         <View style={styles.searchWrap}>
           <Ionicons name="search" size={18} color={colors.muted} />
           <TextInput
@@ -856,7 +1131,7 @@ export default function ExploreScreen() {
           <View style={styles.searchDivider} />
           <Pressable
             style={styles.tuneButton}
-            onPress={openFilterModal}
+            onPress={showFilterDropdown ? closeFilterModal : openFilterModal}
             variant="icon"
             accessibilityRole="button"
             accessibilityLabel="Open filters"
@@ -866,90 +1141,95 @@ export default function ExploreScreen() {
           </Pressable>
         </View>
 
-      <Modal
-        visible={showFilterDropdown}
-        animationType="none"
-        transparent={true}
-        onRequestClose={closeFilterModal}
-      >
-        <View style={styles.modalWrapper}>
-          <TouchableWithoutFeedback onPress={closeFilterModal}>
-            <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]} />
-          </TouchableWithoutFeedback>
+        {showFilterDropdown && (
+          <>
+            <TouchableWithoutFeedback onPress={closeFilterModal}>
+              <Animated.View style={[styles.backdrop, { opacity: fadeAnim, left: -horizontalPadding, right: -horizontalPadding }]} />
+            </TouchableWithoutFeedback>
 
-          <Animated.View style={[styles.modalContent, { transform: [{ translateY: slideAnim }] }]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Filters</Text>
-              <View style={styles.modalHeaderActions}>
-                <Pressable style={styles.resetButton} onPress={handleResetFilters}>
-                  <Text style={styles.resetButtonText}>Reset All</Text>
-                </Pressable>
-                <Pressable style={styles.modalCloseButton} onPress={closeFilterModal} variant="icon">
-                  <Ionicons name="close" size={20} color={colors.primary} />
-                </Pressable>
-              </View>
-            </View>
-
-            <View>
-              <View style={styles.dropdownHeader}>
-                <Text style={styles.dropdownTitle}>Price Range</Text>
-              </View>
-              <View style={styles.filterChipsContainer}>
-                {PRICE_RANGES.map((range, idx) => (
-                  <Pressable
-                    key={`price-${idx}`}
-                    style={[
-                      styles.filterChipOption,
-                      selectedPriceRange === idx && styles.filterChipOptionActive,
-                    ]}
-                    onPress={() => handlePriceRangeChange(idx)}
-                    variant="chip"
-                  >
-                    <Text
-                      style={[
-                        styles.filterChipOptionText,
-                        selectedPriceRange === idx && styles.filterChipOptionTextActive,
-                      ]}
-                    >
-                      {range.label}
-                    </Text>
+            <Animated.View
+              style={[
+                styles.filterOverlayCard,
+                {
+                  opacity: fadeAnim,
+                  transform: [{ translateY: slideAnim }],
+                  left: horizontalPadding,
+                  right: horizontalPadding,
+                },
+              ]}
+            >
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Filters</Text>
+                <View style={styles.modalHeaderActions}>
+                  <Pressable style={styles.resetButton} onPress={handleResetFilters}>
+                    <Text style={styles.resetButtonText}>Reset All</Text>
                   </Pressable>
-                ))}
-              </View>
-            </View>
-
-            <View style={styles.dropdownDivider} />
-
-            <View>
-              <View style={styles.dropdownHeader}>
-                <Text style={styles.dropdownTitle}>Rating</Text>
-              </View>
-              <View style={styles.filterChipsContainer}>
-                {RATING_FILTERS.map((rating) => (
-                  <Pressable
-                    key={`rating-${rating.value}`}
-                    style={[
-                      styles.filterChipOption,
-                      selectedRating === rating.value && styles.filterChipOptionActive,
-                    ]}
-                    onPress={() => handleRatingChange(rating.value)}
-                    variant="chip"
-                  >
-                    <Text
-                      style={[
-                        styles.filterChipOptionText,
-                        selectedRating === rating.value && styles.filterChipOptionTextActive,
-                      ]}
-                    >
-                      {rating.label}
-                    </Text>
+                  <Pressable style={styles.modalCloseButton} onPress={closeFilterModal} variant="icon">
+                    <Ionicons name="close" size={20} color={colors.primary} />
                   </Pressable>
-                ))}
+                </View>
               </View>
-            </View>
-          </Animated.View>
-        </View>
-      </Modal>
+
+              <View>
+                <View style={styles.dropdownHeader}>
+                  <Text style={styles.dropdownTitle}>Price Range</Text>
+                </View>
+                <View style={styles.filterChipsContainer}>
+                  {PRICE_RANGES.map((range, idx) => (
+                    <Pressable
+                      key={`price-${idx}`}
+                      style={[
+                        styles.filterChipOption,
+                        selectedPriceRange === idx && styles.filterChipOptionActive,
+                      ]}
+                      onPress={() => handlePriceRangeChange(idx)}
+                      variant="chip"
+                    >
+                      <Text
+                        style={[
+                          styles.filterChipOptionText,
+                          selectedPriceRange === idx && styles.filterChipOptionTextActive,
+                        ]}
+                      >
+                        {range.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.dropdownDivider} />
+
+              <View>
+                <View style={styles.dropdownHeader}>
+                  <Text style={styles.dropdownTitle}>Rating</Text>
+                </View>
+                <View style={styles.filterChipsContainer}>
+                  {RATING_FILTERS.map((rating) => (
+                    <Pressable
+                      key={`rating-${rating.value}`}
+                      style={[
+                        styles.filterChipOption,
+                        selectedRating === rating.value && styles.filterChipOptionActive,
+                      ]}
+                      onPress={() => handleRatingChange(rating.value)}
+                      variant="chip"
+                    >
+                      <Text
+                        style={[
+                          styles.filterChipOptionText,
+                          selectedRating === rating.value && styles.filterChipOptionTextActive,
+                        ]}
+                      >
+                        {rating.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            </Animated.View>
+          </>
+        )}
 
         {/* View Mode Toggle Switch */}
         <View style={styles.toggleRow}>
@@ -985,8 +1265,8 @@ export default function ExploreScreen() {
           data={displayedCoursesWithDistance}
           renderItem={renderCourseItem}
           keyExtractor={(item) => item.id}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={Platform.OS === "web"}
+          contentContainerStyle={[styles.scrollContent, { paddingHorizontal: horizontalPadding }]}
           bounces={false}
           overScrollMode="never"
           keyboardShouldPersistTaps="handled"
@@ -1000,179 +1280,7 @@ export default function ExploreScreen() {
           ListFooterComponent={<View style={styles.listFooterSpacer} />}
         />
       ) : (
-        <View style={styles.mapContainer}>
-          <View style={styles.mapViewWrapper}>
-            {showInteractiveMap ? (
-              <WebView
-                ref={webViewRef}
-                style={styles.map}
-                source={{ html: leafletHtml }}
-                onMessage={handleWebViewMessage}
-                javaScriptEnabled={true}
-                domStorageEnabled={true}
-                originWhitelist={['*']}
-                scalesPageToFit={true}
-              />
-            ) : (
-              <View style={styles.mapPlaceholder}>
-                <Ionicons name="map-outline" size={24} color={colors.muted} />
-                <Text style={styles.mapPlaceholderTitle}>Loading map...</Text>
-                <Text style={styles.mapPlaceholderText}>Course results are ready. Interactive map follows right after the screen settles.</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Floating Map Header */}
-          <View style={styles.mapViewHeaderFloating}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.mapViewTitle}>Sri Lanka Course Map</Text>
-              <Text style={styles.mapViewSubtitle} numberOfLines={1}>{locationLabel}</Text>
-            </View>
-            <View style={styles.mapViewBadge}>
-              <Ionicons name="location" size={12} color={colors.primary} />
-              <Text style={styles.mapViewBadgeText}>{displayedCoursesWithDistance.length} pins</Text>
-            </View>
-          </View>
-
-          {/* Floating Location Trigger */}
-          <Pressable
-            style={[
-              styles.useLocationButtonFloating,
-              locationState === "loading" && styles.useLocationButtonDisabled,
-              { bottom: selectedCourse ? 244 : 96 }
-            ]}
-            onPress={() => void requestUserLocation()}
-            disabled={locationState === "loading"}
-            variant="button"
-            accessibilityRole="button"
-            accessibilityLabel="Use my location"
-            accessibilityHint="Centers map on your current location"
-          >
-            <Ionicons
-              name={locationState === "ready" ? "locate" : "locate-outline"}
-              size={20}
-              color={colors.primary}
-            />
-          </Pressable>
-
-          {/* Floating Bottom Overlays Container */}
-          <View style={styles.floatingBottomContainer}>
-            {locationNotice.kind !== "none" ? (
-              <View style={[styles.locationNoticeCard, { position: "relative" }]}>
-                <View style={[styles.locationNoticeHeader, { paddingRight: 24 }]}>
-                  <View style={styles.locationNoticeIconWrap}>
-                    <Ionicons
-                      name={locationNotice.kind === "permissionBlocked" ? "settings-outline" : "locate-outline"}
-                      size={16}
-                      color={colors.primary}
-                    />
-                  </View>
-                  <View style={styles.locationNoticeCopy}>
-                    <Text style={styles.locationNoticeTitle}>{locationNotice.title}</Text>
-                    <Text style={styles.locationNoticeBody}>{locationNotice.body}</Text>
-                  </View>
-                </View>
-                <Pressable style={styles.locationNoticeAction} onPress={handleLocationNoticePrimaryAction} variant="chip">
-                  <Text style={styles.locationNoticeActionText}>
-                    {locationNotice.kind === "permissionBlocked" ? "Open Settings" : "Retry"}
-                  </Text>
-                </Pressable>
-                {/* Close Button */}
-                <Pressable
-                  style={styles.closeCardButton}
-                  onPress={() => setLocationNotice({ kind: "none", title: "", body: "" })}
-                  variant="icon"
-                >
-                  <Ionicons name="close" size={18} color={colors.text} />
-                </Pressable>
-              </View>
-            ) : null}
-
-            <Animated.View
-              style={[
-                styles.floatingCourseCard,
-                {
-                  opacity: cardAnim,
-                  transform: [{
-                    translateY: cardAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [40, 0],
-                    }),
-                  }],
-                  pointerEvents: selectedCourse ? 'auto' : 'none',
-                },
-              ]}
-            >
-              {selectedCourse ? (
-                <Pressable
-                  style={styles.mapCardInner}
-                  onPress={centerSelectedCourse}
-                  variant="card"
-                >
-                  {/* Top Row: Course Info & Dismiss */}
-                  <View style={styles.mapCardHeaderRow}>
-                    <View style={styles.mapCardInfo}>
-                      <Text style={styles.selectedCourseLabel}>SELECTED COURSE</Text>
-                      <Text style={styles.selectedCourseTitle} numberOfLines={1}>{selectedCourse.title}</Text>
-                      
-                      <View style={styles.mapCardMetaRow}>
-                        <View style={styles.mapCardMetaItem}>
-                          <Ionicons name="location" size={12} color={colors.textSoft} />
-                          <Text style={styles.mapCardMetaText} numberOfLines={1}>
-                            {selectedCourse.location} ({selectedCourse.distanceKm.toFixed(0)} km)
-                          </Text>
-                        </View>
-                        <View style={styles.mapCardMetaDivider} />
-                        <View style={styles.mapCardMetaItem}>
-                          <Ionicons name="star" size={12} color={colors.accentWarm} />
-                          <Text style={styles.mapCardMetaText}>{selectedCourse.rating}</Text>
-                        </View>
-                      </View>
-                    </View>
-
-                    <Pressable
-                      style={styles.mapCardCloseBtn}
-                      onPress={() => setSelectedCourseId(null)}
-                      variant="icon"
-                    >
-                      <Ionicons name="close" size={18} color={colors.text} />
-                    </Pressable>
-                  </View>
-
-                  {/* Mid Row: Price and Actions */}
-                  <View style={styles.mapCardFooterRow}>
-                    <View style={styles.mapCardPriceBlock}>
-                      <Text style={styles.mapCardPriceLabel}>STARTING AT</Text>
-                      <Text style={styles.mapCardPriceVal}>{selectedCourse.price}</Text>
-                    </View>
-
-                    <View style={styles.mapCardActions}>
-                      <Pressable
-                        style={[styles.mapCardBtn, styles.mapCardBtnSecondary]}
-                        onPress={() => openCourseDetails(selectedCourse.id)}
-                        variant="chip"
-                      >
-                        <Text style={styles.mapCardBtnSecondaryText}>Details</Text>
-                      </Pressable>
-
-                      <Pressable
-                        style={[styles.mapCardBtn, styles.mapCardBtnPrimary]}
-                        onPress={() => router.navigate({
-                          pathname: "/tee-time-booking",
-                          params: { id: selectedCourse.id }
-                        })}
-                        variant="cta"
-                      >
-                        <Ionicons name="calendar-outline" size={14} color={colors.surface} />
-                        <Text style={styles.mapCardBtnPrimaryText}>Book Now</Text>
-                      </Pressable>
-                    </View>
-                  </View>
-                </Pressable>
-              ) : null}
-            </Animated.View>
-          </View>
-        </View>
+        renderMapView()
       )}
     </SafeAreaView>
   );
@@ -1574,26 +1682,32 @@ const themedStyles = createThemedStyleSheet((colors) => ({
   },
   
   // Modal & Dropdown Styles
-  modalWrapper: {
-    flex: 1,
-    justifyContent: "flex-end",
+  backdrop: {
+    position: "absolute",
+    top: 80,
+    left: -16,
+    right: -16,
+    height: 1200,
+    backgroundColor: "rgba(0, 0, 0, 0.15)",
   },
-  modalOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.4)",
-  },
-  modalContent: {
+  filterOverlayCard: {
+    position: "absolute",
+    top: 62,
+    left: 0,
+    right: 0,
     backgroundColor: colors.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderRadius: 16,
     paddingHorizontal: 20,
     paddingTop: 20,
-    paddingBottom: Platform.OS === "ios" ? 40 : 24,
+    paddingBottom: 20,
     shadowColor: colors.shadow,
     shadowOpacity: 0.15,
     shadowRadius: 10,
-    shadowOffset: { width: 0, height: -4 },
+    shadowOffset: { width: 0, height: 4 },
     elevation: 10,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    zIndex: 12,
   },
   modalHeader: {
     flexDirection: "row",
@@ -1732,6 +1846,9 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     padding: 4,
     marginTop: 10,
     gap: 4,
+    alignSelf: "center",
+    width: "100%",
+    maxWidth: 380,
   },
   toggleBtn: {
     flex: 1,
@@ -1984,5 +2101,18 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     fontSize: 11,
     color: colors.text,
     fontWeight: "700",
+  },
+  desktopSplitLayout: {
+    flex: 1,
+    flexDirection: "row",
+  },
+  desktopListColumn: {
+    width: 440,
+    borderRightWidth: 1,
+    borderColor: colors.border,
+  },
+  desktopMapColumn: {
+    flex: 1,
+    height: "100%",
   },
 }));

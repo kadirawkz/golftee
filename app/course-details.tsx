@@ -14,6 +14,7 @@ import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../
 import { getCourseImage } from "../lib/image-mapping";
 import { DailyWeatherForecast, getFourteenDayForecast, getWeatherCodeIconName } from "../services/weather";
 import { useAuthSession } from "../services/auth";
+import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
 
 
 interface CourseReview {
@@ -202,8 +203,7 @@ export default function CourseDetailsScreen() {
   const isFavorite = useIsFavoriteCourse(course.id);
   const todayDateKey = getColomboDateKey(now);
   const visibleWeather = weather.filter((day) => day.dateKey !== todayDateKey || todayHasBookableSlots);
-  const isCompact = width < 360;
-  const isTabletLike = width >= 768;
+  const { isTabletLike, horizontalPadding, maxContentWidth, isCompact } = useResponsiveLayout();
   const tabHeight = isTabletLike ? 74 : isCompact ? 62 : 68;
   const tabBottom = Math.max(insets.bottom + 6, 8);
   const bookingHorizontalInset = isTabletLike ? Math.max((width - 560) / 2, 24) : isCompact ? 12 : 16;
@@ -337,12 +337,16 @@ export default function CourseDetailsScreen() {
       <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
 
       <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollBottomPadding }]}
+        showsVerticalScrollIndicator={Platform.OS === "web"}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingHorizontal: isTabletLike ? horizontalPadding : 0, paddingBottom: scrollBottomPadding },
+        ]}
         bounces={false}
         overScrollMode="never"
       >
-        <View style={styles.heroSection}>
+        <View style={[styles.contentBlock, { maxWidth: maxContentWidth }]}>
+          <View style={[styles.heroSection, isTabletLike && { borderRadius: 20, overflow: "hidden", borderWidth: 1, borderColor: colors.border }]}>
           <AppImage source={getCourseImage(course.image)} style={styles.heroImage} />
           <View style={styles.heroOverlay} />
           <Pressable
@@ -409,7 +413,7 @@ export default function CourseDetailsScreen() {
             {weatherState === "success" ? (
               <ScrollView
                 horizontal
-                showsHorizontalScrollIndicator={false}
+                showsHorizontalScrollIndicator={Platform.OS === "web"}
                 contentContainerStyle={styles.weatherRow}
                 bounces={false}
                 overScrollMode="never"
@@ -520,6 +524,7 @@ export default function CourseDetailsScreen() {
               </Pressable>
             ) : null}
           </View>
+        </View>
         </View>
       </ScrollView>
 
@@ -642,6 +647,11 @@ const themedStyles = createThemedStyleSheet((colors) => ({
   },
   scrollContent: {
     paddingBottom: 200,
+    alignItems: "center",
+  },
+  contentBlock: {
+    width: "100%",
+    alignItems: "stretch",
   },
   heroSection: {
     height: 380,

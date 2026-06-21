@@ -2,14 +2,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ScrollView, StyleSheet, Text, useWindowDimensions, View, Linking, RefreshControl } from "react-native";
+import { Platform,  ScrollView, StyleSheet, Text, useWindowDimensions, View, Linking, RefreshControl, Pressable as RNPressable  } from "react-native";
 import Animated, {
     interpolate,
     interpolateColor,
     SharedValue,
     useAnimatedStyle,
     useSharedValue,
-    withSpring,
+    useAnimatedScrollHandler,
+    runOnJS,
 } from "react-native-reanimated";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
@@ -29,7 +30,6 @@ import {
   useBookingState,
   isUpcomingBooking,
   formatBookingDateTime,
-  isHistoricalBooking,
   refreshBookings,
 } from "../services/bookings";
 
@@ -84,18 +84,22 @@ function HeroIndicatorDot({
   index: number;
   activeIndex: SharedValue<number>;
 }) {
-  const { colors } = useAppTheme();
+  const { colors, resolvedTheme } = useAppTheme();
   const styles = useThemedStyles(themedStyles);
+
+  const activeColor = resolvedTheme === "dark" ? "#FFFFFF" : colors.primary;
+  const inactiveColor = resolvedTheme === "dark" ? "rgba(255, 255, 255, 0.28)" : colors.borderStrong;
+
   const dotAnimatedStyle = useAnimatedStyle(() => {
     const distance = Math.abs(activeIndex.value - index);
 
     return {
-      width: interpolate(distance, [0, 1, 2], [HERO_INDICATOR_ACTIVE_WIDTH, 16, HERO_INDICATOR_SIZE]),
-      opacity: interpolate(distance, [0, 1, 2], [1, 0.72, 0.38]),
+      width: interpolate(distance, [0, 1, 2], [HERO_INDICATOR_ACTIVE_WIDTH, 12, HERO_INDICATOR_SIZE]),
+      opacity: interpolate(distance, [0, 1, 2], [1, 0.7, 0.4]),
       backgroundColor: interpolateColor(
         distance,
-        [0, 1, 2],
-        [colors.primary, colors.accentWarm, colors.borderStrong]
+        [0, 1],
+        [activeColor, inactiveColor]
       ),
       transform: [{ scale: interpolate(distance, [0, 1, 2], [1, 0.95, 0.88]) }],
     };
@@ -130,12 +134,13 @@ export default function HomeScreen() {
       setRefreshing(false);
     }
   }, []);
-  const heroScrollRef = useRef<ScrollView>(null);
+  const heroScrollRef = useRef<Animated.ScrollView>(null);
   const autoplayIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoplayResumeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeHeroIndexRef = useRef(0);
   const activeHeroLoopIndexRef = useRef(1);
   const heroIndicatorIndex = useSharedValue(0);
+  const isProgrammaticScrollRef = useRef(false);
   const allCourses = courseCatalog.courses;
   const favoriteCourseIds = useFavoriteCourseIds();
   const favoriteCourseIdSet = useMemo(() => new Set(favoriteCourseIds), [favoriteCourseIds]);
@@ -144,9 +149,7 @@ export default function HomeScreen() {
     return bookingState.bookings.filter(isUpcomingBooking);
   }, [bookingState.bookings]);
 
-  const completedRounds = useMemo(() => {
-    return bookingState.bookings.filter((b) => b.status === "completed" || isHistoricalBooking(b)).length;
-  }, [bookingState.bookings]);
+
 
   const nextBooking = useMemo(() => {
     return upcomingBookings[0] || null;
@@ -185,10 +188,8 @@ export default function HomeScreen() {
   );
   const isTabletLike = width >= 768;
   const isCompactScreen = width < 390;
-  const heroCardWidth = isTabletLike
-    ? Math.min(Math.round(width - horizontalPadding * 2), 560)
-    : Math.max(Math.round(width - horizontalPadding * 2), 280);
-  const heroCardHeight = width < 360 ? 290 : 312;
+  const heroCardWidth = Math.round(width - horizontalPadding * 2);
+  const heroCardHeight = isTabletLike ? 380 : (width < 360 ? 290 : 312);
   const openCourseDetails = useCallback(
     (courseId: string) => {
       router.navigate({ pathname: "/course-details", params: { id: courseId } });
@@ -210,22 +211,6 @@ export default function HomeScreen() {
     }
   }, []);
 
-  const animateHeroIndicator = useCallback(
-    (index: number, immediate = false) => {
-      if (immediate) {
-        heroIndicatorIndex.value = index;
-        return;
-      }
-
-      heroIndicatorIndex.value = withSpring(index, {
-        stiffness: 240,
-        damping: 24,
-        mass: 0.82,
-      });
-    },
-    [heroIndicatorIndex]
-  );
-
   const jumpToHeroLoopIndex = useCallback(
     (loopIndex: number) => {
       activeHeroLoopIndexRef.current = loopIndex;
@@ -237,8 +222,15 @@ export default function HomeScreen() {
   const startHeroAutoplay = useCallback(() => {
     stopHeroAutoplay();
     autoplayIntervalRef.current = setInterval(() => {
-      const nextLoopIndex = activeHeroLoopIndexRef.current + 1;
-      heroScrollRef.current?.scrollTo({ x: nextLoopIndex * heroCardWidth, animated: true });
+      isProgrammaticScrollRef.current = true;
+      if (Platform.OS === 'web') {
+        const nextIndex = (activeHeroIndexRef.current + 1) % HERO_SLIDES.length;
+        activeHeroIndexRef.current = nextIndex;
+        heroScrollRef.current?.scrollTo({ x: nextIndex * heroCardWidth, animated: true });
+      } else {
+        const nextLoopIndex = activeHeroLoopIndexRef.current + 1;
+        heroScrollRef.current?.scrollTo({ x: nextLoopIndex * heroCardWidth, animated: true });
+      }
     }, HERO_AUTOPLAY_MS);
   }, [heroCardWidth, stopHeroAutoplay]);
 
@@ -250,23 +242,150 @@ export default function HomeScreen() {
     }, HERO_USER_PAUSE_MS);
   }, [clearHeroResumeTimeout, startHeroAutoplay, stopHeroAutoplay]);
 
+  const updateActiveIndexJS = useCallback((index: number) => {
+    if (Platform.OS === 'web') {
+      activeHeroIndexRef.current = Math.max(0, Math.min(index, HERO_SLIDES.length - 1));
+    } else {
+      const roundedActiveIdx = index - 1;
+      if (index > 0 && index < HERO_LOOP_SLIDES.length - 1) {
+        activeHeroIndexRef.current = roundedActiveIdx;
+        activeHeroLoopIndexRef.current = index;
+      }
+    }
+
+    if (isProgrammaticScrollRef.current) {
+      isProgrammaticScrollRef.current = false;
+      return;
+    }
+    pauseHeroAutoplay();
+  }, [pauseHeroAutoplay]);
+
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      const scrollX = event.contentOffset.x;
+      const progress = scrollX / heroCardWidth;
+
+      if (Platform.OS === 'web') {
+        heroIndicatorIndex.value = Math.max(0, Math.min(progress, HERO_SLIDES.length - 1));
+      } else {
+        heroIndicatorIndex.value = progress - 1;
+      }
+
+      const index = Math.round(progress);
+      runOnJS(updateActiveIndexJS)(index);
+    },
+  });
+
   useEffect(() => {
-    jumpToHeroLoopIndex(1);
-    animateHeroIndicator(0, true);
+    if (Platform.OS === 'web') {
+      heroIndicatorIndex.value = 0;
+    } else {
+      jumpToHeroLoopIndex(1);
+      heroIndicatorIndex.value = 0;
+    }
     startHeroAutoplay();
 
     return () => {
       stopHeroAutoplay();
       clearHeroResumeTimeout();
     };
-  }, [animateHeroIndicator, clearHeroResumeTimeout, jumpToHeroLoopIndex, startHeroAutoplay, stopHeroAutoplay]);
+  }, [clearHeroResumeTimeout, heroIndicatorIndex, jumpToHeroLoopIndex, startHeroAutoplay, stopHeroAutoplay]);
+
+
+
+  const nextBookingWidget = nextBooking && nextBookingCourse ? (
+    <View style={styles.nextRoundSection}>
+      {isTabletLike ? null : (
+        <View style={styles.nextRoundHeader}>
+          <Text style={styles.kicker}>UP NEXT</Text>
+          <Text style={styles.nextRoundTitle}>Your Upcoming Tee Time</Text>
+        </View>
+      )}
+      <View style={styles.nextRoundCard}>
+        <View style={styles.nextRoundCardBody}>
+          <View style={styles.nextRoundCourseRow}>
+            <Ionicons name="golf" size={16} color={colors.primary} style={styles.nextRoundIcon} />
+            <Text style={styles.nextRoundCourseName} numberOfLines={1}>
+              {nextBookingCourse.title}
+            </Text>
+          </View>
+          
+          <View style={styles.nextRoundTimeRow}>
+            <Ionicons name="calendar-outline" size={14} color={colors.textSoft} style={styles.nextRoundIcon} />
+            <Text style={styles.nextRoundTimeText}>
+              {formatBookingDateTime(nextBooking)}
+            </Text>
+          </View>
+
+          <View style={styles.nextRoundPlayersRow}>
+            <Ionicons name="people-outline" size={14} color={colors.textSoft} style={styles.nextRoundIcon} />
+            <Text style={styles.nextRoundTimeText}>
+              {nextBooking.players} {nextBooking.players === 1 ? "Player" : "Players"}
+            </Text>
+          </View>
+
+          <View style={styles.nextRoundActions}>
+            <Pressable
+              style={[styles.nextRoundBtn, styles.nextRoundBtnSecondary]}
+              onPress={() => {
+                const lat = nextBookingCourse.coordinates?.latitude ?? 6.9271;
+                const lon = nextBookingCourse.coordinates?.longitude ?? 79.8612;
+                const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+                Linking.openURL(url);
+              }}
+              variant="chip"
+            >
+              <Ionicons name="map-outline" size={14} color={colors.primary} />
+              <Text style={styles.nextRoundBtnTextSecondary}>Directions</Text>
+            </Pressable>
+            
+            <Pressable
+              style={[styles.nextRoundBtn, styles.nextRoundBtnPrimary]}
+              onPress={() => router.navigate({
+                pathname: "/manage-booking",
+                params: { bookingId: nextBooking.id }
+              })}
+              variant="cta"
+            >
+              <Text style={styles.nextRoundBtnTextPrimary}>Manage</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </View>
+  ) : (
+    <View style={styles.nextRoundSection}>
+      {isTabletLike ? null : (
+        <View style={styles.nextRoundHeader}>
+          <Text style={styles.kicker}>UP NEXT</Text>
+          <Text style={styles.nextRoundTitle}>Your Upcoming Tee Time</Text>
+        </View>
+      )}
+      <View style={styles.nextRoundCardEmpty}>
+        <View style={styles.nextRoundEmptyContent}>
+          <Ionicons name="golf-outline" size={28} color={colors.muted} />
+          <View style={styles.nextRoundEmptyTextCol}>
+            <Text style={styles.nextRoundEmptyTitle}>No Upcoming Tee Times</Text>
+            <Text style={styles.nextRoundEmptyDesc}>Ready for a round? Book a signature green nearby.</Text>
+          </View>
+        </View>
+        <Pressable
+          style={styles.nextRoundEmptyBookBtn}
+          onPress={() => router.navigate("/explore")}
+          variant="cta"
+        >
+          <Text style={styles.nextRoundEmptyBookBtnText}>Book Now</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
 
   return (
     <View style={styles.screen}>
       <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
 
       <ScrollView
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator={Platform.OS === "web"}
         contentContainerStyle={[
           styles.scrollContent,
           {
@@ -303,131 +422,10 @@ export default function HomeScreen() {
           </Text>
         </View>
 
-        {/* Player Stats Card */}
-        <View style={styles.playerCard}>
-          <View style={styles.playerCardHeader}>
-            <View>
-              <Text style={styles.playerCardLabel}>MEMBERSHIP TIER</Text>
-              <Text style={styles.playerCardTier}>
-                {((auth.profile as any)?.membership_tiers?.name as string)?.toUpperCase() ?? "STANDARD MEMBER"}
-              </Text>
-            </View>
-            <View style={styles.tierIconWrap}>
-              <Ionicons name="ribbon-outline" size={18} color={colors.accentWarm} />
-            </View>
-          </View>
-          
-          <View style={styles.playerCardStats}>
-            <View style={styles.playerStatBox}>
-              <Text style={styles.playerStatVal}>
-                {auth.profile?.handicap ? Number(auth.profile.handicap).toFixed(1) : "—"}
-              </Text>
-              <Text style={styles.playerStatLabel}>Handicap</Text>
-            </View>
-            
-            <View style={styles.playerStatDivider} />
-            
-            <View style={styles.playerStatBox}>
-              <Text style={styles.playerStatVal}>{completedRounds}</Text>
-              <Text style={styles.playerStatLabel}>Rounds</Text>
-            </View>
-            
-            <View style={styles.playerStatDivider} />
-            
-            <View style={styles.playerStatBox}>
-              <Text style={[styles.playerStatVal, styles.playerStatStatus]}>
-                {auth.profile ? "Active" : "Guest"}
-              </Text>
-              <Text style={styles.playerStatLabel}>Status</Text>
-            </View>
-          </View>
-        </View>
-
-
-
-        {/* Next Round Widget */}
-        {nextBooking && nextBookingCourse ? (
-          <View style={styles.nextRoundSection}>
-            <View style={styles.nextRoundHeader}>
-              <Text style={styles.kicker}>UP NEXT</Text>
-              <Text style={styles.nextRoundTitle}>Your Upcoming Tee Time</Text>
-            </View>
-            <View style={styles.nextRoundCard}>
-              <View style={styles.nextRoundCardBody}>
-                <View style={styles.nextRoundCourseRow}>
-                  <Ionicons name="golf" size={16} color={colors.primary} style={styles.nextRoundIcon} />
-                  <Text style={styles.nextRoundCourseName} numberOfLines={1}>
-                    {nextBookingCourse.title}
-                  </Text>
-                </View>
-                
-                <View style={styles.nextRoundTimeRow}>
-                  <Ionicons name="calendar-outline" size={14} color={colors.textSoft} style={styles.nextRoundIcon} />
-                  <Text style={styles.nextRoundTimeText}>
-                    {formatBookingDateTime(nextBooking)}
-                  </Text>
-                </View>
-
-                <View style={styles.nextRoundPlayersRow}>
-                  <Ionicons name="people-outline" size={14} color={colors.textSoft} style={styles.nextRoundIcon} />
-                  <Text style={styles.nextRoundTimeText}>
-                    {nextBooking.players} {nextBooking.players === 1 ? "Player" : "Players"}
-                  </Text>
-                </View>
-
-                <View style={styles.nextRoundActions}>
-                  <Pressable
-                    style={[styles.nextRoundBtn, styles.nextRoundBtnSecondary]}
-                    onPress={() => {
-                      const lat = nextBookingCourse.coordinates?.latitude ?? 6.9271;
-                      const lon = nextBookingCourse.coordinates?.longitude ?? 79.8612;
-                      const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
-                      Linking.openURL(url);
-                    }}
-                    variant="chip"
-                  >
-                    <Ionicons name="map-outline" size={14} color={colors.primary} />
-                    <Text style={styles.nextRoundBtnTextSecondary}>Directions</Text>
-                  </Pressable>
-                  
-                  <Pressable
-                    style={[styles.nextRoundBtn, styles.nextRoundBtnPrimary]}
-                    onPress={() => router.navigate({
-                      pathname: "/manage-booking",
-                      params: { bookingId: nextBooking.id }
-                    })}
-                    variant="cta"
-                  >
-                    <Text style={styles.nextRoundBtnTextPrimary}>Manage</Text>
-                  </Pressable>
-                </View>
-              </View>
-            </View>
-          </View>
-        ) : (
-          <View style={styles.nextRoundSection}>
-            <View style={styles.nextRoundCardEmpty}>
-              <View style={styles.nextRoundEmptyContent}>
-                <Ionicons name="golf-outline" size={28} color={colors.muted} />
-                <View style={styles.nextRoundEmptyTextCol}>
-                  <Text style={styles.nextRoundEmptyTitle}>No Upcoming Tee Times</Text>
-                  <Text style={styles.nextRoundEmptyDesc}>Ready for a round? Book a signature green nearby.</Text>
-                </View>
-              </View>
-              <Pressable
-                style={styles.nextRoundEmptyBookBtn}
-                onPress={() => router.navigate("/explore")}
-                variant="cta"
-              >
-                <Text style={styles.nextRoundEmptyBookBtnText}>Book Now</Text>
-              </Pressable>
-            </View>
-          </View>
-        )}
-
         <View style={styles.heroShell}>
-          <ScrollView
+          <Animated.ScrollView
             ref={heroScrollRef}
+            style={styles.heroCarousel}
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
@@ -437,35 +435,37 @@ export default function HomeScreen() {
             snapToInterval={heroCardWidth}
             snapToAlignment="start"
             disableIntervalMomentum
+            onScroll={scrollHandler}
             onScrollBeginDrag={pauseHeroAutoplay}
             scrollEventThrottle={16}
             onMomentumScrollEnd={(event) => {
-              const loopIndex = Math.round(event.nativeEvent.contentOffset.x / heroCardWidth);
+              if (Platform.OS === 'web') {
+                return;
+              }
+              const scrollX = event.nativeEvent.contentOffset.x;
+              const index = Math.round(scrollX / heroCardWidth);
 
-              if (loopIndex <= 0) {
+              if (index <= 0) {
                 activeHeroIndexRef.current = HERO_SLIDES.length - 1;
-                animateHeroIndicator(activeHeroIndexRef.current);
+                heroIndicatorIndex.value = HERO_SLIDES.length - 1;
                 jumpToHeroLoopIndex(HERO_SLIDES.length);
                 return;
               }
 
-              if (loopIndex >= HERO_LOOP_SLIDES.length - 1) {
+              if (index >= HERO_LOOP_SLIDES.length - 1) {
                 activeHeroIndexRef.current = 0;
-                animateHeroIndicator(0);
+                heroIndicatorIndex.value = 0;
                 jumpToHeroLoopIndex(1);
                 return;
               }
-
-              activeHeroLoopIndexRef.current = loopIndex;
-              activeHeroIndexRef.current = loopIndex - 1;
-              animateHeroIndicator(activeHeroIndexRef.current);
             }}
           >
-            {HERO_LOOP_SLIDES.map((slide, index) => (
+            {(Platform.OS === 'web' ? HERO_SLIDES : HERO_LOOP_SLIDES).map((slide, index) => (
               <View key={`${slide.id}-${index}`} style={[styles.heroCard, { width: heroCardWidth, height: heroCardHeight }]}>
                 <AppImage
                   source={slide.image}
                   style={styles.heroImage}
+                  contentPosition="center"
                 />
                 <View style={styles.heroOverlay} />
                 <View style={styles.heroContent}>
@@ -491,14 +491,30 @@ export default function HomeScreen() {
                 </View>
               </View>
             ))}
-          </ScrollView>
+          </Animated.ScrollView>
 
           <View style={styles.heroDots}>
             {HERO_SLIDES.map((slide, index) => (
-              <HeroIndicatorDot key={slide.id} index={index} activeIndex={heroIndicatorIndex} />
+              <RNPressable
+                key={slide.id}
+                onPress={() => {
+                  pauseHeroAutoplay();
+                  isProgrammaticScrollRef.current = true;
+                  activeHeroIndexRef.current = index;
+                  activeHeroLoopIndexRef.current = index + 1;
+                  const scrollX = (Platform.OS === 'web' ? index : index + 1) * heroCardWidth;
+                  heroScrollRef.current?.scrollTo({ x: scrollX, animated: true });
+                }}
+                style={{ padding: 4 }}
+              >
+                <HeroIndicatorDot index={index} activeIndex={heroIndicatorIndex} />
+              </RNPressable>
             ))}
           </View>
         </View>
+
+        {/* Upcoming Round Card */}
+        {nextBookingWidget}
 
         <View style={styles.sectionHeader}>
           <View>
@@ -530,27 +546,46 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.featuredRow}
-          bounces={false}
-          overScrollMode="never"
-        >
-          {featuredHomeCourses.map((course) => (
-            <CourseCard
-              key={course.id}
-              variant="featured"
-              title={course.title}
-              location={course.location}
-              image={course.image}
-              price={course.price}
-              rating={course.rating}
-              styleLabel={course.style}
-              onPress={() => openCourseDetails(course.id)}
-            />
-          ))}
-        </ScrollView>
+        {isTabletLike ? (
+          <View style={styles.desktopGrid}>
+            {featuredHomeCourses.map((course) => (
+              <CourseCard
+                key={course.id}
+                variant="featured"
+                title={course.title}
+                location={course.location}
+                image={course.image}
+                price={course.price}
+                rating={course.rating}
+                styleLabel={course.style}
+                cardStyle={styles.desktopFeaturedCard}
+                onPress={() => openCourseDetails(course.id)}
+              />
+            ))}
+          </View>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={Platform.OS === "web"}
+            contentContainerStyle={styles.featuredRow}
+            bounces={false}
+            overScrollMode="never"
+          >
+            {featuredHomeCourses.map((course) => (
+              <CourseCard
+                key={course.id}
+                variant="featured"
+                title={course.title}
+                location={course.location}
+                image={course.image}
+                price={course.price}
+                rating={course.rating}
+                styleLabel={course.style}
+                onPress={() => openCourseDetails(course.id)}
+              />
+            ))}
+          </ScrollView>
+        )}
 
         <FavoriteCoursesSection
           courses={favoriteCourses}
@@ -579,7 +614,7 @@ export default function HomeScreen() {
 
           <ScrollView
             horizontal
-            showsHorizontalScrollIndicator={false}
+            showsHorizontalScrollIndicator={Platform.OS === "web"}
             contentContainerStyle={styles.trendingList}
             bounces={false}
             overScrollMode="never"
@@ -619,7 +654,7 @@ export default function HomeScreen() {
             {getawayHomeCourses.map((getaway) => (
               <Pressable
                 key={getaway.id}
-                style={styles.getawaySquareCard}
+                style={[styles.getawaySquareCard, isTabletLike && styles.getawaySquareCardTablet]}
                 onPress={() => openCourseDetails(getaway.id)}
                 variant="card"
               >
@@ -656,6 +691,10 @@ const themedStyles = createThemedStyleSheet((colors) => ({
   heroShell: {
     marginBottom: 28,
   },
+  heroCarousel: {
+    borderRadius: 18,
+    overflow: "hidden",
+  },
   heroCard: {
     borderRadius: 18,
     overflow: "hidden",
@@ -664,10 +703,12 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     width: "100%",
     height: "100%",
     position: "absolute",
+    borderRadius: 18,
   },
   heroOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0, 0, 0, 0.45)",
+    borderRadius: 18,
   },
   heroContent: {
     flex: 1,
@@ -1127,5 +1168,23 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     color: colors.surface,
     fontWeight: "700",
     fontSize: theme.typography.bodySm.fontSize,
+  },
+  desktopRow: {
+    flexDirection: "row",
+    gap: 20,
+    marginBottom: 26,
+  },
+  desktopGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 16,
+    marginBottom: 22,
+  },
+  desktopFeaturedCard: {
+    width: "31.5%",
+    minWidth: 280,
+  },
+  getawaySquareCardTablet: {
+    width: "23.5%",
   },
 }));

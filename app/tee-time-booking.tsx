@@ -67,7 +67,7 @@ export default function TeeTimeBookingScreen() {
   const { colors, resolvedTheme } = useAppTheme();
   const styles = useThemedStyles(themedStyles);
   const router = useRouter();
-  const { horizontalPadding, screenBottomPadding } = useResponsiveLayout();
+  const { horizontalPadding, screenBottomPadding, isTabletLike } = useResponsiveLayout();
   const { id, courseId: paramCourseId, bookingId } = useLocalSearchParams<{
     id?: string | string[];
     courseId?: string | string[];
@@ -599,7 +599,7 @@ export default function TeeTimeBookingScreen() {
     <SafeAreaView style={styles.screen} edges={["bottom"]}>
       <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
       <ScrollView
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator={Platform.OS === "web"}
         contentContainerStyle={[
           styles.scrollContent,
           { paddingHorizontal: horizontalPadding, paddingBottom: screenBottomPadding },
@@ -607,302 +607,613 @@ export default function TeeTimeBookingScreen() {
         bounces={false}
         overScrollMode="never"
       >
-        <View style={styles.heroSection}>
-          <AppImage source={getCourseImage(course.image)} style={styles.heroImage} />
-          <View style={styles.heroOverlay} />
-
-          <View style={styles.heroContent}>
-            <Text style={styles.heroTitle}>{course.title}</Text>
-
-            <View style={styles.heroLocationRow}>
-              <Ionicons name="location" size={14} color="rgba(255, 255, 255, 0.8)" />
-              <Text style={styles.heroLocation}>{course.location}</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>14-Day Weather</Text>
-            <Text style={styles.sectionMeta}>Forecast</Text>
-          </View>
-
-          {weatherState === "loading" || autoSelectionLoading ? (
-            <Text style={styles.weatherStateText}>Loading weather forecast...</Text>
-          ) : null}
-
-          {weatherState === "error" ? (
-            <Text style={styles.weatherStateText}>Weather forecast is unavailable right now.</Text>
-          ) : null}
-
-          {weatherState === "success" ? (
-            <ScrollView
-              ref={weatherStripRef}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.weatherRow}
-              bounces={false}
-              overScrollMode="never"
-            >
-              {visibleWeather.map((day) => {
-                const active = day.dateKey === selectedDateObj.key;
-                return (
-                <View key={day.dateKey} style={[styles.weatherCard, active && styles.weatherCardActive]}>
-                  <Text style={styles.weatherDate}>{day.dateLabel}</Text>
-                  <View style={styles.weatherIconWrap}>
-                    <Ionicons
-                      name={getWeatherCodeIconName(day.weatherCode)}
-                      size={20}
-                      color={colors.accentWarm}
-                    />
-                  </View>
-                  <Text style={styles.weatherTemp}>{`${day.tempMax}\u00B0`}</Text>
-                  <Text style={styles.weatherMinTemp}>{`${day.tempMin}\u00B0 low`}</Text>
+        {isTabletLike ? (
+          <View style={styles.desktopLayoutRow}>
+            <View style={styles.desktopColumnLeft}>
+              {/* 14-Day Weather */}
+              <View style={[styles.section, { marginTop: 0 }]}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>14-Day Weather</Text>
+                  <Text style={styles.sectionMeta}>Forecast</Text>
                 </View>
-                );
-              })}
-            </ScrollView>
-          ) : null}
 
-        </View>
+                {weatherState === "loading" || autoSelectionLoading ? (
+                  <Text style={styles.weatherStateText}>Loading weather forecast...</Text>
+                ) : null}
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Select Date</Text>
-            <View style={styles.sectionHeaderRight}>
-              <Text style={styles.sectionMeta}>{monthYearLabel}</Text>
-              <Pressable
-                style={[styles.calendarQuickButton]}
-                onPress={handleCalendarQuickPick}
-                disabled={!canEditExistingBooking}
-                variant="chip"
-              >
-                <Ionicons name="calendar-outline" size={14} color={colors.primary} />
-                <Text style={styles.calendarQuickButtonText}>Calendar</Text>
-              </Pressable>
-            </View>
-          </View>
+                {weatherState === "error" ? (
+                  <Text style={styles.weatherStateText}>Weather forecast is unavailable right now.</Text>
+                ) : null}
 
-          {showDatePicker && canEditExistingBooking ? (
-            <View style={styles.inlinePickerWrap}>
-              <DateTimePicker
-                value={selectedDateObj.fullDate}
-                mode="date"
-                display={Platform.OS === "ios" ? "inline" : "default"}
-                minimumDate={minimumBookableDate}
-                onChange={handleDatePickerChange}
-              />
-              <Pressable style={[styles.inlinePickerDoneButton]} onPress={() => setShowDatePicker(false)} variant="button">
-                <Text style={styles.inlinePickerDoneButtonText}>Done</Text>
-              </Pressable>
-            </View>
-          ) : null}
-
-            <ScrollView
-              ref={dateStripRef}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.dateRow}
-            bounces={false}
-            overScrollMode="never"
-          >
-            {visibleBookingDates.map((item) => {
-              const active = item.key === selectedDateKey;
-              return (
-                <Pressable
-                  key={item.key}
-                  style={[styles.dateChip, active && styles.dateChipActive]}
-                  onPress={() => {
-                    if (canEditExistingBooking) {
-                      setSelectedDateKey(item.key);
-                    }
-                  }}
-                  disabled={!canEditExistingBooking}
-                  variant="chip"
-                >
-                  <Text style={[styles.dateChipDay, active && styles.dateChipDayActive]}>{item.day}</Text>
-                  <Text style={[styles.dateChipDate, active && styles.dateChipDateActive]}>{item.date}</Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Number of Players</Text>
-          <View style={styles.playersRow}>
-            {[1, 2, 3, 4].map((count) => {
-              const active = selectedPlayers === count;
-              const iconName = count === 1 ? "person" : count === 2 ? "people" : "people-circle";
-
-              return (
-                <Pressable
-                  key={count}
-                  style={[styles.playerChip, active && styles.playerChipActive]}
-                  onPress={() => {
-                    if (canEditExistingBooking) {
-                      setSelectedPlayers(count);
-                    }
-                  }}
-                  disabled={!canEditExistingBooking}
-                  variant="chip"
-                >
-                  <Ionicons
-                    name={iconName as "person" | "people" | "people-circle"}
-                    size={16}
-                    color={active ? colors.accentWarm : colors.text}
-                  />
-                  <Text style={[styles.playerChipText, active && styles.playerChipTextActive]}>{count}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Available Times</Text>
-            <View style={styles.periodRow}>
-              <Pressable
-                style={[styles.periodPill, timePeriod === "MORNING" && styles.periodPillActive]}
-                onPress={() => {
-                  if (canEditExistingBooking) {
-                    setTimePeriod("MORNING");
-                    setSelectedTime("");
-                  }
-                }}
-                disabled={!canEditExistingBooking}
-                variant="chip"
-              >
-                <Text style={[styles.periodText, timePeriod === "MORNING" && styles.periodTextActive]}>MORNING</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.periodPill, timePeriod === "AFTERNOON" && styles.periodPillActive]}
-                onPress={() => {
-                  if (canEditExistingBooking) {
-                    setTimePeriod("AFTERNOON");
-                    setSelectedTime("");
-                  }
-                }}
-                disabled={!canEditExistingBooking}
-                variant="chip"
-              >
-                <Text style={[styles.periodText, timePeriod === "AFTERNOON" && styles.periodTextActive]}>
-                  AFTERNOON
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-
-          <View style={styles.timeGrid}>
-            {slotState === "loading" ? <Text style={styles.weatherStateText}>Loading available tee slots...</Text> : null}
-            {slotState === "error" ? <Text style={styles.weatherStateText}>{slotError}</Text> : null}
-            {slotState === "success" && !visiblePeriodSlots.length ? (
-              <Text style={styles.weatherStateText}>No tee slots configured for this period on the selected date.</Text>
-            ) : null}
-            {slotState === "success" && visiblePeriodSlots.length > 0 && !availableTimes.length ? (
-              <Text style={styles.weatherStateText}>Past and booked tee times are shown below. No bookable slots remain in this period.</Text>
-            ) : null}
-            {slotState === "success" && visiblePeriodSlots.map((slot) => {
-              const active = selectedTime === slot.teeTime;
-              const disabled = !slot.isSelectable;
-              return (
-                <Pressable
-                  key={slot.teeTime}
-                  style={[
-                    styles.timeChip,
-                    active && styles.timeChipActive,
-                    slot.isPast && styles.timeChipPast,
-                    slot.isUnavailableByBooking && styles.timeChipBooked,
-                  ]}
-                  onPress={() => {
-                    if (!disabled) {
-                      setSelectedTime(slot.teeTime);
-                    }
-                  }}
-                  disabled={disabled || !canEditExistingBooking}
-                  variant="chip"
-                >
-                  <Text
-                    style={[
-                      styles.timeChipText,
-                      active && styles.timeChipTextActive,
-                      disabled && styles.timeChipTextDisabled,
-                      slot.isUnavailableByBooking && styles.timeChipTextBooked,
-                    ]}
+                {weatherState === "success" ? (
+                  <ScrollView
+                    ref={weatherStripRef}
+                    horizontal
+                    showsHorizontalScrollIndicator={Platform.OS === "web"}
+                    contentContainerStyle={styles.weatherRow}
+                    bounces={false}
+                    overScrollMode="never"
                   >
-                    {slot.teeTime}
-                  </Text>
-                  {slot.isUnavailableByBooking ? <View style={styles.timeChipStrike} /> : null}
+                    {visibleWeather.map((day) => {
+                      const active = day.dateKey === selectedDateObj.key;
+                      return (
+                      <View key={day.dateKey} style={[styles.weatherCard, active && styles.weatherCardActive]}>
+                        <Text style={styles.weatherDate}>{day.dateLabel}</Text>
+                        <View style={styles.weatherIconWrap}>
+                          <Ionicons
+                            name={getWeatherCodeIconName(day.weatherCode)}
+                            size={20}
+                            color={colors.accentWarm}
+                          />
+                        </View>
+                        <Text style={styles.weatherTemp}>{`${day.tempMax}\u00B0`}</Text>
+                        <Text style={styles.weatherMinTemp}>{`${day.tempMin}\u00B0 low`}</Text>
+                      </View>
+                      );
+                    })}
+                  </ScrollView>
+                ) : null}
+              </View>
+
+              {/* Select Date */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Select Date</Text>
+                  <View style={styles.sectionHeaderRight}>
+                    <Text style={styles.sectionMeta}>{monthYearLabel}</Text>
+                    <Pressable
+                      style={[styles.calendarQuickButton]}
+                      onPress={handleCalendarQuickPick}
+                      disabled={!canEditExistingBooking}
+                      variant="chip"
+                    >
+                      <Ionicons name="calendar-outline" size={14} color={colors.primary} />
+                      <Text style={styles.calendarQuickButtonText}>Calendar</Text>
+                    </Pressable>
+                  </View>
+                </View>
+
+                {showDatePicker && canEditExistingBooking ? (
+                  <View style={styles.inlinePickerWrap}>
+                    <DateTimePicker
+                      value={selectedDateObj.fullDate}
+                      mode="date"
+                      display={Platform.OS === "ios" ? "inline" : "default"}
+                      minimumDate={minimumBookableDate}
+                      onChange={handleDatePickerChange}
+                    />
+                    <Pressable style={[styles.inlinePickerDoneButton]} onPress={() => setShowDatePicker(false)} variant="button">
+                      <Text style={styles.inlinePickerDoneButtonText}>Done</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+
+                <ScrollView
+                  ref={dateStripRef}
+                  horizontal
+                  showsHorizontalScrollIndicator={Platform.OS === "web"}
+                  contentContainerStyle={styles.dateRow}
+                  bounces={false}
+                  overScrollMode="never"
+                >
+                  {visibleBookingDates.map((item) => {
+                    const active = item.key === selectedDateKey;
+                    return (
+                      <Pressable
+                        key={item.key}
+                        style={[styles.dateChip, active && styles.dateChipActive]}
+                        onPress={() => {
+                          if (canEditExistingBooking) {
+                            setSelectedDateKey(item.key);
+                          }
+                        }}
+                        disabled={!canEditExistingBooking}
+                        variant="chip"
+                      >
+                        <Text style={[styles.dateChipDay, active && styles.dateChipDayActive]}>{item.day}</Text>
+                        <Text style={[styles.dateChipDate, active && styles.dateChipDateActive]}>{item.date}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+
+              {/* Number of Players */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Number of Players</Text>
+                <View style={styles.playersRow}>
+                  {[1, 2, 3, 4].map((count) => {
+                    const active = selectedPlayers === count;
+                    const iconName = count === 1 ? "person" : count === 2 ? "people" : "people-circle";
+
+                    return (
+                      <Pressable
+                        key={count}
+                        style={[styles.playerChip, active && styles.playerChipActive]}
+                        onPress={() => {
+                          if (canEditExistingBooking) {
+                            setSelectedPlayers(count);
+                          }
+                        }}
+                        disabled={!canEditExistingBooking}
+                        variant="chip"
+                      >
+                        <Ionicons
+                          name={iconName as "person" | "people" | "people-circle"}
+                          size={16}
+                          color={active ? colors.accentWarm : colors.text}
+                        />
+                        <Text style={[styles.playerChipText, active && styles.playerChipTextActive]}>{count}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Available Times */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Available Times</Text>
+                  <View style={styles.periodRow}>
+                    <Pressable
+                      style={[styles.periodPill, timePeriod === "MORNING" && styles.periodPillActive]}
+                      onPress={() => {
+                        if (canEditExistingBooking) {
+                          setTimePeriod("MORNING");
+                          setSelectedTime("");
+                        }
+                      }}
+                      disabled={!canEditExistingBooking}
+                      variant="chip"
+                    >
+                      <Text style={[styles.periodText, timePeriod === "MORNING" && styles.periodTextActive]}>MORNING</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.periodPill, timePeriod === "AFTERNOON" && styles.periodPillActive]}
+                      onPress={() => {
+                        if (canEditExistingBooking) {
+                          setTimePeriod("AFTERNOON");
+                          setSelectedTime("");
+                        }
+                      }}
+                      disabled={!canEditExistingBooking}
+                      variant="chip"
+                    >
+                      <Text style={[styles.periodText, timePeriod === "AFTERNOON" && styles.periodTextActive]}>
+                        AFTERNOON
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
+
+                <View style={styles.timeGrid}>
+                  {slotState === "loading" ? <Text style={styles.weatherStateText}>Loading available tee slots...</Text> : null}
+                  {slotState === "error" ? <Text style={styles.weatherStateText}>{slotError}</Text> : null}
+                  {slotState === "success" && !visiblePeriodSlots.length ? (
+                    <Text style={styles.weatherStateText}>No tee slots configured for this period on the selected date.</Text>
+                  ) : null}
+                  {slotState === "success" && visiblePeriodSlots.length > 0 && !availableTimes.length ? (
+                    <Text style={styles.weatherStateText}>Past and booked tee times are shown below. No bookable slots remain in this period.</Text>
+                  ) : null}
+                  {slotState === "success" && visiblePeriodSlots.map((slot) => {
+                    const active = selectedTime === slot.teeTime;
+                    const disabled = !slot.isSelectable;
+                    return (
+                      <Pressable
+                        key={slot.teeTime}
+                        style={[
+                          styles.timeChip,
+                          active && styles.timeChipActive,
+                          slot.isPast && styles.timeChipPast,
+                          slot.isUnavailableByBooking && styles.timeChipBooked,
+                        ]}
+                        onPress={() => {
+                          if (!disabled) {
+                            setSelectedTime(slot.teeTime);
+                          }
+                        }}
+                        disabled={disabled || !canEditExistingBooking}
+                        variant="chip"
+                      >
+                        <Text
+                          style={[
+                            styles.timeChipText,
+                            active && styles.timeChipTextActive,
+                            disabled && styles.timeChipTextDisabled,
+                            slot.isUnavailableByBooking && styles.timeChipTextBooked,
+                          ]}
+                        >
+                          {slot.teeTime}
+                        </Text>
+                        {slot.isUnavailableByBooking ? <View style={styles.timeChipStrike} /> : null}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.desktopColumnRight}>
+              {/* Hero Section */}
+              <View style={[styles.heroSection, { height: 180 }]}>
+                <AppImage source={getCourseImage(course.image)} style={styles.heroImage} />
+                <View style={styles.heroOverlay} />
+
+                <View style={styles.heroContent}>
+                  <Text style={styles.heroTitle}>{course.title}</Text>
+                  <View style={styles.heroLocationRow}>
+                    <Ionicons name="location" size={14} color="rgba(255, 255, 255, 0.8)" />
+                    <Text style={styles.heroLocation}>{course.location}</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Summary Card */}
+              <View style={[styles.summaryCard, { marginTop: 0 }]}>
+                <Text style={styles.summaryTitle}>Booking Summary</Text>
+
+                {!canEditExistingBooking && existingBooking ? (
+                  <Text style={styles.weatherStateText}>This booking is read-only because its tee time has already passed.</Text>
+                ) : null}
+
+                <View style={styles.summaryMetaItem}>
+                  <View style={styles.summaryIconWrap}>
+                    <Ionicons name="calendar" size={18} color={colors.accentSoft} />
+                  </View>
+                  <View>
+                    <Text style={styles.summaryLabel}>DATE & TIME</Text>
+                    <Text style={styles.summaryValue}>{formattedDateTime}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.summaryMetaItem}>
+                  <View style={styles.summaryIconWrap}>
+                    <Ionicons name="person" size={18} color={colors.accentSoft} />
+                  </View>
+                  <View>
+                    <Text style={styles.summaryLabel}>PARTY SIZE</Text>
+                    <Text style={styles.summaryValue}>{selectedPlayers} Players</Text>
+                  </View>
+                </View>
+
+                <View style={styles.pricingSection}>
+                  <View style={styles.pricingRow}>
+                    <Text style={styles.pricingName}>Green Fees ({selectedPlayers}x)</Text>
+                    <Text style={styles.pricingAmount}>${greenFees.toFixed(2)}</Text>
+                  </View>
+                  <View style={styles.pricingRow}>
+                    <Text style={styles.pricingName}>Service Fee</Text>
+                    <Text style={styles.pricingAmount}>${serviceFee.toFixed(2)}</Text>
+                  </View>
+                  <View style={styles.pricingRow}>
+                    <Text style={styles.pricingName}>Caddy Fee</Text>
+                    <Text style={styles.pricingAmount}>${caddyFee.toFixed(2)}</Text>
+                  </View>
+                  <View style={styles.pricingRow}>
+                    <Text style={styles.pricingName}>Taxes & Fees</Text>
+                    <Text style={styles.pricingAmount}>${taxesAndFees.toFixed(2)}</Text>
+                  </View>
+                  <View style={[styles.pricingRow, styles.totalRow]}>
+                    <Text style={styles.totalLabel}>Total Due</Text>
+                    <Text style={styles.totalAmount}>${totalDue.toFixed(2)}</Text>
+                  </View>
+                </View>
+
+                <Pressable
+                  style={[styles.confirmButton, (!selectedTime || !canEditExistingBooking) && styles.confirmButtonDisabled]}
+                  onPress={handleConfirmBooking}
+                  disabled={!selectedTime || !canEditExistingBooking}
+                  variant="cta"
+                >
+                  <Text style={styles.confirmButtonText}>{existingBooking ? "Save Changes" : "Confirm Booking"}</Text>
                 </Pressable>
-              );
-            })}
-          </View>
-        </View>
 
-        <View style={styles.summaryCard}>
-            <Text style={styles.summaryTitle}>Booking Summary</Text>
-
-            {!canEditExistingBooking && existingBooking ? (
-              <Text style={styles.weatherStateText}>This booking is read-only because its tee time has already passed.</Text>
-            ) : null}
-
-            <View style={styles.summaryMetaItem}>
-              <View style={styles.summaryIconWrap}>
-                <Ionicons name="calendar" size={18} color={colors.accentSoft} />
+                <Text style={styles.policyText}>
+                  By confirming, you agree to our 24-hour cancellation policy and course etiquette guidelines.
+                </Text>
               </View>
-              <View>
-                <Text style={styles.summaryLabel}>DATE & TIME</Text>
-                <Text style={styles.summaryValue}>{formattedDateTime}</Text>
-              </View>
-            </View>
-
-            <View style={styles.summaryMetaItem}>
-              <View style={styles.summaryIconWrap}>
-                <Ionicons name="person" size={18} color={colors.accentSoft} />
-              </View>
-              <View>
-                <Text style={styles.summaryLabel}>PARTY SIZE</Text>
-                <Text style={styles.summaryValue}>{selectedPlayers} Players</Text>
-              </View>
-            </View>
-
-            <View style={styles.pricingSection}>
-            <View style={styles.pricingRow}>
-              <Text style={styles.pricingName}>Green Fees ({selectedPlayers}x)</Text>
-              <Text style={styles.pricingAmount}>${greenFees.toFixed(2)}</Text>
-            </View>
-            <View style={styles.pricingRow}>
-              <Text style={styles.pricingName}>Service Fee</Text>
-              <Text style={styles.pricingAmount}>${serviceFee.toFixed(2)}</Text>
-            </View>
-            <View style={styles.pricingRow}>
-              <Text style={styles.pricingName}>Caddy Fee</Text>
-              <Text style={styles.pricingAmount}>${caddyFee.toFixed(2)}</Text>
-            </View>
-            <View style={styles.pricingRow}>
-              <Text style={styles.pricingName}>Taxes & Fees</Text>
-              <Text style={styles.pricingAmount}>${taxesAndFees.toFixed(2)}</Text>
-            </View>
-            <View style={[styles.pricingRow, styles.totalRow]}>
-              <Text style={styles.totalLabel}>Total Due</Text>
-              <Text style={styles.totalAmount}>${totalDue.toFixed(2)}</Text>
             </View>
           </View>
+        ) : (
+          <>
+            <View style={styles.heroSection}>
+              <AppImage source={getCourseImage(course.image)} style={styles.heroImage} />
+              <View style={styles.heroOverlay} />
 
-          <Pressable
-            style={[styles.confirmButton, (!selectedTime || !canEditExistingBooking) && styles.confirmButtonDisabled]}
-            onPress={handleConfirmBooking}
-            disabled={!selectedTime || !canEditExistingBooking}
-            variant="cta"
-          >
-            <Text style={styles.confirmButtonText}>{existingBooking ? "Save Changes" : "Confirm Booking"}</Text>
-          </Pressable>
+              <View style={styles.heroContent}>
+                <Text style={styles.heroTitle}>{course.title}</Text>
 
-          <Text style={styles.policyText}>
-            By confirming, you agree to our 24-hour cancellation policy and course etiquette guidelines.
-          </Text>
-        </View>
+                <View style={styles.heroLocationRow}>
+                  <Ionicons name="location" size={14} color="rgba(255, 255, 255, 0.8)" />
+                  <Text style={styles.heroLocation}>{course.location}</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>14-Day Weather</Text>
+                <Text style={styles.sectionMeta}>Forecast</Text>
+              </View>
+
+              {weatherState === "loading" || autoSelectionLoading ? (
+                <Text style={styles.weatherStateText}>Loading weather forecast...</Text>
+              ) : null}
+
+              {weatherState === "error" ? (
+                <Text style={styles.weatherStateText}>Weather forecast is unavailable right now.</Text>
+              ) : null}
+
+              {weatherState === "success" ? (
+                <ScrollView
+                  ref={weatherStripRef}
+                  horizontal
+                  showsHorizontalScrollIndicator={Platform.OS === "web"}
+                  contentContainerStyle={styles.weatherRow}
+                  bounces={false}
+                  overScrollMode="never"
+                >
+                  {visibleWeather.map((day) => {
+                    const active = day.dateKey === selectedDateObj.key;
+                    return (
+                    <View key={day.dateKey} style={[styles.weatherCard, active && styles.weatherCardActive]}>
+                      <Text style={styles.weatherDate}>{day.dateLabel}</Text>
+                      <View style={styles.weatherIconWrap}>
+                        <Ionicons
+                          name={getWeatherCodeIconName(day.weatherCode)}
+                          size={20}
+                          color={colors.accentWarm}
+                        />
+                      </View>
+                      <Text style={styles.weatherTemp}>{`${day.tempMax}\u00B0`}</Text>
+                      <Text style={styles.weatherMinTemp}>{`${day.tempMin}\u00B0 low`}</Text>
+                    </View>
+                    );
+                  })}
+                </ScrollView>
+              ) : null}
+
+            </View>
+
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Select Date</Text>
+                <View style={styles.sectionHeaderRight}>
+                  <Text style={styles.sectionMeta}>{monthYearLabel}</Text>
+                  <Pressable
+                    style={[styles.calendarQuickButton]}
+                    onPress={handleCalendarQuickPick}
+                    disabled={!canEditExistingBooking}
+                    variant="chip"
+                  >
+                    <Ionicons name="calendar-outline" size={14} color={colors.primary} />
+                    <Text style={styles.calendarQuickButtonText}>Calendar</Text>
+                  </Pressable>
+                </View>
+              </View>
+
+              {showDatePicker && canEditExistingBooking ? (
+                <View style={styles.inlinePickerWrap}>
+                  <DateTimePicker
+                    value={selectedDateObj.fullDate}
+                    mode="date"
+                    display={Platform.OS === "ios" ? "inline" : "default"}
+                    minimumDate={minimumBookableDate}
+                    onChange={handleDatePickerChange}
+                  />
+                  <Pressable style={[styles.inlinePickerDoneButton]} onPress={() => setShowDatePicker(false)} variant="button">
+                    <Text style={styles.inlinePickerDoneButtonText}>Done</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+
+                <ScrollView
+                  ref={dateStripRef}
+                  horizontal
+                  showsHorizontalScrollIndicator={Platform.OS === "web"}
+                  contentContainerStyle={styles.dateRow}
+                bounces={false}
+                overScrollMode="never"
+              >
+                {visibleBookingDates.map((item) => {
+                  const active = item.key === selectedDateKey;
+                  return (
+                    <Pressable
+                      key={item.key}
+                      style={[styles.dateChip, active && styles.dateChipActive]}
+                      onPress={() => {
+                        if (canEditExistingBooking) {
+                          setSelectedDateKey(item.key);
+                        }
+                      }}
+                      disabled={!canEditExistingBooking}
+                      variant="chip"
+                    >
+                      <Text style={[styles.dateChipDay, active && styles.dateChipDayActive]}>{item.day}</Text>
+                      <Text style={[styles.dateChipDate, active && styles.dateChipDateActive]}>{item.date}</Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Number of Players</Text>
+              <View style={styles.playersRow}>
+                {[1, 2, 3, 4].map((count) => {
+                  const active = selectedPlayers === count;
+                  const iconName = count === 1 ? "person" : count === 2 ? "people" : "people-circle";
+
+                  return (
+                    <Pressable
+                      key={count}
+                      style={[styles.playerChip, active && styles.playerChipActive]}
+                      onPress={() => {
+                        if (canEditExistingBooking) {
+                          setSelectedPlayers(count);
+                        }
+                      }}
+                      disabled={!canEditExistingBooking}
+                      variant="chip"
+                    >
+                      <Ionicons
+                        name={iconName as "person" | "people" | "people-circle"}
+                        size={16}
+                        color={active ? colors.accentWarm : colors.text}
+                      />
+                      <Text style={[styles.playerChipText, active && styles.playerChipTextActive]}>{count}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Available Times</Text>
+                <View style={styles.periodRow}>
+                  <Pressable
+                    style={[styles.periodPill, timePeriod === "MORNING" && styles.periodPillActive]}
+                    onPress={() => {
+                      if (canEditExistingBooking) {
+                        setTimePeriod("MORNING");
+                        setSelectedTime("");
+                      }
+                    }}
+                    disabled={!canEditExistingBooking}
+                    variant="chip"
+                  >
+                    <Text style={[styles.periodText, timePeriod === "MORNING" && styles.periodTextActive]}>MORNING</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.periodPill, timePeriod === "AFTERNOON" && styles.periodPillActive]}
+                    onPress={() => {
+                      if (canEditExistingBooking) {
+                        setTimePeriod("AFTERNOON");
+                        setSelectedTime("");
+                      }
+                    }}
+                    disabled={!canEditExistingBooking}
+                    variant="chip"
+                  >
+                    <Text style={[styles.periodText, timePeriod === "AFTERNOON" && styles.periodTextActive]}>
+                      AFTERNOON
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+
+              <View style={styles.timeGrid}>
+                {slotState === "loading" ? <Text style={styles.weatherStateText}>Loading available tee slots...</Text> : null}
+                {slotState === "error" ? <Text style={styles.weatherStateText}>{slotError}</Text> : null}
+                {slotState === "success" && !visiblePeriodSlots.length ? (
+                  <Text style={styles.weatherStateText}>No tee slots configured for this period on the selected date.</Text>
+                ) : null}
+                {slotState === "success" && visiblePeriodSlots.length > 0 && !availableTimes.length ? (
+                  <Text style={styles.weatherStateText}>Past and booked tee times are shown below. No bookable slots remain in this period.</Text>
+                ) : null}
+                {slotState === "success" && visiblePeriodSlots.map((slot) => {
+                  const active = selectedTime === slot.teeTime;
+                  const disabled = !slot.isSelectable;
+                  return (
+                    <Pressable
+                      key={slot.teeTime}
+                      style={[
+                        styles.timeChip,
+                        active && styles.timeChipActive,
+                        slot.isPast && styles.timeChipPast,
+                        slot.isUnavailableByBooking && styles.timeChipBooked,
+                      ]}
+                      onPress={() => {
+                        if (!disabled) {
+                          setSelectedTime(slot.teeTime);
+                        }
+                      }}
+                      disabled={disabled || !canEditExistingBooking}
+                      variant="chip"
+                    >
+                      <Text
+                        style={[
+                          styles.timeChipText,
+                          active && styles.timeChipTextActive,
+                          disabled && styles.timeChipTextDisabled,
+                          slot.isUnavailableByBooking && styles.timeChipTextBooked,
+                        ]}
+                      >
+                        {slot.teeTime}
+                      </Text>
+                      {slot.isUnavailableByBooking ? <View style={styles.timeChipStrike} /> : null}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={styles.summaryCard}>
+                <Text style={styles.summaryTitle}>Booking Summary</Text>
+
+                {!canEditExistingBooking && existingBooking ? (
+                  <Text style={styles.weatherStateText}>This booking is read-only because its tee time has already passed.</Text>
+                ) : null}
+
+                <View style={styles.summaryMetaItem}>
+                  <View style={styles.summaryIconWrap}>
+                    <Ionicons name="calendar" size={18} color={colors.accentSoft} />
+                  </View>
+                  <View>
+                    <Text style={styles.summaryLabel}>DATE & TIME</Text>
+                    <Text style={styles.summaryValue}>{formattedDateTime}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.summaryMetaItem}>
+                  <View style={styles.summaryIconWrap}>
+                    <Ionicons name="person" size={18} color={colors.accentSoft} />
+                  </View>
+                  <View>
+                    <Text style={styles.summaryLabel}>PARTY SIZE</Text>
+                    <Text style={styles.summaryValue}>{selectedPlayers} Players</Text>
+                  </View>
+                </View>
+
+                <View style={styles.pricingSection}>
+                <View style={styles.pricingRow}>
+                  <Text style={styles.pricingName}>Green Fees ({selectedPlayers}x)</Text>
+                  <Text style={styles.pricingAmount}>${greenFees.toFixed(2)}</Text>
+                </View>
+                <View style={styles.pricingRow}>
+                  <Text style={styles.pricingName}>Service Fee</Text>
+                  <Text style={styles.pricingAmount}>${serviceFee.toFixed(2)}</Text>
+                </View>
+                <View style={styles.pricingRow}>
+                  <Text style={styles.pricingName}>Caddy Fee</Text>
+                  <Text style={styles.pricingAmount}>${caddyFee.toFixed(2)}</Text>
+                </View>
+                <View style={styles.pricingRow}>
+                  <Text style={styles.pricingName}>Taxes & Fees</Text>
+                  <Text style={styles.pricingAmount}>${taxesAndFees.toFixed(2)}</Text>
+                </View>
+                <View style={[styles.pricingRow, styles.totalRow]}>
+                  <Text style={styles.totalLabel}>Total Due</Text>
+                  <Text style={styles.totalAmount}>${totalDue.toFixed(2)}</Text>
+                </View>
+              </View>
+
+              <Pressable
+                style={[styles.confirmButton, (!selectedTime || !canEditExistingBooking) && styles.confirmButtonDisabled]}
+                onPress={handleConfirmBooking}
+                disabled={!selectedTime || !canEditExistingBooking}
+                variant="cta"
+              >
+                <Text style={styles.confirmButtonText}>{existingBooking ? "Save Changes" : "Confirm Booking"}</Text>
+              </Pressable>
+
+              <Text style={styles.policyText}>
+                By confirming, you agree to our 24-hour cancellation policy and course etiquette guidelines.
+              </Text>
+            </View>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -1348,5 +1659,19 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     lineHeight: theme.typography.caption.lineHeight + 4,
     fontWeight: "500",
     paddingHorizontal: 8,
+  },
+  desktopLayoutRow: {
+    flexDirection: "row",
+    gap: 24,
+    width: "100%",
+    alignItems: "flex-start",
+  },
+  desktopColumnLeft: {
+    flex: 1.2,
+    gap: 16,
+  },
+  desktopColumnRight: {
+    flex: 1,
+    gap: 16,
   },
 }));

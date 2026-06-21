@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, ScrollView, Text, TextInput, View, Modal } from "react-native";
+import { Platform,  ActivityIndicator, ScrollView, Text, TextInput, View, Modal  } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
@@ -99,7 +99,7 @@ export default function AccountScreen() {
   const { colors, resolvedTheme } = useAppTheme();
   const styles = useThemedStyles(themedStyles);
   const auth = useAuthSession();
-  const { horizontalPadding, screenBottomPadding } = useResponsiveLayout();
+  const { horizontalPadding, screenBottomPadding, isTabletLike } = useResponsiveLayout();
   const catalog = useCourseCatalog();
   const bookingState = useBookingState();
 
@@ -340,7 +340,7 @@ export default function AccountScreen() {
       <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
 
       <ScrollView
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator={Platform.OS === "web"}
         contentContainerStyle={[
           styles.scrollContent,
           { paddingHorizontal: horizontalPadding, paddingBottom: Math.max(screenBottomPadding - 30, 120) },
@@ -348,173 +348,356 @@ export default function AccountScreen() {
         bounces={false}
         overScrollMode="never"
       >
-        {/* Premium Profile Summary Card */}
-        <View style={styles.profileCard}>
-          <View style={styles.photoRow}>
-            <View style={styles.avatarWrapContainer}>
-              <Pressable style={styles.avatarWrap} onPress={() => setIsPhotoModalVisible(true)} variant="card">
-                {auth.profile?.avatar_url ? (
-                  <AppImage source={{ uri: auth.profile.avatar_url }} style={styles.avatarImage} />
-                ) : (
-                  <View style={styles.avatarInitialContainer}>
-                    <Text style={styles.avatarInitialText}>
-                      {(fullName || auth.session?.user.email || "G")[0].toUpperCase()}
-                    </Text>
+        {isTabletLike ? (
+          <View style={styles.desktopLayoutRow}>
+            <View style={styles.desktopColumnLeft}>
+              {/* Premium Profile Summary Card */}
+              <View style={styles.profileCard}>
+                <View style={styles.photoRow}>
+                  <View style={styles.avatarWrapContainer}>
+                    <Pressable style={styles.avatarWrap} onPress={() => setIsPhotoModalVisible(true)} variant="card">
+                      {auth.profile?.avatar_url ? (
+                        <AppImage source={{ uri: auth.profile.avatar_url }} style={styles.avatarImage} />
+                      ) : (
+                        <View style={styles.avatarInitialContainer}>
+                          <Text style={styles.avatarInitialText}>
+                            {(fullName || auth.session?.user.email || "G")[0].toUpperCase()}
+                          </Text>
+                        </View>
+                      )}
+                    </Pressable>
+                    <Pressable style={styles.avatarEditBadge} onPress={() => setIsPhotoModalVisible(true)} variant="icon">
+                      <Ionicons name="create" size={12} color={colors.surface} />
+                    </Pressable>
                   </View>
-                )}
-              </Pressable>
-              <Pressable style={styles.avatarEditBadge} onPress={() => setIsPhotoModalVisible(true)} variant="icon">
-                <Ionicons name="create" size={12} color={colors.surface} />
-              </Pressable>
-            </View>
-            <View style={styles.photoCopy}>
-              <Text style={styles.photoTitle}>{fullName || "Golfer Profile"}</Text>
-              <Text style={styles.photoSubtitle}>Member since {memberSince}</Text>
-            </View>
-          </View>
+                  <View style={styles.photoCopy}>
+                    <Text style={styles.photoTitle}>{fullName || "Golfer Profile"}</Text>
+                    <Text style={styles.photoSubtitle}>Member since {memberSince}</Text>
+                  </View>
+                </View>
 
-          <View style={styles.profileMetaRow}>
-            <View style={styles.metaPill}>
-              <Text style={styles.metaPillLabel}>MEMBERSHIP</Text>
-              <Text style={styles.metaPillValue}>{membershipTier}</Text>
-            </View>
-            <View style={styles.metaPill}>
-              <Text style={styles.metaPillLabel}>MEMBER ID</Text>
-              <Text style={styles.metaPillValue}>GT-{memberId}</Text>
-            </View>
-          </View>
-        </View>
+                <View style={styles.profileMetaRow}>
+                  <View style={styles.metaPill}>
+                    <Text style={styles.metaPillLabel}>MEMBERSHIP</Text>
+                    <Text style={styles.metaPillValue}>{membershipTier}</Text>
+                  </View>
+                  <View style={styles.metaPill}>
+                    <Text style={styles.metaPillLabel}>MEMBER ID</Text>
+                    <Text style={styles.metaPillValue}>GT-{memberId}</Text>
+                  </View>
+                </View>
+              </View>
 
-        {/* Profile details */}
-        <View style={styles.section}>
-          <Text style={styles.sectionHeader}>Golfer Credentials</Text>
-          <View style={styles.card}>
-            <PremiumInput
-              label="FULL NAME"
-              value={fullName}
-              onChangeText={setFullName}
-              placeholder="Enter full name"
-            />
-            <PremiumInput
-              label="EMAIL ADDRESS"
-              value={email}
-              onChangeText={setEmail}
-              placeholder="Email address"
-              keyboardType="email-address"
-            />
+              {/* Profile details */}
+              <View style={styles.section}>
+                <Text style={styles.sectionHeader}>Golfer Credentials</Text>
+                <View style={styles.card}>
+                  <PremiumInput
+                    label="FULL NAME"
+                    value={fullName}
+                    onChangeText={setFullName}
+                    placeholder="Enter full name"
+                  />
+                  <PremiumInput
+                    label="EMAIL ADDRESS"
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="Email address"
+                    keyboardType="email-address"
+                  />
 
-            {/* Phone Number Input with Country Code & Verification Badge */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>PHONE NUMBER</Text>
-              <View style={styles.phoneRowField}>
-                <Pressable
-                  style={styles.countryCodePill}
-                  onPress={() => setIsCountryModalVisible(true)}
-                  variant="chip"
-                >
-                  <Text style={styles.countryCodeText}>{countryCode}</Text>
-                  <Ionicons name="chevron-down" size={10} color={colors.textSoft} />
-                </Pressable>
-                
-                <TextInput
-                  value={localPhone}
-                  onChangeText={(val) => {
-                    setLocalPhone(val);
-                    setIsPhoneVerified(false); // Reset verification if number changes
-                  }}
-                  placeholder="555 555 5555"
-                  placeholderTextColor={colors.muted}
-                  style={styles.localPhoneInput}
-                  keyboardType="phone-pad"
-                />
+                  {/* Phone Number Input with Country Code & Verification Badge */}
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>PHONE NUMBER</Text>
+                    <View style={styles.phoneRowField}>
+                      <Pressable
+                        style={styles.countryCodePill}
+                        onPress={() => setIsCountryModalVisible(true)}
+                        variant="chip"
+                      >
+                        <Text style={styles.countryCodeText}>{countryCode}</Text>
+                        <Ionicons name="chevron-down" size={10} color={colors.textSoft} />
+                      </Pressable>
+                      
+                      <TextInput
+                        value={localPhone}
+                        onChangeText={(val) => {
+                          setLocalPhone(val);
+                          setIsPhoneVerified(false); // Reset verification if number changes
+                        }}
+                        placeholder="555 555 5555"
+                        placeholderTextColor={colors.muted}
+                        style={styles.localPhoneInput}
+                        keyboardType="phone-pad"
+                      />
 
-                <Pressable
-                  style={[styles.verifyBadge, isPhoneVerified && styles.verifyBadgeSuccess]}
-                  onPress={isPhoneVerified ? undefined : () => void handleStartPhoneVerification()}
-                  disabled={!localPhone.trim()}
-                  variant="chip"
-                >
-                  {isPhoneVerified ? (
-                    <>
-                      <Ionicons name="checkmark-circle" size={13} color={colors.successText} />
-                      <Text style={styles.verifyBadgeTextActive}>Verified</Text>
-                    </>
-                  ) : (
-                    <Text style={styles.verifyBadgeText}>Verify</Text>
-                  )}
-                </Pressable>
+                      <Pressable
+                        style={[styles.verifyBadge, isPhoneVerified && styles.verifyBadgeSuccess]}
+                        onPress={isPhoneVerified ? undefined : () => void handleStartPhoneVerification()}
+                        disabled={!localPhone.trim()}
+                        variant="chip"
+                      >
+                        {isPhoneVerified ? (
+                          <>
+                            <Ionicons name="checkmark-circle" size={13} color={colors.successText} />
+                            <Text style={styles.verifyBadgeTextActive}>Verified</Text>
+                          </>
+                        ) : (
+                          <Text style={styles.verifyBadgeText}>Verify</Text>
+                        )}
+                      </Pressable>
+                    </View>
+                  </View>
+
+                  <PremiumInput
+                    label="CURRENT HANDICAP"
+                    value={handicap}
+                    onChangeText={setHandicap}
+                    placeholder="e.g. 10.4"
+                    keyboardType="decimal-pad"
+                  />
+                </View>
               </View>
             </View>
 
-            <PremiumInput
-              label="CURRENT HANDICAP"
-              value={handicap}
-              onChangeText={setHandicap}
-              placeholder="e.g. 10.4"
-              keyboardType="decimal-pad"
-            />
-
-            {/* Home Club Selection */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>HOME CLUB</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.clubSelector}
-                bounces={false}
-              >
-                {catalog.courses.map((course) => {
-                  const isSelected = homeClubId === course.id;
-                  return (
-                    <Pressable
-                      key={course.id}
-                      style={[styles.clubChip, isSelected && styles.clubChipActive]}
-                      onPress={() => setHomeClubId(course.id)}
-                      variant="chip"
+            <View style={styles.desktopColumnRight}>
+              {/* Home Club Selection */}
+              <View style={styles.section}>
+                <Text style={styles.sectionHeader}>Home Club Selection</Text>
+                <View style={styles.card}>
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>CHOOSE YOUR HOME CLUB</Text>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={Platform.OS === "web"}
+                      contentContainerStyle={styles.clubSelector}
+                      bounces={false}
                     >
-                      <Text style={[styles.clubChipText, isSelected && styles.clubChipTextActive]}>
-                        {course.title}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-              {!catalog.courses.length && <Text style={styles.loadingText}>Loading clubs...</Text>}
+                      {catalog.courses.map((course) => {
+                        const isSelected = homeClubId === course.id;
+                        return (
+                          <Pressable
+                            key={course.id}
+                            style={[styles.clubChip, isSelected && styles.clubChipActive]}
+                            onPress={() => setHomeClubId(course.id)}
+                            variant="chip"
+                          >
+                            <Text style={[styles.clubChipText, isSelected && styles.clubChipTextActive]}>
+                              {course.title}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </ScrollView>
+                    {!catalog.courses.length && <Text style={styles.loadingText}>Loading clubs...</Text>}
+                  </View>
+                </View>
+              </View>
+
+              {/* Status card */}
+              {statusMessage ? (
+                <View style={[styles.noticeCard, { marginTop: 0 }]}>
+                  <Ionicons name="information-circle-outline" size={18} color={colors.primary} />
+                  <Text style={styles.noticeText}>{statusMessage}</Text>
+                </View>
+              ) : null}
+
+              {/* Action Panel */}
+              <View style={[styles.footerActions, { marginTop: 0 }]}>
+                <Pressable
+                  style={styles.primaryButton}
+                  onPress={() => void handleSave()}
+                  disabled={isSaving || auth.profileLoading}
+                  variant="cta"
+                >
+                  {isSaving ? (
+                    <ActivityIndicator size="small" color={colors.surface} />
+                  ) : (
+                    <Text style={styles.primaryButtonText}>Save Details</Text>
+                  )}
+                </Pressable>
+                <Pressable
+                  style={styles.secondaryButton}
+                  onPress={() => setIsBillingModalVisible(true)}
+                  variant="button"
+                >
+                  <Ionicons name="receipt-outline" size={16} color={colors.primary} />
+                  <Text style={styles.secondaryButtonText}>View Booking Statements</Text>
+                </Pressable>
+              </View>
             </View>
           </View>
-        </View>
+        ) : (
+          <>
+            {/* Premium Profile Summary Card */}
+            <View style={styles.profileCard}>
+              <View style={styles.photoRow}>
+                <View style={styles.avatarWrapContainer}>
+                  <Pressable style={styles.avatarWrap} onPress={() => setIsPhotoModalVisible(true)} variant="card">
+                    {auth.profile?.avatar_url ? (
+                      <AppImage source={{ uri: auth.profile.avatar_url }} style={styles.avatarImage} />
+                    ) : (
+                      <View style={styles.avatarInitialContainer}>
+                        <Text style={styles.avatarInitialText}>
+                          {(fullName || auth.session?.user.email || "G")[0].toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
+                  </Pressable>
+                  <Pressable style={styles.avatarEditBadge} onPress={() => setIsPhotoModalVisible(true)} variant="icon">
+                    <Ionicons name="create" size={12} color={colors.surface} />
+                  </Pressable>
+                </View>
+                <View style={styles.photoCopy}>
+                  <Text style={styles.photoTitle}>{fullName || "Golfer Profile"}</Text>
+                  <Text style={styles.photoSubtitle}>Member since {memberSince}</Text>
+                </View>
+              </View>
 
-        {/* Status card */}
-        {statusMessage ? (
-          <View style={styles.noticeCard}>
-            <Ionicons name="information-circle-outline" size={18} color={colors.primary} />
-            <Text style={styles.noticeText}>{statusMessage}</Text>
-          </View>
-        ) : null}
+              <View style={styles.profileMetaRow}>
+                <View style={styles.metaPill}>
+                  <Text style={styles.metaPillLabel}>MEMBERSHIP</Text>
+                  <Text style={styles.metaPillValue}>{membershipTier}</Text>
+                </View>
+                <View style={styles.metaPill}>
+                  <Text style={styles.metaPillLabel}>MEMBER ID</Text>
+                  <Text style={styles.metaPillValue}>GT-{memberId}</Text>
+                </View>
+              </View>
+            </View>
 
-        {/* Action Panel */}
-        <View style={styles.footerActions}>
-          <Pressable
-            style={styles.primaryButton}
-            onPress={() => void handleSave()}
-            disabled={isSaving || auth.profileLoading}
-            variant="cta"
-          >
-            {isSaving ? (
-              <ActivityIndicator size="small" color={colors.surface} />
-            ) : (
-              <Text style={styles.primaryButtonText}>Save Details</Text>
-            )}
-          </Pressable>
-          <Pressable
-            style={styles.secondaryButton}
-            onPress={() => setIsBillingModalVisible(true)}
-            variant="button"
-          >
-            <Ionicons name="receipt-outline" size={16} color={colors.primary} />
-            <Text style={styles.secondaryButtonText}>View Booking Statements</Text>
-          </Pressable>
-        </View>
+            {/* Profile details */}
+            <View style={styles.section}>
+              <Text style={styles.sectionHeader}>Golfer Credentials</Text>
+              <View style={styles.card}>
+                <PremiumInput
+                  label="FULL NAME"
+                  value={fullName}
+                  onChangeText={setFullName}
+                  placeholder="Enter full name"
+                />
+                <PremiumInput
+                  label="EMAIL ADDRESS"
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="Email address"
+                  keyboardType="email-address"
+                />
+
+                {/* Phone Number Input with Country Code & Verification Badge */}
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>PHONE NUMBER</Text>
+                  <View style={styles.phoneRowField}>
+                    <Pressable
+                      style={styles.countryCodePill}
+                      onPress={() => setIsCountryModalVisible(true)}
+                      variant="chip"
+                    >
+                      <Text style={styles.countryCodeText}>{countryCode}</Text>
+                      <Ionicons name="chevron-down" size={10} color={colors.textSoft} />
+                    </Pressable>
+                    
+                    <TextInput
+                      value={localPhone}
+                      onChangeText={(val) => {
+                        setLocalPhone(val);
+                        setIsPhoneVerified(false); // Reset verification if number changes
+                      }}
+                      placeholder="555 555 5555"
+                      placeholderTextColor={colors.muted}
+                      style={styles.localPhoneInput}
+                      keyboardType="phone-pad"
+                    />
+
+                    <Pressable
+                      style={[styles.verifyBadge, isPhoneVerified && styles.verifyBadgeSuccess]}
+                      onPress={isPhoneVerified ? undefined : () => void handleStartPhoneVerification()}
+                      disabled={!localPhone.trim()}
+                      variant="chip"
+                    >
+                      {isPhoneVerified ? (
+                        <>
+                          <Ionicons name="checkmark-circle" size={13} color={colors.successText} />
+                          <Text style={styles.verifyBadgeTextActive}>Verified</Text>
+                        </>
+                      ) : (
+                        <Text style={styles.verifyBadgeText}>Verify</Text>
+                      )}
+                    </Pressable>
+                  </View>
+                </View>
+
+                <PremiumInput
+                  label="CURRENT HANDICAP"
+                  value={handicap}
+                  onChangeText={setHandicap}
+                  placeholder="e.g. 10.4"
+                  keyboardType="decimal-pad"
+                />
+
+                {/* Home Club Selection */}
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>HOME CLUB</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={Platform.OS === "web"}
+                    contentContainerStyle={styles.clubSelector}
+                    bounces={false}
+                  >
+                    {catalog.courses.map((course) => {
+                      const isSelected = homeClubId === course.id;
+                      return (
+                        <Pressable
+                          key={course.id}
+                          style={[styles.clubChip, isSelected && styles.clubChipActive]}
+                          onPress={() => setHomeClubId(course.id)}
+                          variant="chip"
+                        >
+                          <Text style={[styles.clubChipText, isSelected && styles.clubChipTextActive]}>
+                            {course.title}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                  {!catalog.courses.length && <Text style={styles.loadingText}>Loading clubs...</Text>}
+                </View>
+              </View>
+            </View>
+
+            {/* Status card */}
+            {statusMessage ? (
+              <View style={styles.noticeCard}>
+                <Ionicons name="information-circle-outline" size={18} color={colors.primary} />
+                <Text style={styles.noticeText}>{statusMessage}</Text>
+              </View>
+            ) : null}
+
+            {/* Action Panel */}
+            <View style={styles.footerActions}>
+              <Pressable
+                style={styles.primaryButton}
+                onPress={() => void handleSave()}
+                disabled={isSaving || auth.profileLoading}
+                variant="cta"
+              >
+                {isSaving ? (
+                  <ActivityIndicator size="small" color={colors.surface} />
+                ) : (
+                  <Text style={styles.primaryButtonText}>Save Details</Text>
+                )}
+              </Pressable>
+              <Pressable
+                style={styles.secondaryButton}
+                onPress={() => setIsBillingModalVisible(true)}
+                variant="button"
+              >
+                <Ionicons name="receipt-outline" size={16} color={colors.primary} />
+                <Text style={styles.secondaryButtonText}>View Booking Statements</Text>
+              </Pressable>
+            </View>
+          </>
+        )}
       </ScrollView>
 
       {/* Country Code Selection Modal */}
@@ -527,7 +710,7 @@ export default function AccountScreen() {
         <View style={styles.modalBg}>
           <View style={[styles.modalContent, { maxHeight: "70%" }]}>
             <Text style={styles.modalTitle}>Country Code</Text>
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView showsVerticalScrollIndicator={Platform.OS === "web"}>
               {COUNTRY_CODES.map((item) => (
                 <Pressable
                   key={item.name}
@@ -691,7 +874,7 @@ export default function AccountScreen() {
               </Pressable>
             </View>
 
-            <ScrollView contentContainerStyle={styles.billingScroll} showsVerticalScrollIndicator={false}>
+            <ScrollView contentContainerStyle={styles.billingScroll} showsVerticalScrollIndicator={Platform.OS === "web"}>
               {bookingState.bookings.length === 0 ? (
                 <View style={styles.emptyBillingState}>
                   <Ionicons name="receipt-outline" size={38} color={colors.muted} />
@@ -1373,5 +1556,19 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     fontSize: theme.typography.body.fontSize,
     fontWeight: "700",
     color: colors.surface,
+  },
+  desktopLayoutRow: {
+    flexDirection: "row",
+    gap: 24,
+    width: "100%",
+    alignItems: "flex-start",
+  },
+  desktopColumnLeft: {
+    flex: 1,
+    gap: 16,
+  },
+  desktopColumnRight: {
+    flex: 1,
+    gap: 16,
   },
 }));
