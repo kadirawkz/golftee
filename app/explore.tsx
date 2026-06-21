@@ -143,6 +143,7 @@ export default function ExploreScreen() {
     body: "",
   });
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const isLocationLoadingRef = useRef(false);
   // Animated values for the bottom course card slide-up / fade
   const cardAnim = useRef(new Animated.Value(0)).current;
   const [showInteractiveMap, setShowInteractiveMap] = useState(false);
@@ -222,10 +223,11 @@ export default function ExploreScreen() {
   }, []);
 
   const requestUserLocation = useCallback(async () => {
-    if (locationState === "loading") {
+    if (isLocationLoadingRef.current) {
       return;
     }
 
+    isLocationLoadingRef.current = true;
     hasCenteredOnUser.current = false;
     setLocationState("loading");
     setLocationNotice({ kind: "none", title: "", body: "" });
@@ -347,8 +349,10 @@ export default function ExploreScreen() {
         locationTimeoutRef.current = null;
       }
       applyLocationFailureFallback();
+    } finally {
+      isLocationLoadingRef.current = false;
     }
-  }, [locationState, applyResolvedUserLocation, applyLocationFailureFallback]);
+  }, [applyResolvedUserLocation, applyLocationFailureFallback]);
 
   useEffect(() => {
     const silentCheck = async () => {
