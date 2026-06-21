@@ -129,7 +129,7 @@ export default function Index() {
           {/* Logo & Title branding */}
           <Animated.View style={[styles.brandBlock, { transform: [{ translateY: logoTranslateY }] }]}>
             <View style={styles.logoShell}>
-              <Image source={require("../assets/images/icon.png")} style={styles.logoImage} />
+              <Image source={require("../assets/images/android-icon-foreground.png")} style={styles.logoImage} />
             </View>
 
             <Text
@@ -268,9 +268,9 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     marginTop: 30,
   },
   logoShell: {
-    width: 130,
-    height: 130,
-    borderRadius: 65,
+    width: 112,
+    height: 112,
+    borderRadius: 56,
     backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
@@ -283,9 +283,9 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     borderColor: colors.border,
   },
   logoImage: {
-    width: 130,
-    height: 130,
-    borderRadius: 65,
+    width: 112,
+    height: 112,
+    borderRadius: 56,
   },
   title: {
     marginTop: 6,
@@ -378,3 +378,4 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     letterSpacing: 0.2,
   },
 }));
+

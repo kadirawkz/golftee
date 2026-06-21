@@ -37,7 +37,7 @@ export default function LaunchScreen() {
       <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
       <View style={styles.logoContainer}>
         <View style={styles.logoShell} accessibilityRole="image" accessibilityLabel="GolfTee logo">
-          <Image source={require("../assets/images/icon.png")} style={styles.logoImage} />
+          <Image source={require("../assets/images/android-icon-foreground.png")} style={styles.logoImage} />
         </View>
         <Text
           style={[
@@ -73,9 +73,9 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     gap: 12,
   },
   logoShell: {
-    width: 130,
-    height: 130,
-    borderRadius: 65,
+    width: 112,
+    height: 112,
+    borderRadius: 56,
     backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
@@ -88,9 +88,9 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     borderColor: colors.border,
   },
   logoImage: {
-    width: 130,
-    height: 130,
-    borderRadius: 65,
+    width: 112,
+    height: 112,
+    borderRadius: 56,
   },
   logo: {
     color: colors.text,
@@ -103,3 +103,4 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     marginTop: 20,
   },
 }));
+
