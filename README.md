@@ -26,8 +26,8 @@ It uses Supabase for authentication, profiles, favorites, course catalog data, t
 
 - Install deps: `npm install`
 - Start dev server: `npm run start`
-- Run Android: `npm run android`
-- Run iOS: `npm run ios`
+- Run Android: `npm run android` (runs prebuild and compiles native Android client)
+- Run iOS: `npm run ios` (runs prebuild and compiles native iOS client)
 - Run web: `npm run web`
 - Run lint: `npm run lint`
 - Run typecheck: `npm run typecheck`
