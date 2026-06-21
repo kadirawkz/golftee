@@ -388,8 +388,8 @@ export async function addNotification(
       });
   }
 
-  // Trigger real OS system notification immediately if requested
-  if (options?.triggerSystemNotification) {
+  // Trigger real OS system notification immediately if requested (only if targeted for this device)
+  if (options?.triggerSystemNotification && isTargeted) {
     const hasPermission = await requestNotificationPermissions();
     if (hasPermission) {
       try {
