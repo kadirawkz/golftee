@@ -92,8 +92,8 @@ function RootLayoutContent() {
     }
   }, [isReady, auth.initialized, themeInitialized]);
 
-  if (!isReady || !auth.initialized || !themeInitialized) {
-    return <View style={[styles.fallback, { backgroundColor: systemBackground }]} />;
+  if (!themeInitialized) {
+    return <View style={styles.fallback} />;
   }
 
   const stack = (
