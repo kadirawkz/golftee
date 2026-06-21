@@ -489,6 +489,49 @@ export type Database = {
           }
         ];
       };
+      user_sessions: {
+        Row: {
+          id: string;
+          user_id: string;
+          device_session_id: string;
+          device_name: string;
+          os_name: string;
+          client_type: string;
+          location: string | null;
+          last_active_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          device_session_id: string;
+          device_name: string;
+          os_name: string;
+          client_type: string;
+          location?: string | null;
+          last_active_at?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          device_session_id?: string;
+          device_name?: string;
+          os_name?: string;
+          client_type?: string;
+          location?: string | null;
+          last_active_at?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "user_sessions_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: {

@@ -9,6 +9,9 @@ import { Platform,
   TextInput,
   View,
   Modal,
+  LayoutAnimation,
+  UIManager,
+  Animated,
  } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -16,8 +19,15 @@ import { AnimatedPressable as Pressable } from "../components/animated-pressable
 import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
 import { createThemedStyleSheet, useThemedStyles, useAppTheme } from "../components/theme";
 import { supabase } from "../lib/supabase";
-import { useAuthSession } from "../services/auth";
+import { useAuthSession, getActiveSessions, deleteActiveSession, getDeviceSessionId, signOut } from "../services/auth";
 import { useRouter } from "expo-router";
+
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  const isNewArch = !!(global as any).nativeFabricUILegenericProfiler || !!(global as any).nativeFabricUILegacyProfiler || !!(global as any).RN$Bridgeless;
+  if (!isNewArch) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+  }
+}
 
 function SectionHeader({ title, caption }: { title: string; caption?: string }) {
   const styles = useThemedStyles(themedStyles);
@@ -26,6 +36,116 @@ function SectionHeader({ title, caption }: { title: string; caption?: string }) 
       <Text style={styles.sectionTitle}>{title}</Text>
       {caption ? <Text style={styles.sectionCaption}>{caption}</Text> : null}
     </View>
+  );
+}
+
+function SessionRowItem({
+  item,
+  isCurrent,
+  colors,
+  styles,
+  onPressRevoke,
+  isRevoking,
+  onAnimationComplete,
+}: {
+  item: any;
+  isCurrent: boolean;
+  colors: any;
+  styles: any;
+  onPressRevoke: () => void;
+  isRevoking: boolean;
+  onAnimationComplete: () => void;
+}) {
+  const [fadeAnim] = useState(() => new Animated.Value(1));
+  const [heightAnim] = useState(() => new Animated.Value(1));
+
+  useEffect(() => {
+    if (isRevoking) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 350,
+          useNativeDriver: false,
+        }),
+        Animated.timing(heightAnim, {
+          toValue: 0,
+          duration: 350,
+          useNativeDriver: false,
+        }),
+      ]).start(() => {
+        onAnimationComplete();
+      });
+    }
+  }, [isRevoking, fadeAnim, heightAnim, onAnimationComplete]);
+
+  const animatedStyle = {
+    opacity: fadeAnim,
+    transform: [
+      {
+        scale: fadeAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.9, 1],
+        }),
+      },
+    ],
+    maxHeight: heightAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 150],
+    }),
+    paddingVertical: heightAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 14],
+    }),
+    borderBottomWidth: heightAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 1],
+    }),
+  };
+
+  const sessionAgeMs = new Date().getTime() - new Date(item.created_at || item.last_active_at).getTime();
+  const isTooNewToLogOut = !isCurrent && sessionAgeMs < 24 * 60 * 60 * 1000;
+  const hoursLeft = Math.ceil((24 * 60 * 60 * 1000 - sessionAgeMs) / (1000 * 60 * 60));
+
+  return (
+    <Animated.View style={[styles.sessionRow, animatedStyle, { overflow: "hidden" }]}>
+      <View style={styles.sessionIconWrap}>
+        <Ionicons
+          name={item.client_type === "web" ? "desktop-outline" : "phone-portrait-outline"}
+          size={20}
+          color={colors.primary}
+        />
+      </View>
+      <View style={styles.sessionInfo}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+          <Text style={styles.sessionDeviceName}>{item.device_name}</Text>
+          {isCurrent ? (
+            <View style={styles.currentDeviceBadge}>
+              <Text style={styles.currentDeviceBadgeText}>This Device</Text>
+            </View>
+          ) : null}
+        </View>
+        <Text style={styles.sessionSubtext}>
+          {item.os_name} • {item.location || "Unknown Location"}
+        </Text>
+        <Text style={styles.sessionTimeText}>
+          Active: {new Date(item.last_active_at).toLocaleDateString()} at {new Date(item.last_active_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </Text>
+        {isTooNewToLogOut ? (
+          <Text style={[styles.sessionTimeText, { color: colors.warning, marginTop: 4, fontWeight: "600" }]}>
+            Can log out in {hoursLeft}h (24h minimum required)
+          </Text>
+        ) : null}
+      </View>
+      <Pressable
+        style={[styles.revokeBtn, { opacity: isTooNewToLogOut ? 0.5 : 1 }]}
+        onPress={onPressRevoke}
+        variant="chip"
+        disabled={isRevoking || isTooNewToLogOut}
+      >
+        <Ionicons name="log-out-outline" size={16} color={isTooNewToLogOut ? colors.muted : colors.danger} />
+        <Text style={[styles.revokeBtnText, { color: isTooNewToLogOut ? colors.muted : colors.danger }]}>Log Out</Text>
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -52,6 +172,162 @@ export default function SettingsScreen() {
   const [passwordStatus, setPasswordStatus] = useState<string | null>(null);
 
   const [isFaqModalVisible, setIsFaqModalVisible] = useState(false);
+
+  // Sessions State
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [currentDeviceId, setCurrentDeviceId] = useState<string>("");
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sessionToRevoke, setSessionToRevoke] = useState<any | null>(null);
+  const [animatingRevokeId, setAnimatingRevokeId] = useState<string | null>(null);
+
+  // Custom spring alert modal animation states
+  const [showRevokeModal, setShowRevokeModal] = useState(false);
+  const [modalScale] = useState(() => new Animated.Value(0.85));
+  const [modalBgOpacity] = useState(() => new Animated.Value(0));
+
+  const loadSessions = async () => {
+    setSessionsLoading(true);
+    try {
+      const active = await getActiveSessions();
+      const currentId = await getDeviceSessionId();
+
+      // Sort: Current device session always goes first, then order by last_active_at descending
+      const sorted = (active || []).sort((a, b) => {
+        const aIsCurrent = a.device_session_id === currentId;
+        const bIsCurrent = b.device_session_id === currentId;
+        if (aIsCurrent && !bIsCurrent) return -1;
+        if (!aIsCurrent && bIsCurrent) return 1;
+        return new Date(b.last_active_at).getTime() - new Date(a.last_active_at).getTime();
+      });
+
+      // Animate transition of the list updates smoothly
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setSessions(sorted);
+      setCurrentDeviceId(currentId);
+    } catch (err) {
+      console.warn("Failed to load active sessions:", err);
+    } finally {
+      setSessionsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (auth.isAuthenticated) {
+      void loadSessions();
+    }
+  }, [auth.isAuthenticated]);
+
+  const handleRevokeSession = (sessionId: string) => {
+    const targetSession = sessions.find((s) => s.id === sessionId);
+    if (targetSession) {
+      setSessionToRevoke(targetSession);
+      setShowRevokeModal(true);
+      modalBgOpacity.setValue(0);
+      modalScale.setValue(0.85);
+
+      Animated.parallel([
+        Animated.timing(modalBgOpacity, {
+          toValue: 1,
+          duration: 220,
+          useNativeDriver: true,
+        }),
+        Animated.spring(modalScale, {
+          toValue: 1,
+          friction: 7,
+          tension: 45,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  };
+
+  const closeRevokeModal = (callback?: () => void) => {
+    Animated.parallel([
+      Animated.timing(modalBgOpacity, {
+        toValue: 0,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.timing(modalScale, {
+        toValue: 0.85,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setShowRevokeModal(false);
+      setSessionToRevoke(null);
+      if (callback) callback();
+    });
+  };
+
+  const confirmRevokeSession = async () => {
+    if (!sessionToRevoke) return;
+    const sessionId = sessionToRevoke.id;
+
+    // Trigger close animation first, then start row collapse transition on complete
+    closeRevokeModal(() => {
+      setAnimatingRevokeId(sessionId);
+    });
+  };
+
+  const handleFinalRevoke = async (sessionId: string) => {
+    const targetSession = sessions.find((s) => s.id === sessionId);
+    if (!targetSession) return;
+    const isCurrent = targetSession.device_session_id === currentDeviceId;
+
+    // Remove from local sessions state
+    setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+    setAnimatingRevokeId(null);
+
+    // Perform background API call
+    try {
+      await deleteActiveSession(sessionId);
+      if (isCurrent) {
+        await signOut();
+        router.replace("/splash");
+      }
+    } catch (err) {
+      console.warn("Failed to revoke session:", err);
+      // Restore list if action fails
+      void loadSessions();
+    }
+  };
+
+  const renderSessionsSection = () => {
+    if (!auth.isAuthenticated) return null;
+    return (
+      <View style={styles.section}>
+        <SectionHeader title="Logged-in Devices" caption="Manage and revoke active sessions on your account." />
+        <View style={styles.card}>
+          {sessionsLoading && sessions.length === 0 ? (
+            <View style={{ padding: 20, alignItems: "center" }}>
+              <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+          ) : sessions.length === 0 ? (
+            <View style={{ padding: 20, alignItems: "center" }}>
+              <Text style={styles.rowDescription}>No active sessions found.</Text>
+            </View>
+          ) : (
+            sessions.map((item) => {
+              const isCurrent = item.device_session_id === currentDeviceId;
+              return (
+                <SessionRowItem
+                  key={item.id}
+                  item={item}
+                  isCurrent={isCurrent}
+                  colors={colors}
+                  styles={styles}
+                  onPressRevoke={() => handleRevokeSession(item.id)}
+                  isRevoking={animatingRevokeId === item.id}
+                  onAnimationComplete={() => void handleFinalRevoke(item.id)}
+                />
+              );
+            })
+          )}
+        </View>
+      </View>
+    );
+  };
 
   // Load preferences
   useEffect(() => {
@@ -464,6 +740,7 @@ export default function SettingsScreen() {
             </View>
           </>
         )}
+        {renderSessionsSection()}
       </ScrollView>
 
       {/* Change Password Modal */}
@@ -601,6 +878,54 @@ export default function SettingsScreen() {
             </ScrollView>
           </SafeAreaView>
         </View>
+      </Modal>
+
+      {/* Revoke Session Confirmation Modal */}
+      <Modal
+        visible={showRevokeModal}
+        transparent
+        animationType="none"
+        onRequestClose={() => closeRevokeModal()}
+      >
+        <Animated.View style={[styles.modalBg, { opacity: modalBgOpacity }]}>
+          <Animated.View style={[
+            styles.modalContent, 
+            { 
+              maxWidth: 400, 
+              alignItems: "center",
+              transform: [{ scale: modalScale }]
+            }
+          ]}>
+            <View style={[styles.iconPrimary, { backgroundColor: colors.danger + "20", width: 56, height: 56, borderRadius: 28, marginBottom: 8 }]}>
+              <Ionicons name="log-out" size={28} color={colors.danger} />
+            </View>
+            <Text style={styles.modalTitle}>
+              {sessionToRevoke?.device_session_id === currentDeviceId ? "Log Out of This Device?" : "Log Out Device?"}
+            </Text>
+            <Text style={[styles.modalSubtitle, { textAlign: "center", lineHeight: 18 }]}>
+              {sessionToRevoke?.device_session_id === currentDeviceId
+                ? "Are you sure you want to log out of your current session? You will need to sign in again to access your account."
+                : `Are you sure you want to log out of the session on ${sessionToRevoke?.device_name || "this device"}?`}
+            </Text>
+
+            <View style={styles.modalActionsRow}>
+              <Pressable
+                style={[styles.modalBtn, styles.modalBtnCancel]}
+                onPress={() => closeRevokeModal()}
+                variant="chip"
+              >
+                <Text style={styles.modalBtnCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modalBtn, { backgroundColor: colors.danger }]}
+                onPress={() => void confirmRevokeSession()}
+                variant="cta"
+              >
+                <Text style={[styles.modalBtnSaveText, { color: "#FFFFFF" }]}>Log Out</Text>
+              </Pressable>
+            </View>
+          </Animated.View>
+        </Animated.View>
       </Modal>
     </SafeAreaView>
   );
@@ -822,6 +1147,7 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     flexDirection: "row",
     gap: 12,
     marginTop: 10,
+    width: "100%",
   },
   modalBtn: {
     flex: 1,
@@ -847,6 +1173,68 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     fontSize: 14,
     fontWeight: "700",
     color: colors.background,
+  },
+
+  sessionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderSoft,
+  },
+  sessionIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: colors.surfaceSoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sessionInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  sessionDeviceName: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  currentDeviceBadge: {
+    backgroundColor: colors.success,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  currentDeviceBadgeText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: colors.successText,
+  },
+  sessionSubtext: {
+    fontSize: 12,
+    color: colors.textSoft,
+  },
+  sessionTimeText: {
+    fontSize: 10,
+    color: colors.muted,
+  },
+  revokeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    height: 32,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surfaceSoft,
+  },
+  revokeBtnText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: colors.danger,
   },
 
   // FAQ Modal

@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Platform,  ScrollView, StyleSheet, Text, useWindowDimensions, View, Linking, RefreshControl, Pressable as RNPressable  } from "react-native";
+import * as Location from "expo-location";
 import Animated, {
     interpolate,
     interpolateColor,
@@ -17,7 +18,9 @@ import { AppImage } from "../components/app-image";
 import { CourseCard } from "../components/course-card";
 import {
     calculateDistanceKm,
-    DEFAULT_USER_LOCATION,
+    getCachedUserLocation,
+    setCachedUserLocation,
+    shouldRefreshLocation,
 } from "../services/course-data";
 import { useCourseCatalog, getManagedCourseById, refreshCourseCatalog } from "../services/course-management";
 import { FavoriteCoursesSection } from "../components/favorite-courses-section";
@@ -25,7 +28,7 @@ import { useFavoriteCourseIds, refreshFavoriteCourseIds } from "../services/favo
 import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
 import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../components/theme";
 import { getCourseImage } from "../lib/image-mapping";
-import { useAuthSession, refreshProfile } from "../services/auth";
+import { useAuthSession, refreshProfile, trackSession } from "../services/auth";
 import {
   useBookingState,
   isUpcomingBooking,
@@ -91,17 +94,39 @@ function HeroIndicatorDot({
   const inactiveColor = resolvedTheme === "dark" ? "rgba(255, 255, 255, 0.28)" : colors.borderStrong;
 
   const dotAnimatedStyle = useAnimatedStyle(() => {
-    const distance = Math.abs(activeIndex.value - index);
+    const N = 3; // HERO_SLIDES.length
+    const progressMod = ((activeIndex.value % N) + N) % N;
+    let distance = Math.abs(progressMod - index);
+    distance = Math.min(distance, N - distance);
 
     return {
-      width: interpolate(distance, [0, 1, 2], [HERO_INDICATOR_ACTIVE_WIDTH, 12, HERO_INDICATOR_SIZE]),
-      opacity: interpolate(distance, [0, 1, 2], [1, 0.7, 0.4]),
+      width: interpolate(
+        distance,
+        [0, 1],
+        [HERO_INDICATOR_ACTIVE_WIDTH, HERO_INDICATOR_SIZE],
+        "clamp"
+      ),
+      opacity: interpolate(
+        distance,
+        [0, 1],
+        [1, 0.45],
+        "clamp"
+      ),
       backgroundColor: interpolateColor(
         distance,
         [0, 1],
         [activeColor, inactiveColor]
       ),
-      transform: [{ scale: interpolate(distance, [0, 1, 2], [1, 0.95, 0.88]) }],
+      transform: [
+        {
+          scale: interpolate(
+            distance,
+            [0, 1],
+            [1, 0.88],
+            "clamp"
+          ),
+        },
+      ],
     };
   });
 
@@ -118,6 +143,72 @@ export default function HomeScreen() {
   const { width } = useWindowDimensions();
   const { horizontalPadding, screenBottomPadding, scaleFont, scaleLineHeight } = useResponsiveLayout();
   const [refreshing, setRefreshing] = useState(false);
+  const [userCoords, setUserCoords] = useState<{ latitude: number; longitude: number } | null>(getCachedUserLocation());
+
+  const checkAndRequestLocation = useCallback(async (forcePrompt = false) => {
+    // Skip location request if we already have fresh cached coordinates (less than 5 minutes old)
+    // unless the call is explicitly forced (like a pull-to-refresh or fallback button press)
+    if (!forcePrompt && !shouldRefreshLocation()) {
+      return;
+    }
+
+    try {
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!servicesEnabled) {
+        setUserCoords(null);
+        setCachedUserLocation(null);
+        return;
+      }
+
+      let { status } = await Location.getForegroundPermissionsAsync();
+      
+      // Request permission only if it's undetermined, OR if the user explicitly clicked the button (forcePrompt = true)
+      if (status === "undetermined" || (forcePrompt && status !== "granted")) {
+        const response = await Location.requestForegroundPermissionsAsync();
+        status = response.status;
+      }
+
+      if (status === "granted") {
+        const lastKnown = await Location.getLastKnownPositionAsync({});
+        if (lastKnown) {
+          const coords = {
+            latitude: lastKnown.coords.latitude,
+            longitude: lastKnown.coords.longitude,
+          };
+          setUserCoords(coords);
+          setCachedUserLocation(coords);
+          if (auth.session) {
+            void trackSession(auth.session);
+          }
+        }
+        const current = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        if (current) {
+          const coords = {
+            latitude: current.coords.latitude,
+            longitude: current.coords.longitude,
+          };
+          setUserCoords(coords);
+          setCachedUserLocation(coords);
+          if (auth.session) {
+            void trackSession(auth.session);
+          }
+        }
+      } else {
+        setUserCoords(null);
+        setCachedUserLocation(null);
+      }
+    } catch (err) {
+      console.warn("Error getting location:", err);
+      setUserCoords(null);
+      setCachedUserLocation(null);
+    }
+  }, [auth.session]);
+
+  useEffect(() => {
+    void checkAndRequestLocation();
+  }, [checkAndRequestLocation]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -127,13 +218,14 @@ export default function HomeScreen() {
         refreshBookings(),
         refreshCourseCatalog(),
         refreshFavoriteCourseIds(),
+        checkAndRequestLocation(),
       ]);
     } catch (err) {
       console.warn("Failed to refresh home screen data", err);
     } finally {
       setRefreshing(false);
     }
-  }, []);
+  }, [checkAndRequestLocation]);
   const heroScrollRef = useRef<Animated.ScrollView>(null);
   const autoplayIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoplayResumeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -171,16 +263,18 @@ export default function HomeScreen() {
     }));
   }, [allCourses]);
   const homeNearestCourses = useMemo(
-    () =>
-      allCourses
+    () => {
+      if (!userCoords) return [];
+      return allCourses
         .map((course) => ({
           ...course,
-          distanceKm: calculateDistanceKm(DEFAULT_USER_LOCATION, course.coordinates),
+          distanceKm: calculateDistanceKm(userCoords, course.coordinates),
         }))
         .filter((course) => course.distanceKm <= 100)
         .sort((a, b) => a.distanceKm - b.distanceKm)
-        .slice(0, 5),
-    [allCourses]
+        .slice(0, 5);
+    },
+    [allCourses, userCoords]
   );
   const favoriteCourses = useMemo(
     () => allCourses.filter((course) => favoriteCourseIdSet.has(course.id)).slice(0, 3),
@@ -612,30 +706,46 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={Platform.OS === "web"}
-            contentContainerStyle={styles.trendingList}
-            bounces={false}
-            overScrollMode="never"
-          >
-            {homeNearestCourses.map((course) => (
-              <CourseCard
-                key={course.id}
-                variant="compact"
-                size="small"
-                title={course.title}
-                location={`${course.location} - ${course.distanceKm.toFixed(0)} km`}
-                image={course.image}
-                price={course.price}
-                rating={course.rating}
-                styleLabel={course.style}
-                tone={course.style === "COASTAL" ? "green" : "gold"}
-                cardStyle={[styles.trendingCard, isTabletLike && styles.trendingCardTablet]}
-                onPress={() => openCourseDetails(course.id)}
-              />
-            ))}
-          </ScrollView>
+          {userCoords ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={Platform.OS === "web"}
+              contentContainerStyle={styles.trendingList}
+              bounces={false}
+              overScrollMode="never"
+            >
+              {homeNearestCourses.map((course) => (
+                <CourseCard
+                  key={course.id}
+                  variant="compact"
+                  size="small"
+                  title={course.title}
+                  location={`${course.location} - ${course.distanceKm.toFixed(0)} km`}
+                  image={course.image}
+                  price={course.price}
+                  rating={course.rating}
+                  styleLabel={course.style}
+                  tone={course.style === "COASTAL" ? "green" : "gold"}
+                  cardStyle={[styles.trendingCard, isTabletLike && styles.trendingCardTablet]}
+                  onPress={() => openCourseDetails(course.id)}
+                />
+              ))}
+            </ScrollView>
+          ) : (
+            <View style={styles.locationFallbackCard}>
+              <Ionicons name="location-outline" size={24} color={colors.textSoft} style={styles.locationFallbackIcon} />
+              <Text style={styles.locationFallbackText}>
+                Enable location to see golf courses nearest to you.
+              </Text>
+              <Pressable
+                style={styles.locationFallbackBtn}
+                onPress={() => void checkAndRequestLocation(true)}
+                variant="cta"
+              >
+                <Text style={styles.locationFallbackBtnText}>Show Nearby</Text>
+              </Pressable>
+            </View>
+          )}
         </View>
 
         <View style={styles.getawaysSection}>
@@ -1168,6 +1278,42 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     color: colors.surface,
     fontWeight: "700",
     fontSize: theme.typography.bodySm.fontSize,
+  },
+  locationFallbackCard: {
+    backgroundColor: colors.surfaceSoft,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    borderRadius: theme.radius.lg,
+    padding: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    marginTop: 4,
+    width: "100%",
+  },
+  locationFallbackIcon: {
+    marginBottom: 2,
+  },
+  locationFallbackText: {
+    fontSize: theme.typography.bodySm.fontSize,
+    lineHeight: theme.typography.bodySm.lineHeight,
+    color: colors.textSoft,
+    textAlign: "center",
+    maxWidth: 280,
+    marginBottom: 6,
+  },
+  locationFallbackBtn: {
+    paddingHorizontal: 20,
+    height: 40,
+    borderRadius: theme.radius.pill,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  locationFallbackBtnText: {
+    color: colors.surface,
+    fontWeight: "700",
+    fontSize: theme.typography.body.fontSize,
   },
   desktopRow: {
     flexDirection: "row",

@@ -3,6 +3,7 @@ import * as Notifications from "expo-notifications";
 import { useSyncExternalStore } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
+import { getDeviceSessionId } from "./device";
 
 // Configure how notifications are displayed when the app is in the foreground
 Notifications.setNotificationHandler({
@@ -99,6 +100,25 @@ function mapDbNotification(db: any): AppNotification {
   };
 }
 
+function shouldShowNotification(notif: AppNotification, currentId: string | null): boolean {
+  if (!currentId) return true;
+
+  const params = notif.routeParams;
+  if (params && typeof params === "object") {
+    const target = (params as Record<string, any>).target_device_id;
+    const exclude = (params as Record<string, any>).exclude_device_id || 
+                    (notif.title === "New Login Detected" ? (params as Record<string, any>).device_session_id : null);
+
+    if (target && target !== currentId) {
+      return false;
+    }
+    if (exclude && exclude === currentId) {
+      return false;
+    }
+  }
+  return true;
+}
+
 let bootstrapPromise: Promise<void> | null = null;
 
 export function bootstrapNotifications(): Promise<void> {
@@ -126,12 +146,14 @@ export function bootstrapNotifications(): Promise<void> {
         }
 
         const mapped = (data || []).map(mapDbNotification);
+        const currentId = await getDeviceSessionId().catch(() => null);
+        const filtered = mapped.filter(n => shouldShowNotification(n, currentId));
         updateSnapshot({
-          notifications: mapped,
+          notifications: filtered,
           initialized: true,
           loading: false,
         });
-        await AsyncStorage.setItem(storageKey, JSON.stringify(mapped));
+        await AsyncStorage.setItem(storageKey, JSON.stringify(filtered));
         return;
       } catch (dbError) {
         console.warn("Failed to load notifications from Supabase, falling back to local cache", dbError);
@@ -142,8 +164,10 @@ export function bootstrapNotifications(): Promise<void> {
       const raw = await AsyncStorage.getItem(storageKey);
       if (raw) {
         const parsed = JSON.parse(raw) as AppNotification[];
+        const currentId = await getDeviceSessionId().catch(() => null);
+        const filtered = parsed.filter(n => shouldShowNotification(n, currentId));
         updateSnapshot({
-          notifications: parsed,
+          notifications: filtered,
           initialized: true,
           loading: false,
         });
@@ -210,11 +234,16 @@ export function setNotificationsUser(userId: string | null) {
             table: "notifications",
             filter: `user_id=eq.${userId}`,
           },
-          (payload) => {
+          async (payload) => {
             const { eventType, new: newRow, old: oldRow } = payload;
             if (eventType === "INSERT" && newRow) {
               const mapped = mapDbNotification(newRow);
               if (!snapshot.notifications.some((n) => n.id === mapped.id)) {
+                const currentId = await getDeviceSessionId().catch(() => null);
+                if (!shouldShowNotification(mapped, currentId)) {
+                  return;
+                }
+
                 const nextNotifications = [mapped, ...snapshot.notifications];
                 updateSnapshot({ notifications: nextNotifications });
                 void saveNotifications(nextNotifications);
@@ -252,7 +281,13 @@ export function setNotificationsUser(userId: string | null) {
             }
           }
         )
-        .subscribe();
+        .subscribe((status, err) => {
+          if (err) {
+            console.warn(`Supabase Realtime notifications subscription error:`, err);
+          } else {
+            console.log(`Supabase Realtime notifications subscription status: ${status}`);
+          }
+        });
     }
 
     void bootstrapNotifications();
@@ -322,9 +357,14 @@ export async function addNotification(
     routeParams: options?.routeParams,
   };
 
-  const nextNotifications = [newNotif, ...snapshot.notifications];
-  updateSnapshot({ notifications: nextNotifications });
-  await saveNotifications(nextNotifications);
+  const currentId = await getDeviceSessionId().catch(() => null);
+  const isTargeted = shouldShowNotification(newNotif, currentId);
+
+  if (isTargeted) {
+    const nextNotifications = [newNotif, ...snapshot.notifications];
+    updateSnapshot({ notifications: nextNotifications });
+    await saveNotifications(nextNotifications);
+  }
 
   // Sync to database if logged in
   if (currentUserId) {
@@ -458,12 +498,14 @@ export async function refreshNotifications() {
       }
 
       const mapped = (data || []).map(mapDbNotification);
+      const currentId = await getDeviceSessionId().catch(() => null);
+      const filtered = mapped.filter(n => shouldShowNotification(n, currentId));
       updateSnapshot({
-        notifications: mapped,
+        notifications: filtered,
         initialized: true,
         loading: false,
       });
-      await saveNotifications(mapped);
+      await saveNotifications(filtered);
       return;
     } catch (dbError) {
       console.warn("Failed to refresh notifications from Supabase", dbError);

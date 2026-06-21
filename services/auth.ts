@@ -1,7 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
-import type { Session } from "@supabase/supabase-js";
+import type { Session, RealtimeChannel } from "@supabase/supabase-js";
 import { useSyncExternalStore } from "react";
+import { Platform } from "react-native";
+import Constants from "expo-constants";
+import * as Location from "expo-location";
+import { getCachedUserLocation } from "./course-data";
 import type { ProfileRow, ProfileUpdate } from "../lib/database.types";
 import { supabase, supabaseConfigurationError } from "../lib/supabase";
 import { addNotification, setNotificationsUser } from "./notifications";
@@ -81,6 +85,42 @@ async function loadProfile(userId: string) {
   return data;
 }
 
+let sessionRealtimeChannel: RealtimeChannel | null = null;
+
+function unsubscribeSessionRealtime() {
+  if (sessionRealtimeChannel) {
+    void sessionRealtimeChannel.unsubscribe();
+    sessionRealtimeChannel = null;
+  }
+}
+
+async function subscribeSessionRealtime(userId: string) {
+  unsubscribeSessionRealtime();
+
+  const deviceSessionId = await getDeviceSessionId();
+
+  sessionRealtimeChannel = supabase
+    .channel(`user_sessions_sync:${deviceSessionId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "DELETE",
+        schema: "public",
+        table: "user_sessions",
+        filter: `device_session_id=eq.${deviceSessionId}`,
+      },
+      async (payload) => {
+        console.log("Active device session was remotely logged out. Signing out...");
+        try {
+          await signOut();
+        } catch (err) {
+          console.warn("Failed to sign out after remote revocation:", err);
+        }
+      }
+    )
+    .subscribe();
+}
+
 async function applySession(session: Session | null) {
   setNotificationsUser(session?.user?.id ?? null);
   updateSnapshot({
@@ -96,13 +136,145 @@ async function applySession(session: Session | null) {
       profile: null,
       profileLoading: false,
     });
+    unsubscribeSessionRealtime();
     return;
   }
 
   try {
     await loadProfile(session.user.id);
+    void trackSession(session);
+    void subscribeSessionRealtime(session.user.id);
   } catch {
     // Keep the active session and last known profile data when profile refresh fails.
+  }
+}
+
+import { getDeviceSessionId } from "./device";
+export { getDeviceSessionId };
+
+async function fetchIpLocation(): Promise<string> {
+  const providers = [
+    { url: "https://ipapi.co/json/", key: "city" },
+    { url: "https://ip-api.com/json/", key: "city" },
+    { url: "https://ipinfo.io/json", key: "city" }
+  ];
+
+  for (const provider of providers) {
+    try {
+      const response = await fetch(provider.url);
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data[provider.key]) {
+          return data[provider.key];
+        }
+      }
+    } catch (e) {
+      console.warn(`IP location provider ${provider.url} failed:`, e);
+    }
+  }
+  return "Unknown";
+}
+
+export async function trackSession(session: Session) {
+  try {
+    const userId = session.user.id;
+    const deviceSessionId = await getDeviceSessionId();
+
+    const clientType = Platform.OS === "web" ? "web" : "mobile";
+    let osName = Platform.OS === "ios" ? "iOS" : Platform.OS === "android" ? "Android" : "Web";
+    let deviceName = Constants.deviceName ?? (Platform.OS === "ios" ? "iPhone" : Platform.OS === "android" ? "Android Device" : "Browser");
+
+    if (Platform.OS === "web" && typeof window !== "undefined" && window.navigator) {
+      const ua = window.navigator.userAgent;
+      if (ua.indexOf("Win") !== -1) osName = "Windows";
+      else if (ua.indexOf("Mac") !== -1) osName = "macOS";
+      else if (ua.indexOf("Linux") !== -1) osName = "Linux";
+      else if (ua.indexOf("Android") !== -1) osName = "Android";
+      else if (ua.indexOf("like Mac") !== -1) osName = "iOS";
+
+      if (ua.indexOf("Chrome") !== -1) deviceName = "Chrome Browser";
+      else if (ua.indexOf("Safari") !== -1) deviceName = "Safari Browser";
+      else if (ua.indexOf("Firefox") !== -1) deviceName = "Firefox Browser";
+      else if (ua.indexOf("Edge") !== -1) deviceName = "Edge Browser";
+      else deviceName = "Web Browser";
+    }
+
+    let locationStr = "Unknown";
+    const cached = getCachedUserLocation();
+    if (cached) {
+      try {
+        if (Platform.OS === "web") {
+          // On Web, reverseGeocodeAsync is not supported or requires configuration, use Nominatim API
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${cached.latitude}&lon=${cached.longitude}`,
+            {
+              headers: {
+                "User-Agent": "GolfTeeApp/1.0",
+              },
+            }
+          );
+          if (response.ok) {
+            const data = await response.json();
+            const addr = data.address;
+            if (addr) {
+              locationStr = addr.city ?? addr.town ?? addr.village ?? addr.suburb ?? addr.state ?? addr.country ?? "Unknown";
+            }
+          }
+        } else {
+          const address = await Location.reverseGeocodeAsync(cached);
+          if (address && address[0]) {
+            locationStr = address[0].city ?? address[0].subregion ?? address[0].region ?? "Sri Lanka";
+          }
+        }
+      } catch {
+        // Fallback to IP geolocation if coordinate geocoding fails
+        locationStr = await fetchIpLocation();
+      }
+    } else {
+      // If GPS coordinates are not yet available/granted, fetch IP-based location
+      locationStr = await fetchIpLocation();
+    }
+
+    const { error } = await supabase.from("user_sessions").upsert({
+      user_id: userId,
+      device_session_id: deviceSessionId,
+      device_name: deviceName,
+      os_name: osName,
+      client_type: clientType,
+      location: locationStr,
+      last_active_at: new Date().toISOString(),
+    }, {
+      onConflict: "user_id,device_session_id"
+    });
+
+    if (error) {
+      throw error;
+    }
+  } catch (err) {
+    console.warn("Failed to track active session:", err);
+  }
+}
+
+export async function getActiveSessions() {
+  const { data, error } = await supabase
+    .from("user_sessions")
+    .select("*")
+    .order("last_active_at", { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+  return data;
+}
+
+export async function deleteActiveSession(id: string) {
+  const { error } = await supabase
+    .from("user_sessions")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    throw error;
   }
 }
 
@@ -233,10 +405,13 @@ export async function signInWithEmail({
   }
 
   await applySession(data.session);
-
-  // Dispatch Secure Login notification
+ 
+  // Dispatch Secure Login and New Login Detected notifications
   try {
     const username = data.session?.user?.user_metadata?.username ?? data.session?.user?.email ?? "Golfer";
+    const deviceSessionId = await getDeviceSessionId();
+    
+    // 1. "Secure Login" notification targeting ONLY this device
     void addNotification(
       "account",
       "Secure Login",
@@ -246,12 +421,71 @@ export async function signInWithEmail({
         actionText: "View Profile",
         route: "/profile",
         triggerSystemNotification: true,
+        routeParams: { target_device_id: deviceSessionId },
+      }
+    );
+
+    // Get device details for the warning notification
+    let deviceName = Constants.deviceName ?? (Platform.OS === "ios" ? "iPhone" : Platform.OS === "android" ? "Android Device" : "Browser");
+    let osName = Platform.OS === "ios" ? "iOS" : Platform.OS === "android" ? "Android" : "Web";
+    if (Platform.OS === "web" && typeof window !== "undefined" && window.navigator) {
+      const ua = window.navigator.userAgent;
+      if (ua.indexOf("Win") !== -1) osName = "Windows";
+      else if (ua.indexOf("Mac") !== -1) osName = "macOS";
+      else if (ua.indexOf("Linux") !== -1) osName = "Linux";
+      else if (ua.indexOf("Android") !== -1) osName = "Android";
+      else if (ua.indexOf("like Mac") !== -1) osName = "iOS";
+
+      if (ua.indexOf("Chrome") !== -1) deviceName = "Chrome Browser";
+      else if (ua.indexOf("Safari") !== -1) deviceName = "Safari Browser";
+      else if (ua.indexOf("Firefox") !== -1) deviceName = "Firefox Browser";
+      else if (ua.indexOf("Edge") !== -1) deviceName = "Edge Browser";
+    }
+
+    let locationStr = "Unknown Location";
+    const cached = getCachedUserLocation();
+    if (cached) {
+      try {
+        if (Platform.OS === "web") {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${cached.latitude}&lon=${cached.longitude}`,
+            { headers: { "User-Agent": "GolfTeeApp/1.0" } }
+          );
+          if (response.ok) {
+            const data = await response.json();
+            const addr = data.address;
+            if (addr) locationStr = addr.city ?? addr.town ?? addr.village ?? "Colombo";
+          }
+        } else {
+          const address = await Location.reverseGeocodeAsync(cached);
+          if (address && address[0]) {
+            locationStr = address[0].city ?? address[0].subregion ?? "Colombo";
+          }
+        }
+      } catch {
+        locationStr = await fetchIpLocation().catch(() => "Colombo");
+      }
+    } else {
+      locationStr = await fetchIpLocation().catch(() => "Colombo");
+    }
+
+    // 2. "New Login Detected" warning notification EXCLUDING this device
+    void addNotification(
+      "account",
+      "New Login Detected",
+      `A new ${osName} device (${deviceName}) logged in from ${locationStr}. If this wasn't you, change your password immediately.`,
+      "warning",
+      {
+        actionText: "Review Devices",
+        route: "/settings",
+        triggerSystemNotification: true,
+        routeParams: { exclude_device_id: deviceSessionId },
       }
     );
   } catch (err) {
     console.warn("Failed to dispatch login notification", err);
   }
-
+ 
   return data;
 }
 
@@ -352,12 +586,16 @@ export async function signOut() {
     return;
   }
 
-  const { error } = await supabase.auth.signOut();
-  if (error) {
-    throw error;
+  try {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.warn("Supabase auth.signOut returned error:", error);
+    }
+  } catch (err) {
+    console.warn("Supabase auth.signOut failed:", err);
+  } finally {
+    await clearAuthState();
   }
-
-  await clearAuthState();
 }
 
 export async function refreshProfile() {

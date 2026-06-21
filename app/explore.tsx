@@ -11,8 +11,9 @@ import { CourseCard } from "../components/course-card";
 import {
     calculateDistanceKm,
     CourseStyle,
-    DEFAULT_USER_LOCATION,
     STYLE_OPTIONS,
+    getCachedUserLocation,
+    setCachedUserLocation,
 } from "../services/course-data";
 import { useCourseCatalog } from "../services/course-management";
 import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../components/theme";
@@ -48,8 +49,8 @@ function buildCoursesWithMetrics(courses: ReturnType<typeof useCourseCatalog>["c
   }));
 }
 
-const DEFAULT_LOCATION_LABEL = "Showing courses near Colombo. Tap Use My Location for nearby results.";
-const LOCATION_ERROR_LABEL = "Could not get your current location, so courses are shown near Colombo.";
+const DEFAULT_LOCATION_LABEL = "Enable location access to show nearby golf courses.";
+const LOCATION_ERROR_LABEL = "Could not get your current location. Please enable location services.";
 const LOCATION_ERROR_NOTICE = {
   kind: "error" as const,
   title: "Couldn't find your location",
@@ -129,9 +130,9 @@ export default function ExploreScreen() {
   };
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [userLocation, setUserLocation] = useState(DEFAULT_USER_LOCATION);
-  const [locationLabel, setLocationLabel] = useState(DEFAULT_LOCATION_LABEL);
-  const [locationState, setLocationState] = useState<LocationState>("idle");
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(getCachedUserLocation());
+  const [locationLabel, setLocationLabel] = useState(getCachedUserLocation() ? "Showing courses nearest to your current location" : DEFAULT_LOCATION_LABEL);
+  const [locationState, setLocationState] = useState<LocationState>(getCachedUserLocation() ? "ready" : "idle");
   const [locationNotice, setLocationNotice] = useState<{
     kind: LocationNoticeKind;
     title: string;
@@ -195,11 +196,12 @@ export default function ExploreScreen() {
     };
   }, []);
 
-  const applyResolvedUserLocation = (
+  const applyResolvedUserLocation = useCallback((
     coordinates: { latitude: number; longitude: number },
     nextLabel = "Showing courses nearest to your current location"
   ) => {
     setUserLocation(coordinates);
+    setCachedUserLocation(coordinates);
     setLocationLabel(nextLabel);
     setLocationState("ready");
     setLocationNotice({ kind: "none", title: "", body: "" });
@@ -210,15 +212,16 @@ export default function ExploreScreen() {
       injectJS(js);
       hasCenteredOnUser.current = true;
     }
-  };
+  }, []);
 
-  const applyLocationFailureFallback = () => {
+  const applyLocationFailureFallback = useCallback(() => {
     setLocationState("fallback");
+    setCachedUserLocation(null);
     setLocationLabel(LOCATION_ERROR_LABEL);
     setLocationNotice(LOCATION_ERROR_NOTICE);
-  };
+  }, []);
 
-  const requestUserLocation = async () => {
+  const requestUserLocation = useCallback(async () => {
     if (locationState === "loading") {
       return;
     }
@@ -345,7 +348,21 @@ export default function ExploreScreen() {
       }
       applyLocationFailureFallback();
     }
-  };
+  }, [locationState, applyResolvedUserLocation, applyLocationFailureFallback]);
+
+  useEffect(() => {
+    const silentCheck = async () => {
+      try {
+        const { status } = await Location.getForegroundPermissionsAsync();
+        if (status === "granted") {
+          void requestUserLocation();
+        }
+      } catch (e) {
+        console.warn("Silent location check failed", e);
+      }
+    };
+    void silentCheck();
+  }, [requestUserLocation]);
 
   const handleLocationNoticePrimaryAction = () => {
     if (locationNotice.kind === "permissionBlocked") {
@@ -363,7 +380,7 @@ export default function ExploreScreen() {
   };
 
   useEffect(() => {
-    if (!showInteractiveMap || locationState !== "ready" || hasCenteredOnUser.current) {
+    if (!showInteractiveMap || locationState !== "ready" || hasCenteredOnUser.current || !userLocation) {
       return;
     }
 
@@ -414,14 +431,22 @@ export default function ExploreScreen() {
     return displayedCourses
       .map((course) => ({
         ...course,
-        distanceKm: calculateDistanceKm(userLocation, course.coordinates),
+        distanceKm: userLocation ? calculateDistanceKm(userLocation, course.coordinates) : 0,
       }))
-      .sort((a, b) => a.distanceKm - b.distanceKm);
+      .sort((a, b) => {
+        if (!userLocation) {
+          return a.title.localeCompare(b.title);
+        }
+        return a.distanceKm - b.distanceKm;
+      });
   }, [displayedCourses, userLocation]);
 
   const nearbyCourses = useMemo(
-    () => displayedCoursesWithDistance.filter((course) => course.distanceKm <= 100),
-    [displayedCoursesWithDistance]
+    () => {
+      if (!userLocation) return [];
+      return displayedCoursesWithDistance.filter((course) => course.distanceKm <= 100);
+    },
+    [displayedCoursesWithDistance, userLocation]
   );
 
   const nearestCourses = useMemo(() => nearbyCourses.slice(0, 5), [nearbyCourses]);
@@ -510,7 +535,7 @@ export default function ExploreScreen() {
         <CourseCard
           variant="featured"
           title={course.title}
-          location={`${course.location} - ${course.distanceKm.toFixed(0)} km`}
+          location={userLocation && locationState === "ready" ? `${course.location} - ${course.distanceKm.toFixed(0)} km` : course.location}
           image={course.image}
           price={course.price}
           rating={course.rating}
@@ -520,7 +545,7 @@ export default function ExploreScreen() {
         />
       </View>
     ),
-    [openCourseDetails, styles.courseCard, styles.courseCardItem]
+    [openCourseDetails, styles.courseCard, styles.courseCardItem, userLocation, locationState]
   );
 
   // Reset map ready status when viewMode changes or interactive map is hidden
@@ -547,7 +572,7 @@ export default function ExploreScreen() {
 
   // Update user location marker in WebView when it resolves
   useEffect(() => {
-    if ((Platform.OS === 'web' || webViewRef.current) && isMapReady && locationState === "ready") {
+    if ((Platform.OS === 'web' || webViewRef.current) && isMapReady && locationState === "ready" && userLocation) {
       const js = `updateUserLocation(${userLocation.latitude}, ${userLocation.longitude});`;
       injectJS(js);
     }
@@ -887,6 +912,7 @@ export default function ExploreScreen() {
 
       {/* Floating Bottom Overlays Container */}
       <View
+        pointerEvents="box-none"
         style={[
           styles.floatingBottomContainer,
           {
@@ -1057,37 +1083,53 @@ export default function ExploreScreen() {
           </View>
         </View>
 
-        {nearestCourses.length > 0 ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={Platform.OS === "web"}
-            contentContainerStyle={styles.trendingList}
-            bounces={false}
-            overScrollMode="never"
-          >
-            {nearestCourses.map((course) => (
-              <CourseCard
-                key={course.id}
-                variant="compact"
-                size="small"
-                title={course.title}
-                location={`${course.location} - ${course.distanceKm.toFixed(0)} km`}
-                image={course.image}
-                price={course.price}
-                rating={course.rating}
-                styleLabel={course.style}
-                tone={course.style === "COASTAL" ? "green" : "gold"}
-                cardStyle={styles.trendingCard}
-                compactActionLabel="View Details"
-                onPressCompactAction={() => openCourseDetails(course.id)}
-                onPress={() => focusCourseOnMap(course.id)}
-              />
-            ))}
-          </ScrollView>
+        {locationState === "ready" ? (
+          nearestCourses.length > 0 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={Platform.OS === "web"}
+              contentContainerStyle={styles.trendingList}
+              bounces={false}
+              overScrollMode="never"
+            >
+              {nearestCourses.map((course) => (
+                <CourseCard
+                  key={course.id}
+                  variant="compact"
+                  size="small"
+                  title={course.title}
+                  location={`${course.location} - ${course.distanceKm.toFixed(0)} km`}
+                  image={course.image}
+                  price={course.price}
+                  rating={course.rating}
+                  styleLabel={course.style}
+                  tone={course.style === "COASTAL" ? "green" : "gold"}
+                  cardStyle={styles.trendingCard}
+                  compactActionLabel="View Details"
+                  onPressCompactAction={() => openCourseDetails(course.id)}
+                  onPress={() => focusCourseOnMap(course.id)}
+                />
+              ))}
+            </ScrollView>
+          ) : (
+            <View style={styles.emptyNearbyState}>
+              <Text style={styles.emptyNearbyTitle}>No courses found within 100 km</Text>
+              <Text style={styles.emptyNearbyText}>Adjust the filters to see more courses across Sri Lanka.</Text>
+            </View>
+          )
         ) : (
-          <View style={styles.emptyNearbyState}>
-            <Text style={styles.emptyNearbyTitle}>No courses found within 100 km</Text>
-            <Text style={styles.emptyNearbyText}>Turn on location or adjust the filters to see more courses across Sri Lanka.</Text>
+          <View style={styles.locationFallbackCard}>
+            <Ionicons name="location-outline" size={24} color={colors.textSoft} style={styles.locationFallbackIcon} />
+            <Text style={styles.locationFallbackText}>
+              Enable location to see golf courses nearest to you.
+            </Text>
+            <Pressable
+              style={styles.locationFallbackBtn}
+              onPress={requestUserLocation}
+              variant="cta"
+            >
+              <Text style={styles.locationFallbackBtnText}>Show Nearby</Text>
+            </Pressable>
           </View>
         )}
       </View>
@@ -2101,6 +2143,42 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     fontSize: 11,
     color: colors.text,
     fontWeight: "700",
+  },
+  locationFallbackCard: {
+    backgroundColor: colors.surfaceSoft,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    borderRadius: theme.radius.lg,
+    padding: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    marginTop: 4,
+    width: "100%",
+  },
+  locationFallbackIcon: {
+    marginBottom: 2,
+  },
+  locationFallbackText: {
+    fontSize: theme.typography.bodySm.fontSize,
+    lineHeight: theme.typography.bodySm.lineHeight,
+    color: colors.textSoft,
+    textAlign: "center",
+    maxWidth: 280,
+    marginBottom: 6,
+  },
+  locationFallbackBtn: {
+    paddingHorizontal: 20,
+    height: 40,
+    borderRadius: theme.radius.pill,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  locationFallbackBtnText: {
+    color: colors.surface,
+    fontWeight: "700",
+    fontSize: theme.typography.body.fontSize,
   },
   desktopSplitLayout: {
     flex: 1,

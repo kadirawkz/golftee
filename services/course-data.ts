@@ -22,6 +22,24 @@ export const DEFAULT_USER_LOCATION = {
   longitude: 79.8612,
 };
 
+let cachedUserLocation: { latitude: number; longitude: number } | null = null;
+let lastLocationFetchTime = 0;
+
+export function getCachedUserLocation() {
+  return cachedUserLocation;
+}
+
+export function setCachedUserLocation(coords: { latitude: number; longitude: number } | null) {
+  cachedUserLocation = coords;
+  lastLocationFetchTime = coords ? Date.now() : 0;
+}
+
+export function shouldRefreshLocation(): boolean {
+  if (!cachedUserLocation) return true;
+  // Refresh location if the cached data is older than 5 minutes
+  return (Date.now() - lastLocationFetchTime) > 300000;
+}
+
 export const SRI_LANKA_MAP_REGION = {
   latitude: 7.8731,
   longitude: 80.7718,

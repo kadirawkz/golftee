@@ -129,7 +129,7 @@ export default function NotificationsScreen() {
   const styles = useThemedStyles(themedStyles);
   const router = useRouter();
   const { filter } = useLocalSearchParams<{ filter?: NotificationFilter }>();
-  const { horizontalPadding, screenBottomPadding, isTabletLike } = useResponsiveLayout();
+  const { horizontalPadding, screenBottomPadding } = useResponsiveLayout();
   const { notifications } = useNotificationState();
   const [activeFilter, setActiveFilter] = useState<NotificationFilter>("all");
   const [refreshing, setRefreshing] = useState(false);
@@ -325,25 +325,16 @@ export default function NotificationsScreen() {
            {unreadNotifications.length > 0 ? (
             <View style={styles.groupSection}>
               <Text style={styles.sectionLabel}>Unread</Text>
-              <View style={isTabletLike ? styles.desktopList : styles.notificationsList}>
-                {unreadNotifications.map((notification) => {
-                  const card = (
-                    <NotificationCard
-                      key={notification.id}
-                      notification={notification}
-                      onMarkRead={handleMarkRead}
-                      onAction={handleNotificationAction}
-                      onDelete={handleDelete}
-                    />
-                  );
-                  return isTabletLike ? (
-                    <View key={notification.id} style={styles.desktopCardWrapper}>
-                      {card}
-                    </View>
-                  ) : (
-                    card
-                  );
-                })}
+              <View style={styles.notificationsList}>
+                {unreadNotifications.map((notification) => (
+                  <NotificationCard
+                    key={notification.id}
+                    notification={notification}
+                    onMarkRead={handleMarkRead}
+                    onAction={handleNotificationAction}
+                    onDelete={handleDelete}
+                  />
+                ))}
               </View>
             </View>
           ) : null}
@@ -351,25 +342,16 @@ export default function NotificationsScreen() {
           {earlierNotifications.length > 0 ? (
             <View style={styles.groupSection}>
               <Text style={styles.sectionLabel}>{unreadNotifications.length > 0 ? "Earlier" : "All Notifications"}</Text>
-              <View style={isTabletLike ? styles.desktopList : styles.notificationsList}>
-                {earlierNotifications.map((notification) => {
-                  const card = (
-                    <NotificationCard
-                      key={notification.id}
-                      notification={notification}
-                      onMarkRead={handleMarkRead}
-                      onAction={handleNotificationAction}
-                      onDelete={handleDelete}
-                    />
-                  );
-                  return isTabletLike ? (
-                    <View key={notification.id} style={styles.desktopCardWrapper}>
-                      {card}
-                    </View>
-                  ) : (
-                    card
-                  );
-                })}
+              <View style={styles.notificationsList}>
+                {earlierNotifications.map((notification) => (
+                  <NotificationCard
+                    key={notification.id}
+                    notification={notification}
+                    onMarkRead={handleMarkRead}
+                    onAction={handleNotificationAction}
+                    onDelete={handleDelete}
+                  />
+                ))}
               </View>
             </View>
           ) : null}

@@ -904,6 +904,93 @@ grant select, insert, update, delete on table public.notifications to authentica
 grant select, insert, update, delete on table public.notifications to service_role;
 
 -- Enable Realtime replication for notifications
-alter publication supabase_realtime add table public.notifications;
+do $$
+begin
+  if not exists (
+    select 1 
+    from pg_publication_rel pr 
+    join pg_publication p on p.oid = pr.prpubid 
+    join pg_class c on c.oid = pr.prrelid 
+    join pg_namespace n on n.oid = c.relnamespace
+    where p.pubname = 'supabase_realtime' 
+      and n.nspname = 'public' 
+      and c.relname = 'notifications'
+  ) then
+    alter publication supabase_realtime add table public.notifications;
+  end if;
+end;
+$$;
 
+-- Create User Sessions Table
+create table if not exists public.user_sessions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  device_session_id text not null,
+  device_name text not null,
+  os_name text not null,
+  client_type text not null, -- 'web' or 'mobile'
+  location text,
+  last_active_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  constraint user_sessions_user_device_unique unique (user_id, device_session_id)
+);
+
+-- Enable RLS
+alter table public.user_sessions enable row level security;
+alter table public.user_sessions replica identity full;
+
+-- Policies
+drop policy if exists "Users can view their own sessions" on public.user_sessions;
+create policy "Users can view their own sessions"
+  on public.user_sessions for select
+  to authenticated
+  using (auth.uid() = user_id);
+
+drop policy if exists "Users can insert/update their own sessions" on public.user_sessions;
+drop policy if exists "Users can insert their own sessions" on public.user_sessions;
+create policy "Users can insert their own sessions"
+  on public.user_sessions for insert
+  to authenticated
+  with check (auth.uid() = user_id);
+
+drop policy if exists "Users can update their own sessions" on public.user_sessions;
+create policy "Users can update their own sessions"
+  on public.user_sessions for update
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "Users can delete their own sessions" on public.user_sessions;
+create policy "Users can delete their own sessions"
+  on public.user_sessions for delete
+  to authenticated
+  using (auth.uid() = user_id);
+
+-- Grants
+grant select, insert, update, delete on table public.user_sessions to authenticated;
+grant select, insert, update, delete on table public.user_sessions to service_role;
+
+
+
+-- Enable Realtime replication for user_sessions
+do $$
+begin
+  if not exists (
+    select 1 
+    from pg_publication_rel pr 
+    join pg_publication p on p.oid = pr.prpubid 
+    join pg_class c on c.oid = pr.prrelid 
+    join pg_namespace n on n.oid = c.relnamespace
+    where p.pubname = 'supabase_realtime' 
+      and n.nspname = 'public' 
+      and c.relname = 'user_sessions'
+  ) then
+    alter publication supabase_realtime add table public.user_sessions;
+  end if;
+end;
+$$;
+
+-- Clean up legacy triggers to prevent duplicate login notifications
+drop trigger if exists on_new_session_login on public.user_sessions;
+drop function if exists public.notify_new_session_login();
 
