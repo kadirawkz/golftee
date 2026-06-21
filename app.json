@@ -44,9 +44,9 @@
           "image": "./assets/images/android-icon-foreground.png",
           "imageWidth": 140,
           "resizeMode": "contain",
-          "backgroundColor": "#000000",
+          "backgroundColor": "#12392D",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#12392D"
           }
         }
       ],
@@ -74,4 +74,5 @@
     "owner": "kadirawkz"
   }
 }
+
 
