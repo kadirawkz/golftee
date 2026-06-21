@@ -269,7 +269,7 @@ create or replace function public.save_tee_time_booking(
 )
 returns public.tee_time_bookings
 language plpgsql
-security definer
+security invoker
 set search_path = public
 as $$
 declare
@@ -451,7 +451,7 @@ $$;
 create or replace function public.cancel_tee_time_booking(target_booking_id uuid)
 returns public.tee_time_bookings
 language plpgsql
-security definer
+security invoker
 set search_path = public
 as $$
 declare
@@ -614,6 +614,7 @@ grant execute on function public.cancel_tee_time_booking(uuid) to authenticated;
 revoke execute on function public.handle_new_user() from public, anon, authenticated;
 revoke execute on function public.set_current_timestamp_updated_at() from public, anon, authenticated;
 revoke execute on function public.rls_auto_enable() from public, anon, authenticated;
+revoke execute on function public.update_course_rating_and_review_count() from public, anon, authenticated;
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created

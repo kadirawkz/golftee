@@ -7,10 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "golftee",
     "userInterfaceStyle": "automatic",
-    "notification": {
-      "icon": "./assets/images/notification-icon.png",
-      "color": "#12392D"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.kadirawkz.golftee",
@@ -42,6 +38,13 @@
     "plugins": [
       "expo-router",
       "expo-system-ui",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#12392D"
+        }
+      ],
       [
         "expo-splash-screen",
         {

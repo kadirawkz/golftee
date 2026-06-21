@@ -66,6 +66,8 @@ To safeguard user data, execute the revoke grants to restrict anonymous write ac
 REVOKE INSERT, UPDATE, DELETE ON public.locations, public.course_styles, public.membership_tiers, public.golf_courses FROM anon, authenticated;
 ```
 
+- **Function Security (Invoker vs Definer)**: Critical functions (e.g., `create_tee_time_booking` and `cancel_tee_time_booking`) run under `SECURITY INVOKER` to guarantee they respect the active user's permissions and Row-Level Security (RLS) instead of executing with administrative permissions.
+
 ---
 
 ## 3. High-Scale Connection Pooling (pgBouncer)
