@@ -158,6 +158,7 @@ export default function ExploreScreen() {
   const hasCenteredOnUser = useRef(false);
   const centerUserLocationOnNextSyncRef = useRef(false);
   const showInteractiveMapRef = useRef(false);
+  const hasFocusedRouteCourseRef = useRef(false);
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const parsedScrollOffset = Number(scrollOffset);
   const resolvedScrollOffset = Number.isFinite(parsedScrollOffset) && parsedScrollOffset > 0
@@ -204,6 +205,10 @@ export default function ExploreScreen() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    hasFocusedRouteCourseRef.current = false;
+  }, [courseId]);
 
   const applyResolvedUserLocation = useCallback((
     coordinates: { latitude: number; longitude: number },
@@ -604,7 +609,8 @@ export default function ExploreScreen() {
   useEffect(() => {
     if (view === "map") {
       setViewMode("map");
-      if (courseId && showInteractiveMap) {
+      if (courseId && showInteractiveMap && !hasFocusedRouteCourseRef.current) {
+        hasFocusedRouteCourseRef.current = true;
         focusCourseOnMap(courseId);
       }
     }
