@@ -739,7 +739,10 @@ export default function HomeScreen() {
               </Text>
               <Pressable
                 style={styles.locationFallbackBtn}
-                onPress={() => void checkAndRequestLocation(true)}
+                onPress={async () => {
+                  await checkAndRequestLocation(true);
+                  router.navigate("/explore");
+                }}
                 variant="cta"
               >
                 <Text style={styles.locationFallbackBtnText}>Show Nearby</Text>

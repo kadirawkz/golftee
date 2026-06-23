@@ -17,6 +17,7 @@ import {
 } from "../services/course-data";
 import { getCachedExploreViewMode, setCachedExploreViewMode } from "../services/explore-state";
 import { useCourseCatalog } from "../services/course-management";
+import { openInGoogleMaps } from "../utils/map-links";
 import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../components/theme";
 import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
 
@@ -1180,43 +1181,55 @@ export default function ExploreScreen() {
                   </View>
                 </View>
 
-                <Pressable
-                  style={styles.mapCardCloseBtn}
-                  onPress={() => setSelectedCourseId(null)}
-                  variant="icon"
-                >
-                  <Ionicons name="close" size={18} color={colors.text} />
-                </Pressable>
-              </View>
-
-              {/* Mid Row: Price and Actions */}
-              <View style={styles.mapCardFooterRow}>
                 <View style={styles.mapCardPriceBlock}>
                   <Text style={styles.mapCardPriceLabel}>STARTING AT</Text>
                   <Text style={styles.mapCardPriceVal}>{activeCardCourse.price}</Text>
                 </View>
+              </View>
 
-                <View style={styles.mapCardActions}>
-                  <Pressable
-                    style={[styles.mapCardBtn, styles.mapCardBtnSecondary]}
-                    onPress={() => openCourseDetails(activeCardCourse.id)}
-                    variant="chip"
-                  >
-                    <Text style={styles.mapCardBtnSecondaryText}>Details</Text>
-                  </Pressable>
+              <Pressable
+                style={styles.mapCardCloseBtn}
+                onPress={() => setSelectedCourseId(null)}
+                variant="icon"
+              >
+                <Ionicons name="close" size={18} color={colors.text} />
+              </Pressable>
 
-                  <Pressable
-                    style={[styles.mapCardBtn, styles.mapCardBtnPrimary]}
-                    onPress={() => router.navigate({
-                      pathname: "/tee-time-booking",
-                      params: { id: activeCardCourse.id }
-                    })}
-                    variant="cta"
-                  >
-                    <Ionicons name="calendar-outline" size={14} color={colors.surface} />
-                    <Text style={styles.mapCardBtnPrimaryText}>Book Now</Text>
-                  </Pressable>
-                </View>
+              {/* Actions Row */}
+              <View style={styles.mapCardActions}>
+                <Pressable
+                  style={[styles.mapCardBtn, styles.mapCardBtnSecondary]}
+                  onPress={() => openInGoogleMaps({
+                    coordinates: activeCardCourse.coordinates,
+                    placeQuery: activeCardCourse.placeQuery,
+                    placeId: activeCardCourse.placeId,
+                  })}
+                  variant="chip"
+                >
+                  <Ionicons name="navigate-outline" size={14} color={colors.primary} />
+                  <Text style={styles.mapCardBtnSecondaryText}>Open in Google Maps</Text>
+                </Pressable>
+
+                <Pressable
+                  style={[styles.mapCardBtn, styles.mapCardBtnSecondaryAlt]}
+                  onPress={() => openCourseDetails(activeCardCourse.id)}
+                  variant="chip"
+                >
+                  <Ionicons name="information-circle-outline" size={14} color={colors.primary} />
+                  <Text style={styles.mapCardBtnSecondaryText}>Details</Text>
+                </Pressable>
+
+                <Pressable
+                  style={[styles.mapCardBtn, styles.mapCardBtnPrimary]}
+                  onPress={() => router.navigate({
+                    pathname: "/tee-time-booking",
+                    params: { id: activeCardCourse.id }
+                  })}
+                  variant="cta"
+                >
+                  <Ionicons name="calendar-outline" size={14} color={colors.surface} />
+                  <Text style={styles.mapCardBtnPrimaryText}>Book Now</Text>
+                </Pressable>
               </View>
             </Pressable>
           </Animated.View>
@@ -1768,9 +1781,9 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     color: colors.textSoft,
   },
   locationNoticeAction: {
-    alignSelf: "flex-start",
+    alignSelf: "center",
+    width: 132,
     minHeight: 34,
-    paddingHorizontal: 14,
     borderRadius: theme.radius.pill,
     borderWidth: 1,
     borderColor: colors.border,
@@ -2230,12 +2243,15 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     fontWeight: "700",
   },
   mapCardInner: {
+    position: "relative",
     gap: 12,
+    paddingTop: 8,
   },
   mapCardHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
+    paddingRight: 45,
   },
   mapCardInfo: {
     flex: 1,
@@ -2264,12 +2280,16 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     backgroundColor: colors.border,
   },
   mapCardCloseBtn: {
+    position: "absolute",
+    top: 0,
+    right: 0,
     width: 28,
     height: 28,
     borderRadius: 14,
     backgroundColor: colors.primarySoft,
     alignItems: "center",
     justifyContent: "center",
+    zIndex: 2,
   },
   mapCardFooterRow: {
     flexDirection: "row",
@@ -2282,6 +2302,8 @@ const themedStyles = createThemedStyleSheet((colors) => ({
   },
   mapCardPriceBlock: {
     justifyContent: "center",
+    marginTop: 10,
+    marginLeft: 0,
   },
   mapCardPriceLabel: {
     fontSize: 9,
@@ -2299,7 +2321,10 @@ const themedStyles = createThemedStyleSheet((colors) => ({
   mapCardActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    justifyContent: "center",
+    gap: 20,
+    flexWrap: "wrap",
+    width: "100%",
   },
   mapCardBtn: {
     height: 36,
@@ -2309,6 +2334,7 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     justifyContent: "center",
     flexDirection: "row",
     gap: 6,
+    minWidth: 0,
   },
   mapCardBtnPrimary: {
     backgroundColor: colors.primary,
@@ -2320,6 +2346,11 @@ const themedStyles = createThemedStyleSheet((colors) => ({
   },
   mapCardBtnSecondary: {
     backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  mapCardBtnSecondaryAlt: {
+    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.borderStrong,
   },
@@ -2352,7 +2383,8 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     marginBottom: 6,
   },
   locationFallbackBtn: {
-    paddingHorizontal: 20,
+    alignSelf: "center",
+    width: 120,
     height: 40,
     borderRadius: theme.radius.pill,
     backgroundColor: colors.primary,

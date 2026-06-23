@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { usePathname, useRouter } from "expo-router";
-import { type ReactNode, useEffect, useState } from "react";
+import { useNavigation, usePathname, useRouter } from "expo-router";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { BackHandler, Platform, ScrollView, Text, View, useWindowDimensions, Image, TouchableWithoutFeedback } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "./animated-pressable";
@@ -101,6 +101,7 @@ const SECURE_NO_CHROME_ROUTES: readonly string[] = ["/tee-time-booking", "/booki
 
 export function AppBottomTabs({ children }: AppBottomTabsProps) {
   const router = useRouter();
+  const navigation = useNavigation();
   const pathname = usePathname();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -110,6 +111,7 @@ export function AppBottomTabs({ children }: AppBottomTabsProps) {
   const auth = useAuthSession();
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showNotificationsPanel, setShowNotificationsPanel] = useState(false);
+  const tabHistoryRef = useRef<TabRoute[]>(["/home"]);
   const shellBackgroundColor = theme.system.getBackground(pathname, colors);
 
   const isSecureNoChromeRoute = SECURE_NO_CHROME_ROUTES.includes(pathname);
@@ -162,24 +164,52 @@ export function AppBottomTabs({ children }: AppBottomTabsProps) {
   ];
 
   useEffect(() => {
+    if (!tabItems.some((item) => item.route === pathname)) {
+      return;
+    }
+
+    const history = tabHistoryRef.current;
+    const lastRoute = history[history.length - 1];
+
+    if (lastRoute !== pathname) {
+      history.push(pathname as TabRoute);
+      return;
+    }
+
+    if (history.length === 0) {
+      history.push(pathname as TabRoute);
+    }
+  }, [pathname]);
+
+  useEffect(() => {
     if (Platform.OS !== "android") {
       return;
     }
 
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (navigation.canGoBack()) {
+        router.back();
+        return true;
+      }
+
       if (tabItems.some((item) => item.route === pathname)) {
-        if (pathname !== "/home") {
-          router.replace("/home");
+        const history = tabHistoryRef.current;
+        if (history.length > 1) {
+          history.pop();
+          const previousTab = history[history.length - 1] ?? "/home";
+          router.navigate(previousTab as TabRoute);
           return true;
         }
+
         BackHandler.exitApp();
         return true;
       }
+
       return false;
     });
 
     return () => subscription.remove();
-  }, [pathname, router]);
+  }, [navigation, pathname, router]);
 
   const handleHeaderBack = () => {
     if (pathname === "/login") {
