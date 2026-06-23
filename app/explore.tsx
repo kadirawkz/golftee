@@ -69,7 +69,7 @@ export default function ExploreScreen() {
   const navHeight = isCompact ? 62 : 68;
   const navBottom = Math.max(insets.bottom + 6, 8);
   const bottomOverlayPosition = isTabletLike ? 44 : (navBottom + navHeight) - insets.bottom + 8;
-  const { section, scrollOffset, view, courseId } = useLocalSearchParams<{
+  const { section, scrollOffset, view, courseId, origin } = useLocalSearchParams<{
     section?: string;
     scrollOffset?: string;
     view?: "list" | "map";
@@ -588,7 +588,7 @@ export default function ExploreScreen() {
     }
   }, [selectedCourse]);
 
-  const focusCourseOnMap = useCallback((courseId: string) => {
+  const focusCourseOnMap = useCallback((courseId: string, focusOrigin?: string) => {
     const course = displayedCoursesById.get(courseId);
     if (!course) {
       return;
@@ -596,25 +596,32 @@ export default function ExploreScreen() {
 
     setViewMode("map");
     setSelectedCourseId(course.id);
-    
-    setTimeout(() => {
-      if (Platform.OS === 'web' || webViewRef.current) {
+
+    if (focusOrigin === "details" && userLocation) {
+      suppressSelectedCourseCenterOnNextCourseSyncRef.current = true;
+    }
+
+    if (Platform.OS === "web" || webViewRef.current) {
+      if (focusOrigin === "details" && userLocation) {
+        const js = `focusCourseFromUser(${userLocation.latitude}, ${userLocation.longitude}, ${course.coordinates.latitude}, ${course.coordinates.longitude}, "${course.id}");`;
+        injectJS(js);
+      } else {
         injectJS(`selectMarker("${course.id}", ${course.coordinates.latitude}, ${course.coordinates.longitude});`);
       }
-    }, 200);
-  }, [displayedCoursesById]);
+    }
+  }, [displayedCoursesById, userLocation]);
 
   useEffect(() => {
     if (view === "map") {
       setViewMode("map");
       if (courseId && showInteractiveMap) {
         const timer = setTimeout(() => {
-          focusCourseOnMap(courseId);
+          focusCourseOnMap(courseId, origin);
         }, 300);
         return () => clearTimeout(timer);
       }
     }
-  }, [view, courseId, showInteractiveMap, focusCourseOnMap]);
+  }, [view, courseId, origin, showInteractiveMap, focusCourseOnMap]);
 
   useEffect(() => {
     if (Platform.OS !== "android") {
@@ -863,6 +870,14 @@ export default function ExploreScreen() {
     var goldIcon   = makeDivIcon('#C79A4B', '#8B6512', '#fff', false);
     var blueIcon   = makeUserLocationIcon();
 
+    function animateMapTo(lat, lng, zoom) {
+      map.flyTo([lat, lng], zoom, {
+        animate: true,
+        duration: 0.55,
+        easeLinearity: 0.25,
+      });
+    }
+
     var markers = {};
     var userMarker = null;
     var selectedCourseId = null;
@@ -881,11 +896,7 @@ export default function ExploreScreen() {
       if (markers[id]) {
         markers[id].setIcon(makeDivIcon('#C79A4B', '#8B6512', '#fff', true));
       }
-      if (map.getZoom() < 9.5) {
-        map.setView([lat, lng], 9.5);
-      } else {
-        map.panTo([lat, lng]);
-      }
+      animateMapTo(lat, lng, 9.5);
     }
 
     function deselectMarker() {
@@ -901,9 +912,28 @@ export default function ExploreScreen() {
       } else {
         userMarker = L.marker([lat, lng], { icon: blueIcon }).addTo(map);
       }
-      if (shouldCenter || !selectedCourseId) {
-        map.setView([lat, lng], 8.5);
+      if (shouldCenter) {
+        animateMapTo(lat, lng, 8.5);
       }
+    }
+
+    function focusCourseFromUser(userLat, userLng, courseLat, courseLng, id) {
+      selectedCourseId = id;
+      for (var key in markers) {
+        markers[key].setIcon(makeDivIcon('#2D7D4E', '#12392D', '#fff', false));
+      }
+      if (markers[id]) {
+        markers[id].setIcon(makeDivIcon('#C79A4B', '#8B6512', '#fff', true));
+      }
+      if (userMarker) {
+        userMarker.setLatLng([userLat, userLng]);
+      } else {
+        userMarker = L.marker([userLat, userLng], { icon: blueIcon }).addTo(map);
+      }
+      animateMapTo(userLat, userLng, 8.5);
+      setTimeout(function() {
+        animateMapTo(courseLat, courseLng, 9.5);
+      }, 220);
     }
 
     function updateCourses(coursesJson, selectedId, preserveCenter) {
@@ -931,7 +961,7 @@ export default function ExploreScreen() {
         
         if (isSelected && !preserveCenter) {
           setTimeout(function() {
-            map.setView([course.lat, course.lng], 9.5);
+            animateMapTo(course.lat, course.lng, 9.5);
           }, 100);
         }
       });
