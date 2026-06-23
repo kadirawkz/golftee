@@ -216,7 +216,7 @@ export default function ExploreScreen() {
     setSelectedCourseId(null);
 
     if (showInteractiveMapRef.current && (Platform.OS === 'web' || webViewRef.current)) {
-      const js = `updateUserLocation(${coordinates.latitude}, ${coordinates.longitude});`;
+      const js = `updateUserLocation(${coordinates.latitude}, ${coordinates.longitude}, true);`;
       injectJS(js);
       hasCenteredOnUser.current = true;
     }
@@ -379,7 +379,7 @@ export default function ExploreScreen() {
         setUserLocation(coords);
         setCachedUserLocation(coords);
         if (showInteractiveMapRef.current && (Platform.OS === 'web' || webViewRef.current)) {
-          injectJS(`updateUserLocation(${coords.latitude}, ${coords.longitude});`);
+          injectJS(`updateUserLocation(${coords.latitude}, ${coords.longitude}, false);`);
         }
       }
 
@@ -413,7 +413,7 @@ export default function ExploreScreen() {
         setUserLocation(coords);
         setCachedUserLocation(coords);
         if (showInteractiveMapRef.current && (Platform.OS === 'web' || webViewRef.current)) {
-          injectJS(`updateUserLocation(${coords.latitude}, ${coords.longitude});`);
+          injectJS(`updateUserLocation(${coords.latitude}, ${coords.longitude}, false);`);
         }
       }
     } catch (e) {
@@ -456,7 +456,7 @@ export default function ExploreScreen() {
     }
 
     if (Platform.OS === 'web' || webViewRef.current) {
-      const js = `updateUserLocation(${userLocation.latitude}, ${userLocation.longitude});`;
+      const js = `updateUserLocation(${userLocation.latitude}, ${userLocation.longitude}, false);`;
       injectJS(js);
       hasCenteredOnUser.current = true;
     }
@@ -684,7 +684,7 @@ export default function ExploreScreen() {
   // Update user location marker in WebView when it resolves
   useEffect(() => {
     if ((Platform.OS === 'web' || webViewRef.current) && isMapReady && locationState === "ready" && userLocation) {
-      const js = `updateUserLocation(${userLocation.latitude}, ${userLocation.longitude});`;
+      const js = `updateUserLocation(${userLocation.latitude}, ${userLocation.longitude}, false);`;
       injectJS(js);
     }
   }, [userLocation, locationState, isMapReady]);
@@ -894,13 +894,13 @@ export default function ExploreScreen() {
       }
     }
 
-    function updateUserLocation(lat, lng) {
+    function updateUserLocation(lat, lng, shouldCenter) {
       if (userMarker) {
         userMarker.setLatLng([lat, lng]);
       } else {
         userMarker = L.marker([lat, lng], { icon: blueIcon }).addTo(map);
       }
-      if (!selectedCourseId) {
+      if (shouldCenter || !selectedCourseId) {
         map.setView([lat, lng], 8.5);
       }
     }
