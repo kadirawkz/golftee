@@ -224,8 +224,6 @@ export default function ExploreScreen() {
 
   const centerUserLocationImmediately = useCallback((coordinates: { latitude: number; longitude: number }) => {
     hasCenteredOnUser.current = true;
-    hasFocusedRouteCourseRef.current = false;
-    setSelectedCourseId(null);
     setUserLocation({ ...coordinates });
     setCachedUserLocation({ ...coordinates });
     setLocationState("ready");
@@ -258,8 +256,6 @@ export default function ExploreScreen() {
 
     isLocationLoadingRef.current = true;
     hasCenteredOnUser.current = false;
-    hasFocusedRouteCourseRef.current = false;
-    setSelectedCourseId(null);
     setLocationState("loading");
     setLocationNotice({ kind: "none", title: "", body: "" });
     setLocationLabel("Requesting location access...");
@@ -951,10 +947,6 @@ export default function ExploreScreen() {
         });
         
         markers[course.id] = marker;
-        
-        if (isSelected) {
-          animateMapTo(course.lat, course.lng, 9.5);
-        }
       });
     }
 
