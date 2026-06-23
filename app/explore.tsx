@@ -231,7 +231,7 @@ export default function ExploreScreen() {
     setLocationState("ready");
     setLocationNotice({ kind: "none", title: "", body: "" });
     setLocationLabel("Showing courses nearest to your current location");
-    centerUserLocationOnNextSyncRef.current = false;
+    centerUserLocationOnNextSyncRef.current = true;
 
     if ((Platform.OS === "web" || webViewRef.current) && isMapReady) {
       injectJS(`updateUserLocation(${coordinates.latitude}, ${coordinates.longitude}, true);`);
@@ -254,10 +254,10 @@ export default function ExploreScreen() {
     hasCenteredOnUser.current = false;
     hasFocusedRouteCourseRef.current = false;
     setSelectedCourseId(null);
+    setLocationState("loading");
     if (userLocation) {
       centerUserLocationImmediately(userLocation);
     }
-    setLocationState("loading");
     setLocationNotice({ kind: "none", title: "", body: "" });
     setLocationLabel("Requesting location access...");
 
@@ -378,7 +378,7 @@ export default function ExploreScreen() {
     } finally {
       isLocationLoadingRef.current = false;
     }
-  }, [applyResolvedUserLocation, applyLocationFailureFallback]);
+  }, [centerUserLocationImmediately, applyLocationFailureFallback, userLocation]);
 
   const fetchLocationSilently = useCallback(async () => {
     try {
