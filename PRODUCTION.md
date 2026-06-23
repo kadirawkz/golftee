@@ -1,6 +1,17 @@
-# GolfTee Production Deployment & Environment Isolation Manual
+# GolfTee Production Deployment & Environment Isolation Manual 🚀
 
 This document outlines the step-by-step procedure for deploying the **GolfTee** mobile application to a production environment. Follow these guidelines to establish a secure, isolated database backend, optimize database performance under heavy traffic, and manage application configurations safely.
+
+---
+
+## 📖 Table of Contents
+
+- [1. Environment Segregation](#1-environment-segregation-staging-vs-production)
+- [2. Mermaid Architecture Diagram](#2-mermaid-architecture-diagram)
+- [3. Database Schema & Policy Migration](#3-database-schema--policy-migration)
+- [4. High-Scale Connection Pooling (pgBouncer)](#4-high-scale-connection-pooling-pgbouncer)
+- [5. Key Rotation & Security Checklist](#5-key-rotation--security-checklist)
+- [6. Production Deployment & Verification Checklist](#6-production-deployment--verification-checklist)
 
 ---
 
@@ -34,7 +45,37 @@ When configuring EAS build commands, specify env files using profile variables i
 
 ---
 
-## 2. Database Schema & Policy Migration
+## 2. Mermaid Architecture Diagram
+
+Below is the workflow showing the environment segregation and build configuration pipeline:
+
+```mermaid
+graph TD
+    subgraph Local Workspace
+        Code[Developer Codebase]
+        EnvStaging[Local .env]
+        EnvProd[Local .env.production]
+    end
+
+    subgraph EAS Build System
+        EASBuild[EAS CLI / Expo Cloud]
+        EAS_Stg_Profile[eas.json: development / preview]
+        EAS_Prod_Profile[eas.json: production]
+    end
+
+    subgraph Cloud Backend
+        SupabaseStg[(Supabase Staging Project)]
+        SupabaseProd[(Supabase Production Project)]
+    end
+
+    Code --> EASBuild
+    EnvStaging --> EAS_Stg_Profile --> SupabaseStg
+    EnvProd --> EAS_Prod_Profile --> SupabaseProd
+```
+
+---
+
+## 3. Database Schema & Policy Migration
 
 Deploy the database schema, functions, constraints, and Row Level Security (RLS) policies using the Supabase CLI.
 
@@ -60,17 +101,20 @@ Deploy the database schema, functions, constraints, and Row Level Security (RLS)
    alter publication supabase_realtime add table public.notifications;
    ```
 
-### Security Reinforcement (Least Privilege)
-To safeguard user data, execute the revoke grants to restrict anonymous write access on structural catalog tables:
-```sql
-REVOKE INSERT, UPDATE, DELETE ON public.locations, public.course_styles, public.membership_tiers, public.golf_courses FROM anon, authenticated;
-```
+> [!IMPORTANT]
+> **Security Reinforcement (Least Privilege)**
+> To safeguard user data, execute the revoke grants to restrict anonymous write access on structural catalog tables:
+> ```sql
+> REVOKE INSERT, UPDATE, DELETE ON public.locations, public.course_styles, public.membership_tiers, public.golf_courses FROM anon, authenticated;
+> ```
 
-- **Function Security (Invoker vs Definer)**: Critical functions (e.g., `create_tee_time_booking` and `cancel_tee_time_booking`) run under `SECURITY INVOKER` to guarantee they respect the active user's permissions and Row-Level Security (RLS) instead of executing with administrative permissions.
+> [!NOTE]
+> **Function Security (Invoker vs Definer)**
+> Critical functions (e.g., `create_tee_time_booking` and `cancel_tee_time_booking`) run under `SECURITY INVOKER` to guarantee they respect the active user's permissions and Row-Level Security (RLS) instead of executing with administrative permissions.
 
 ---
 
-## 3. High-Scale Connection Pooling (pgBouncer)
+## 4. High-Scale Connection Pooling (pgBouncer)
 
 Mobile applications querying databases directly via client libraries open individual client sessions. In high-traffic periods, postgres connections can be quickly exhausted.
 
@@ -84,7 +128,7 @@ To resolve this, route all production requests through Supabase's transaction-po
 
 ---
 
-## 4. Key Rotation & Security Checklist
+## 5. Key Rotation & Security Checklist
 
 Before building binary release candidates for the Google Play Store or Apple App Store, verify that security tokens have been rotated from dev values.
 
@@ -94,3 +138,17 @@ Before building binary release candidates for the Google Play Store or Apple App
 | **JWT Secret Key** | Cryptographic key used to sign database authentication tokens. | Supabase Console | Rotate periodically (every 180 days) via the settings dashboard. |
 | **Database Password** | Administrative credentials for migrations. | CLI Environment | Must be strong, unique, and stored in a password manager. |
 | **Service Role Key** | Superuser bypass key with full database access. | CLI environment | **NEVER** expose to the client-side app bundle. |
+
+---
+
+## 6. Production Deployment & Verification Checklist
+
+Complete these manual and automatic steps prior to releasing the application to users:
+
+- [ ] **Lint and Compilation Check**: Run `npm run lint` and `npm run typecheck` locally.
+- [ ] **Unit Tests**: Confirm that all Jest tests execute successfully via `npm run test`.
+- [ ] **Environment Check**: Ensure `.env.production` contains production endpoints.
+- [ ] **Supabase Migrations**: Confirm `schema.sql` and `seed.sql` have been successfully run against `golftee-production`.
+- [ ] **RLS Verification**: Test that RLS policies are enabled on all user data tables (e.g. `bookings`, `profiles`, `favorites`).
+- [ ] **Connection Pooling Port**: Verify the Supabase connection string is using port `6543`.
+- [ ] **EAS Build Trigger**: Run `eas build --platform all --profile production`.

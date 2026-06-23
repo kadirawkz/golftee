@@ -12,11 +12,17 @@ Use npm scripts from `package.json`:
 | Run on iOS | `npm run ios` |
 | Run on Web | `npm run web` |
 | Lint | `npm run lint` |
+| Typecheck compiler | `npm run typecheck` |
+| Run tests | `npm run test` |
 | Reset starter scaffold | `npm run reset-project` |
 
-There is currently **no test runner configured** (no `test` script and no `*.test`/`*.spec` files), so there is no single-test command in this repository yet.
+### Testing Framework
 
-There is also no dedicated production build script in `package.json`; app packaging/export is done through Expo CLI flows when needed.
+Jest is configured as the test runner. Core test suites are organized as follows:
+- **Service Tests**: Located under [services/__tests__/](file:///d:/repos/golftee/services/__tests__/) (e.g., `course-data.test.ts`)
+- **Utility Tests**: Located under [utils/__tests__/](file:///d:/repos/golftee/utils/__tests__/) (e.g., `colombo-time.test.ts`)
+
+---
 
 ## High-level architecture
 
@@ -39,6 +45,8 @@ This is an Expo Router app (`main: expo-router/entry`) with file-based routing i
   - Booking journey: `home/explore/profile` -> `/course-details?id=...` -> `/tee-time-booking?id=...` -> `/booking-checkout?...`.
   - Existing booking management: `/bookings` -> `/manage-booking` (param-driven).
 
+---
+
 ## Key conventions in this codebase
 
 - Use `AnimatedPressable` (`components/animated-pressable.tsx`) instead of raw `Pressable` for tappable UI; set `variant` (`button`, `cta`, `chip`, `card`, `icon`, `tab`) to match motion style.
@@ -51,4 +59,3 @@ This is an Expo Router app (`main: expo-router/entry`) with file-based routing i
 - Storage keys are namespaced (`golftee:*`) and modules keep an in-memory cache to reduce AsyncStorage reads.
 - Most screens follow a consistent mobile scroll pattern: `SafeAreaView` + `ScrollView` with `bounces={false}` and `overScrollMode="never"`.
 - For heavier async UI work, this codebase often defers via `InteractionManager.runAfterInteractions` before fetching/mounting expensive pieces (weather/map flows).
-

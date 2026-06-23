@@ -1,112 +1,212 @@
-# GolfTee
+# GolfTee 🏌️‍♂️
 
-GolfTee is an Expo Router mobile app for discovering golf courses and booking tee times.
-It uses Supabase for authentication, profiles, favorites, course catalog data, tee-slot availability, and bookings.
+GolfTee is an Expo Router mobile application designed for discovering premium golf courses and booking tee times. It integrates Supabase for secure authentication, user profiles, favorites management, course catalog data, tee-slot availability, and real-time bookings.
 
-## Current backend scope
+---
 
-- Email/password auth (sign up, sign in, sign out)
-- Password reset email trigger
-- Secure session persistence (`expo-secure-store` with AsyncStorage fallback) with user-controlled "Remember Me" toggle
-- User profile read/update flow
-- Per-user favorites with RLS
-- Tee-time booking create/update/cancel flows with slot conflict protection
-- Server-calculated booking pricing and backend-enforced slot validation
-- Supabase-backed course catalog and tee-slot templates (read-only from client)
-- Supabase-backed course detail content, amenities, and reviews
-- Real-time notifications synced instantly across devices using Supabase Realtime
+## 📖 Table of Contents
 
-## Tech stack
+- [Features](#-features)
+- [📂 Directory Structure](#-directory-structure)
+- [🛠️ Tech Stack](#️-tech-stack)
+- [🚀 Local Setup & Installation](#-local-setup--installation)
+- [📦 Available Scripts](#-available-scripts)
+- [🏗️ Professional Architecture](#️-professional-architecture)
+- [🔄 CI/CD Pipeline & Git Hygiene](#-cicd-pipeline--git-hygiene)
+- [📱 EAS Build & Deployment](#-eas-build--deployment)
+- [✅ Pre-Push Checklist](#-pre-push-checklist)
+- [⏳ Deferred Features](#-deferred-features)
 
-- React Native + Expo + Expo Router
-- TypeScript
-- Supabase JS client (`@supabase/supabase-js`)
+---
 
-## Project scripts
+## ✨ Features
 
-- Install deps: `npm install`
-- Start dev server: `npm run start`
-- Run Android: `npm run android` (runs prebuild and compiles native Android client)
-- Run iOS: `npm run ios` (runs prebuild and compiles native iOS client)
-- Run web: `npm run web`
-- Run lint: `npm run lint`
-- Run typecheck: `npm run typecheck`
+- **Email & Password Authentication**: Seamless registration, login, logout, and secure session management.
+- **Secure Session Persistence**: Hybrid storage engine (`expo-secure-store` with `AsyncStorage` fallback) featuring a user-controlled "Remember Me" toggle.
+- **User Profile Management**: Flow for reading and updating user profile data.
+- **Tee-Time Bookings**: Conflict-protected booking creations, updates, and cancellations with server-side validations.
+- **Real-Time Synchronized Notifications**: Push and in-app alerts powered by Supabase Realtime replication.
+- **Location-Based Services**: Nearby golf course recommendations based on user proximity using `expo-location`.
+- **Dynamic Weather Integration**: Localized weather forecast details for golf courses fetched via Open-Meteo API.
 
-## CI/CD Pipeline
+---
 
-This repository has a GitHub Actions CI pipeline configured at [.github/workflows/ci.yml](.github/workflows/ci.yml). The pipeline automatically runs ESLint (`npm run lint`) and TypeScript verification (`npm run typecheck`) on:
-- Every push to the `main` branch.
-- All Pull Requests targeting the `main` branch.
+## 📂 Directory Structure
 
-## Git hygiene
+Below is the directory map of the codebase to help you navigate:
 
-This repo normalizes text files with [.gitattributes](.gitattributes), so line-ending conversion warnings on Windows are expected during staging but commits are stored with LF.
+```text
+golftee/
+├── .github/                  # GitHub configuration
+│   └── workflows/
+│       └── ci.yml            # CI/CD pipeline definition
+├── app/                      # Expo Router pages & routing logic
+│   ├── (tabs)/               # Bottom-tab bar screen routes (home, explore, etc.)
+│   ├── _layout.tsx           # Application layout shell & auth guard logic
+│   ├── tee-time-booking.tsx  # Booking slot selection screen
+│   └── booking-checkout.tsx  # Final checkout page
+├── assets/                   # Static images, app icons, and branding materials
+│   └── images/
+│       └── courses/          # Golf course thumbnail visual assets
+├── components/               # Reusable UI components
+│   ├── animated-pressable.tsx# Motion-wrapped interactive buttons
+│   ├── theme.tsx             # Design system tokens (colors, animations, sizes)
+│   └── app-bottom-tabs.tsx   # Custom bottom navigation bar configuration
+├── constants/                # Project wide static constants
+├── hooks/                    # Custom React hooks (e.g., useResponsiveLayout)
+├── lib/                      # Base client setup and shared storage configs
+│   ├── supabase.ts           # Supabase client instantiation
+│   └── database.types.ts     # Database TypeScript types generated from Supabase
+├── services/                 # Business logic, state, and API wrappers
+│   ├── auth.ts               # Auth state manager & secure storage wrapper
+│   ├── bookings.ts           # Tee time booking CRUD logic
+│   ├── course-data.ts        # Course list & detail fetcher
+│   └── __tests__/            # Jest unit tests for core services
+├── supabase/                 # Supabase migration scripts and SQL database files
+│   ├── schema.sql            # Database tables, triggers, and RPC definitions
+│   └── seed.sql              # Core initial catalog lookup records
+└── utils/                    # Common helper modules
+    ├── colombo-time.ts       # Time zone converter to prevent past-slot bookings
+    └── map-links.ts          # External map deep linking helpers
+```
 
-## Local setup
+---
 
-1. Create a Supabase project.
-2. In Supabase SQL editor, execute the following scripts in order:
-   - [supabase/schema.sql](supabase/schema.sql) (Database structure, RLS policies, and RPC functions)
-   - [supabase/seed.sql](supabase/seed.sql) (Professional course data and templates)
-3. Copy [.env.example](.env.example) to `.env`.
-4. Set your credentials in `.env`:
+## 🛠️ Tech Stack
 
+- **Framework**: React Native + Expo (SDK 54) + Expo Router
+- **Language**: TypeScript
+- **Database / Backend**: Supabase (Database, Auth, RPC, Realtime, RLS)
+- **Styling**: Native styling using theme configuration tokens
+- **Testing**: Jest + `jest-expo` + `ts-jest`
+
+---
+
+## 🚀 Local Setup & Installation
+
+Follow these steps to get a local development instance running:
+
+### 1. Prerequisites
+Ensure you have the following installed:
+- [Node.js](https://nodejs.org/) (v18+ recommended)
+- [Git](https://git-scm.com/)
+- [Supabase CLI](https://supabase.com/docs/guides/cli) (optional, for migrations)
+
+### 2. Database Provisioning
+1. Create a project in the [Supabase Dashboard](https://database.new).
+2. Open the **SQL Editor** in your Supabase dashboard and execute:
+   - [supabase/schema.sql](file:///d:/repos/golftee/supabase/schema.sql) (Table structures, constraints, and RLS policies)
+   - [supabase/seed.sql](file:///d:/repos/golftee/supabase/seed.sql) (Initial courses and locations)
+
+### 3. Local Project Setup
+```bash
+# Clone the repository and navigate to the directory
+cd golftee
+
+# Install dependencies
+npm install
+```
+
+### 4. Configure Environment Variables
+Copy `.env.example` to `.env` and fill in your Supabase credentials:
+```bash
+cp .env.example .env
+```
+
+Open `.env` and set:
 ```env
 EXPO_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-5. In Supabase Auth settings:
-   - Enable the Email provider.
-   - Configure redirect URLs if you plan to use password resets.
-6. Start the development server: `npm run android` or `npm run ios`.
-
-## Professional Architecture
-
-- **3NF Database**: Fully normalized schema for courses, locations, and styles.
-- **Image Mapping**: High-resolution local asset resolution for premium visuals.
-- **Colombo Timezone Logic**: Booking slots are strictly synchronized with Sri Lankan local time to prevent "past-slot" booking errors.
-- **Secure RPCs**: Critical business logic (booking validation, pricing) is handled via server-side PostgreSQL functions to prevent client-side manipulation.
-- **RLS (Row Level Security)**: Data is protected at the database level; users can only access their own profiles and bookings.
-- **Secure Session Persistence**: Hybrid storage engine (`expo-secure-store` with `AsyncStorage` fallback) paired with a user-controlled "Remember Me" option during login. If selected, authentication credentials and tokens are securely stored across restarts; if toggled off, sessions are cleared cleanly on exit.
-- **Location-based Services**: Integrates `expo-location` to request coarse/fine location access to determine the user's proximity to Sri Lankan golf courses for nearby recommendations.
-
-## EAS Build & Deployment
-
-This project is configured with EAS (Expo Application Services) for building and submitting mobile builds:
-- **Project ID**: Configured in `app.json` (`projectId: 2563be69-491d-4cd7-a07f-671d568260a8`).
-- **Profiles**: Configured in `eas.json` for:
-  - `development`: Used for internal development client builds.
-  - `preview` / `preview-simulator`: Used for sharing testing APKs / simulator builds.
-  - `production`: For app store deployment.
-- **App Version Source**: Configured to `remote` to manage builds and version sequences via Expo CLI.
-- **Production Manual**: Refer to [PRODUCTION.md](PRODUCTION.md) for details on staging vs. production environment isolation, Supabase CLI database migrations, pgBouncer connection pooling, and the key rotation checklist.
-
-## Pre-push checklist
-
-Run from project root:
-
+### 5. Running the Application
+Start the development server on your preferred platform:
 ```bash
-npm run lint
-npm run typecheck
-npm audit --omit=dev
-git status --short
+# Start dev server
+npm run start
+
+# Launch on Android (requires emulator or connected device)
+npm run android
+
+# Launch on iOS (requires macOS and Simulator/Xcode)
+npm run ios
+
+# Launch on Web
+npm run web
 ```
 
-Before pushing, confirm:
+---
 
-- `.env` is not tracked
-- only `.env.example` is committed
-- no local credential files (for example `.npmrc`) are staged
-- `.gitattributes` is present so Git keeps text files normalized across platforms
+## 📦 Available Scripts
 
-## Deferred features
+These npm scripts are defined in `package.json` for development, styling, and verification:
 
-The following are intentionally out of scope for this phase:
+| Script | Description | Command |
+| :--- | :--- | :--- |
+| `start` | Starts the Expo development server | `npm run start` |
+| `android` | Builds and runs the native Android client | `npm run android` |
+| `ios` | Builds and runs the native iOS client | `npm run ios` |
+| `web` | Runs the web version in a local browser | `npm run web` |
+| `lint` | Analyzes code for stylistic and linting issues | `npm run lint` |
+| `typecheck` | Verifies TypeScript code compliance | `npm run typecheck` |
+| `test` | Runs the Jest test suites | `npm run test` |
+| `reset-project` | Resets the starter template directory structure | `npm run reset-project` |
 
-- Payments
-- Media/file uploads
-- Analytics and advanced monitoring
-- Admin workflows requiring server-side secrets
+---
 
-For admin actions or secret-bearing operations, use Supabase Edge Functions or a private backend.
+## 🏗️ Professional Architecture
+
+- **3NF Database Design**: Highly normalized database structure for courses, styles, locations, and users to prevent redundancy.
+- **Secure RPCs**: Business logic rules (like booking checks and pricing calculations) are executed server-side via PostgreSQL RPC functions, preventing client manipulation.
+- **Timezone Synchronization**: Booking validations are synchronized to the local time of golf courses (Sri Lanka/Colombo timezone) to prevent booking past slots.
+- **Row-Level Security (RLS)**: Enforced on all tables in Supabase. Users can only modify or access their own bookings, profiles, and favorites.
+- **Asset Resolution Mapping**: High-definition local imagery maps dynamically to online courses to deliver a fast, offline-first visual feel.
+
+---
+
+## 🔄 CI/CD Pipeline & Git Hygiene
+
+- **Automated Validation**: A GitHub Actions workflow at [.github/workflows/ci.yml](file:///d:/repos/golftee/.github/workflows/ci.yml) executes on pushes and pull requests to `main`. It automatically runs code linting (`npm run lint`) and compiler type checking (`npm run typecheck`).
+- **Line Ending Conversions**: The [.gitattributes](file:///d:/repos/golftee/.gitattributes) file normalizes files to LF line endings upon commit, preventing Windows CRLF mismatch warnings.
+
+---
+
+## 📱 EAS Build & Deployment
+
+This project uses **Expo Application Services (EAS)** for building native packages:
+- **Project ID**: Configured in `app.json` (`projectId: 2563be69-491d-4cd7-a07f-671d568260a8`).
+- **Profiles**: Configured inside [eas.json](file:///d:/repos/golftee/eas.json) for `development`, `preview`, and `production`.
+- Refer to [PRODUCTION.md](file:///d:/repos/golftee/PRODUCTION.md) for full deployment workflows.
+
+---
+
+## ✅ Pre-Push Checklist
+
+Before pushing changes to GitHub, run the following verification checks from the project root:
+
+```bash
+# 1. Run eslint check
+npm run lint
+
+# 2. Run typescript compilations
+npm run typecheck
+
+# 3. Run Jest tests
+npm run test
+
+# 4. Check package safety
+npm audit --omit=dev
+```
+
+Ensure:
+- `.env` files are excluded from commits.
+- All code styles conform to existing patterns.
+
+---
+
+## ⏳ Deferred Features
+
+The following functionalities are intentionally deferred:
+- **Direct Payment Gateway Integrations**: Simulated checkouts are used for demo purposes.
+- **Media Uploading**: Course thumbnails and profiles use static URLs.
+- **Administrative Portals**: Admin workflows must be managed through the Supabase console or separate admin services.

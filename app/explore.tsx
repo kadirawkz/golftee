@@ -5,7 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, InteractionManager, Linking, Platform, ScrollView, Text, TextInput, View, TouchableWithoutFeedback, Animated, BackHandler } from "react-native";
 import { WebView } from "react-native-webview";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { CourseCard } from "../components/course-card";
 import {
@@ -62,7 +62,13 @@ export default function ExploreScreen() {
   const styles = useThemedStyles(themedStyles);
   const router = useRouter();
   const courseCatalog = useCourseCatalog();
-  const { isTabletLike, horizontalPadding } = useResponsiveLayout();
+  const { isTabletLike, horizontalPadding, isCompact } = useResponsiveLayout();
+  const insets = useSafeAreaInsets();
+  
+  // Calculate dynamic bottom positioning relative to the SafeAreaView container
+  const navHeight = isCompact ? 62 : 68;
+  const navBottom = Math.max(insets.bottom + 6, 8);
+  const bottomOverlayPosition = isTabletLike ? 44 : (navBottom + navHeight) - insets.bottom + 8;
   const { section, scrollOffset, view, courseId } = useLocalSearchParams<{
     section?: string;
     scrollOffset?: string;
@@ -144,8 +150,9 @@ export default function ExploreScreen() {
   });
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const isLocationLoadingRef = useRef(false);
-  // Animated values for the bottom course card slide-up / fade
   const cardAnim = useRef(new Animated.Value(0)).current;
+  const locationNoticeAnim = useRef(new Animated.Value(0)).current;
+  const [activeLocationNotice, setActiveLocationNotice] = useState<typeof locationNotice | null>(null);
   const [showInteractiveMap, setShowInteractiveMap] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
   const hasCenteredOnUser = useRef(false);
@@ -354,19 +361,79 @@ export default function ExploreScreen() {
     }
   }, [applyResolvedUserLocation, applyLocationFailureFallback]);
 
+  const fetchLocationSilently = useCallback(async () => {
+    try {
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!servicesEnabled) return;
+
+      const recentPosition = await Location.getLastKnownPositionAsync({
+        maxAge: 5 * 60 * 1000,
+        requiredAccuracy: 200,
+      });
+
+      if (recentPosition) {
+        const coords = {
+          latitude: recentPosition.coords.latitude,
+          longitude: recentPosition.coords.longitude,
+        };
+        setUserLocation(coords);
+        setCachedUserLocation(coords);
+        if (showInteractiveMapRef.current && (Platform.OS === 'web' || webViewRef.current)) {
+          injectJS(`updateUserLocation(${coords.latitude}, ${coords.longitude});`);
+        }
+      }
+
+      const currentPositionResult = await Promise.race<
+        | { type: "position"; value: Awaited<ReturnType<typeof Location.getCurrentPositionAsync>> }
+        | { type: "error" }
+        | { type: "timeout" }
+      >([
+        Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+          mayShowUserSettingsDialog: false,
+        }).then(
+          (value) => ({ type: "position" as const, value }),
+          () => ({ type: "error" as const })
+        ),
+        new Promise<{ type: "timeout" }>((resolve) => {
+          locationTimeoutRef.current = setTimeout(() => resolve({ type: "timeout" }), 5000);
+        }),
+      ]);
+
+      if (locationTimeoutRef.current) {
+        clearTimeout(locationTimeoutRef.current);
+        locationTimeoutRef.current = null;
+      }
+
+      if (currentPositionResult.type === "position") {
+        const coords = {
+          latitude: currentPositionResult.value.coords.latitude,
+          longitude: currentPositionResult.value.coords.longitude,
+        };
+        setUserLocation(coords);
+        setCachedUserLocation(coords);
+        if (showInteractiveMapRef.current && (Platform.OS === 'web' || webViewRef.current)) {
+          injectJS(`updateUserLocation(${coords.latitude}, ${coords.longitude});`);
+        }
+      }
+    } catch (e) {
+      console.warn("Silent location fetch failed", e);
+    }
+  }, []);
+
   useEffect(() => {
     const silentCheck = async () => {
       try {
         const { status } = await Location.getForegroundPermissionsAsync();
         if (status === "granted") {
-          void requestUserLocation();
+          void fetchLocationSilently();
         }
       } catch (e) {
         console.warn("Silent location check failed", e);
       }
     };
     void silentCheck();
-  }, [requestUserLocation]);
+  }, [fetchLocationSilently]);
 
   const handleLocationNoticePrimaryAction = () => {
     if (locationNotice.kind === "permissionBlocked") {
@@ -468,15 +535,55 @@ export default function ExploreScreen() {
     }
   }, [displayedCoursesWithDistance, selectedCourseId]);
 
+  const [activeCardCourse, setActiveCardCourse] = useState<DisplayedCourse | null>(null);
+
   // Animate the bottom course card in/out
   useEffect(() => {
-    Animated.spring(cardAnim, {
-      toValue: selectedCourse ? 1 : 0,
-      useNativeDriver: true,
-      speed: 16,
-      bounciness: 7,
-    }).start();
+    if (selectedCourse) {
+      setActiveCardCourse(selectedCourse);
+      Animated.spring(cardAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        speed: 16,
+        bounciness: 7,
+      }).start();
+    } else {
+      Animated.spring(cardAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        speed: 16,
+        bounciness: 7,
+      }).start(({ finished }) => {
+        if (finished) {
+          setActiveCardCourse(null);
+        }
+      });
+    }
   }, [selectedCourse, cardAnim]);
+
+  // Animate the location notice card in/out
+  useEffect(() => {
+    if (locationNotice.kind !== "none") {
+      setActiveLocationNotice(locationNotice);
+      Animated.spring(locationNoticeAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        speed: 16,
+        bounciness: 7,
+      }).start();
+    } else {
+      Animated.spring(locationNoticeAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        speed: 16,
+        bounciness: 7,
+      }).start(({ finished }) => {
+        if (finished) {
+          setActiveLocationNotice(null);
+        }
+      });
+    }
+  }, [locationNotice, locationNoticeAnim]);
 
   const centerSelectedCourse = useCallback(() => {
     if (selectedCourse && (Platform.OS === 'web' || webViewRef.current)) {
@@ -843,11 +950,20 @@ export default function ExploreScreen() {
       >
         {showInteractiveMap ? (
           Platform.OS === 'web' ? (
-            <iframe
-              id="map-iframe"
-              style={{ width: '100%', height: '100%', border: 'none' }}
-              srcDoc={leafletHtml}
-            />
+            <>
+              <style dangerouslySetInnerHTML={{ __html: `
+                #map-iframe {
+                  width: 100%;
+                  height: 100%;
+                  border: none;
+                }
+              `}} />
+              <iframe
+                id="map-iframe"
+                title="Interactive Course Map"
+                srcDoc={leafletHtml}
+              />
+            </>
           ) : (
             <WebView
               ref={webViewRef}
@@ -890,30 +1006,6 @@ export default function ExploreScreen() {
         </View>
       </View>
 
-      {/* Floating Location Trigger */}
-      <Pressable
-        style={[
-          styles.useLocationButtonFloating,
-          locationState === "loading" && styles.useLocationButtonDisabled,
-          {
-            bottom: selectedCourse ? (isTabletLike ? 204 : 244) : (isTabletLike ? 44 : 96),
-            right: isTabletLike ? horizontalPadding + 20 : horizontalPadding
-          }
-        ]}
-        onPress={() => void requestUserLocation()}
-        disabled={locationState === "loading"}
-        variant="button"
-        accessibilityRole="button"
-        accessibilityLabel="Use my location"
-        accessibilityHint="Centers map on your current location"
-      >
-        <Ionicons
-          name={locationState === "ready" ? "locate" : "locate-outline"}
-          size={20}
-          color={colors.primary}
-        />
-      </Pressable>
-
       {/* Floating Bottom Overlays Container */}
       <View
         pointerEvents="box-none"
@@ -922,28 +1014,69 @@ export default function ExploreScreen() {
           {
             left: isTabletLike ? horizontalPadding + 20 : horizontalPadding,
             right: isTabletLike ? horizontalPadding + 20 : horizontalPadding,
-            bottom: isTabletLike ? 44 : 84
+            bottom: bottomOverlayPosition
           }
         ]}
       >
-        {locationNotice.kind !== "none" ? (
-          <View style={[styles.locationNoticeCard, { position: "relative" }]}>
+        {/* Floating Location Trigger */}
+        <Pressable
+          style={[
+            styles.useLocationButtonFloating,
+            locationState === "loading" && styles.useLocationButtonDisabled,
+            {
+              position: "relative",
+              right: 0,
+              bottom: 0,
+              alignSelf: "flex-end",
+            }
+          ]}
+          onPress={() => void requestUserLocation()}
+          disabled={locationState === "loading"}
+          variant="button"
+          accessibilityRole="button"
+          accessibilityLabel="Use my location"
+          accessibilityHint="Centers map on your current location"
+        >
+          <Ionicons
+            name={locationState === "ready" ? "locate" : "locate-outline"}
+            size={20}
+            color={colors.primary}
+          />
+        </Pressable>
+
+        {activeLocationNotice ? (
+          <Animated.View
+            style={[
+              styles.locationNoticeCard,
+              {
+                opacity: locationNoticeAnim,
+                transform: [{
+                  translateY: locationNoticeAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [40, 0]
+                  })
+                }],
+                pointerEvents: locationNotice.kind !== "none" ? 'auto' : 'none',
+                position: "relative",
+              },
+            ]}
+          >
             <View style={[styles.locationNoticeHeader, { paddingRight: 24 }]}>
               <View style={styles.locationNoticeIconWrap}>
                 <Ionicons
-                  name={locationNotice.kind === "permissionBlocked" ? "settings-outline" : "locate-outline"}
+                  name={activeLocationNotice.kind === "permissionBlocked" ? "settings-outline" : "locate-outline"}
                   size={16}
                   color={colors.primary}
                 />
               </View>
               <View style={styles.locationNoticeCopy}>
-                <Text style={styles.locationNoticeTitle}>{locationNotice.title}</Text>
-                <Text style={styles.locationNoticeBody}>{locationNotice.body}</Text>
+                <Text style={styles.locationNoticeTitle}>{activeLocationNotice.title}</Text>
+                <Text style={styles.locationNoticeBody}>{activeLocationNotice.body}</Text>
               </View>
             </View>
             <Pressable style={styles.locationNoticeAction} onPress={handleLocationNoticePrimaryAction} variant="chip">
               <Text style={styles.locationNoticeActionText}>
-                {locationNotice.kind === "permissionBlocked" ? "Open Settings" : "Retry"}
+                {activeLocationNotice.kind === "permissionBlocked" ? "Open Settings" : "Retry"}
               </Text>
             </Pressable>
             {/* Close Button */}
@@ -954,25 +1087,25 @@ export default function ExploreScreen() {
             >
               <Ionicons name="close" size={18} color={colors.text} />
             </Pressable>
-          </View>
+          </Animated.View>
         ) : null}
 
-        <Animated.View
-          style={[
-            styles.floatingCourseCard,
-            {
-              opacity: cardAnim,
-              transform: [{
-                translateY: cardAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [40, 0]
-                })
-              }],
-              pointerEvents: selectedCourse ? 'auto' : 'none',
-            },
-          ]}
-        >
-          {selectedCourse ? (
+        {activeCardCourse ? (
+          <Animated.View
+            style={[
+              styles.floatingCourseCard,
+              {
+                opacity: cardAnim,
+                transform: [{
+                  translateY: cardAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [40, 0]
+                  })
+                }],
+                pointerEvents: selectedCourse ? 'auto' : 'none',
+              },
+            ]}
+          >
             <Pressable
               style={styles.mapCardInner}
               onPress={centerSelectedCourse}
@@ -982,19 +1115,19 @@ export default function ExploreScreen() {
               <View style={styles.mapCardHeaderRow}>
                 <View style={styles.mapCardInfo}>
                   <Text style={styles.selectedCourseLabel}>SELECTED COURSE</Text>
-                  <Text style={styles.selectedCourseTitle} numberOfLines={1}>{selectedCourse.title}</Text>
+                  <Text style={styles.selectedCourseTitle} numberOfLines={1}>{activeCardCourse.title}</Text>
                   
                   <View style={styles.mapCardMetaRow}>
                     <View style={styles.mapCardMetaItem}>
                       <Ionicons name="location" size={12} color={colors.textSoft} />
                       <Text style={styles.mapCardMetaText} numberOfLines={1}>
-                        {selectedCourse.location} ({selectedCourse.distanceKm.toFixed(0)} km)
+                        {activeCardCourse.location} ({activeCardCourse.distanceKm.toFixed(0)} km)
                       </Text>
                     </View>
                     <View style={styles.mapCardMetaDivider} />
                     <View style={styles.mapCardMetaItem}>
                       <Ionicons name="star" size={12} color={colors.accentWarm} />
-                      <Text style={styles.mapCardMetaText}>{selectedCourse.rating}</Text>
+                      <Text style={styles.mapCardMetaText}>{activeCardCourse.rating}</Text>
                     </View>
                   </View>
                 </View>
@@ -1012,13 +1145,13 @@ export default function ExploreScreen() {
               <View style={styles.mapCardFooterRow}>
                 <View style={styles.mapCardPriceBlock}>
                   <Text style={styles.mapCardPriceLabel}>STARTING AT</Text>
-                  <Text style={styles.mapCardPriceVal}>{selectedCourse.price}</Text>
+                  <Text style={styles.mapCardPriceVal}>{activeCardCourse.price}</Text>
                 </View>
 
                 <View style={styles.mapCardActions}>
                   <Pressable
                     style={[styles.mapCardBtn, styles.mapCardBtnSecondary]}
-                    onPress={() => openCourseDetails(selectedCourse.id)}
+                    onPress={() => openCourseDetails(activeCardCourse.id)}
                     variant="chip"
                   >
                     <Text style={styles.mapCardBtnSecondaryText}>Details</Text>
@@ -1028,7 +1161,7 @@ export default function ExploreScreen() {
                     style={[styles.mapCardBtn, styles.mapCardBtnPrimary]}
                     onPress={() => router.navigate({
                       pathname: "/tee-time-booking",
-                      params: { id: selectedCourse.id }
+                      params: { id: activeCardCourse.id }
                     })}
                     variant="cta"
                   >
@@ -1038,8 +1171,8 @@ export default function ExploreScreen() {
                 </View>
               </View>
             </Pressable>
-          ) : null}
-        </Animated.View>
+          </Animated.View>
+        ) : null}
       </View>
     </View>
   );
@@ -1551,7 +1684,6 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     fontWeight: "700",
   },
   locationNoticeCard: {
-    marginTop: 10,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: colors.border,
@@ -1990,8 +2122,8 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     shadowOpacity: 0.12,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
-    elevation: 5,
-    zIndex: 10,
+    elevation: 8,
+    zIndex: 20,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -2000,7 +2132,7 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     left: 12,
     right: 12,
     bottom: 84, // Kept above bottom navigation bar
-    gap: 10,
+    gap: 8,
     zIndex: 10,
   },
   floatingCourseCard: {
