@@ -787,6 +787,15 @@ export default function ExploreScreen() {
       height: 40px;
       position: relative;
     }
+    .user-location-dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      background: #2563EB;
+      border: 3px solid rgba(255, 255, 255, 0.95);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+      box-sizing: border-box;
+    }
   </style>
 </head>
 <body>
@@ -839,9 +848,19 @@ export default function ExploreScreen() {
       });
     }
 
+    function makeUserLocationIcon() {
+      return L.divIcon({
+        html: '<div class="user-location-dot"></div>',
+        className: '',
+        iconSize: [18, 18],
+        iconAnchor: [9, 9],
+        popupAnchor: [0, -9]
+      });
+    }
+
     var greenIcon  = makeDivIcon('#2D7D4E', '#12392D', '#fff', false);
     var goldIcon   = makeDivIcon('#C79A4B', '#8B6512', '#fff', false);
-    var blueIcon   = makeDivIcon('#2563EB', '#1e40af', '#fff', false);
+    var blueIcon   = makeUserLocationIcon();
 
     var markers = {};
     var userMarker = null;
