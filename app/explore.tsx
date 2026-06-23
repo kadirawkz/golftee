@@ -254,6 +254,21 @@ export default function ExploreScreen() {
     setLocationNotice(LOCATION_ERROR_NOTICE);
   }, []);
 
+  const waitForLocationServicesEnabled = useCallback(async (maxAttempts = 3) => {
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      if (servicesEnabled) {
+        return true;
+      }
+
+      if (attempt < maxAttempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
+    }
+
+    return false;
+  }, []);
+
   const requestUserLocation = useCallback(async () => {
     const immediateLocation = userLocation ?? getCachedUserLocation();
 
@@ -313,7 +328,7 @@ export default function ExploreScreen() {
 
       setLocationLabel("Finding your current location...");
 
-      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      const servicesEnabled = await waitForLocationServicesEnabled();
       if (!servicesEnabled) {
         setLocationState("fallback");
         setLocationLabel(DEFAULT_LOCATION_LABEL);
@@ -388,7 +403,7 @@ export default function ExploreScreen() {
     } finally {
       isLocationLoadingRef.current = false;
     }
-  }, [centerUserLocationImmediately, applyLocationFailureFallback, userLocation]);
+  }, [centerUserLocationImmediately, applyLocationFailureFallback, userLocation, waitForLocationServicesEnabled]);
 
   const fetchLocationSilently = useCallback(async () => {
     try {

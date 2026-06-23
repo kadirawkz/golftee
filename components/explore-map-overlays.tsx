@@ -234,7 +234,7 @@ const themedStyles = createThemedStyleSheet((colors) => ({
   },
   locationNoticeAction: {
     alignSelf: "center",
-    width: 132,
+    width: 100,
     minHeight: 34,
     borderRadius: theme.radius.pill,
     borderWidth: 1,
@@ -244,8 +244,8 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     justifyContent: "center",
   },
   locationNoticeActionText: {
-    fontSize: theme.typography.bodySm.fontSize,
-    lineHeight: theme.typography.bodySm.lineHeight,
+    fontSize: theme.typography.body.fontSize,
+    lineHeight: theme.typography.body.lineHeight,
     color: colors.primary,
     fontWeight: "700",
   },
@@ -361,6 +361,7 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     gap: 12,
     flexWrap: "wrap",
     width: "100%",
+    marginLeft: -3,
   },
   mapCardBtn: {
     height: 36,
