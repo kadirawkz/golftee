@@ -15,6 +15,7 @@ import {
     getCachedUserLocation,
     setCachedUserLocation,
 } from "../services/course-data";
+import { getCachedExploreViewMode, setCachedExploreViewMode } from "../services/explore-state";
 import { useCourseCatalog } from "../services/course-management";
 import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../components/theme";
 import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
@@ -79,7 +80,9 @@ export default function ExploreScreen() {
   const webViewRef = useRef<WebView>(null);
   const hasAutoScrolled = useRef(false);
   const locationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [viewMode, setViewMode] = useState<"list" | "map">("list");
+  const [viewMode, setViewMode] = useState<"list" | "map">(
+    view === "map" ? "map" : getCachedExploreViewMode()
+  );
   const [horizontalScrollStartY, setHorizontalScrollStartY] = useState<number | null>(null);
   const [activeStyle, setActiveStyle] = useState<"ALL" | CourseStyle>("ALL");
   const [selectedPriceRange, setSelectedPriceRange] = useState(0);
@@ -175,6 +178,13 @@ export default function ExploreScreen() {
   useEffect(() => {
     showInteractiveMapRef.current = showInteractiveMap;
   }, [showInteractiveMap]);
+
+  useEffect(() => {
+    if (view === "map" || view === "list") {
+      setViewMode(view);
+      setCachedExploreViewMode(view);
+    }
+  }, [view]);
 
   useEffect(() => {
     if (section !== "all-courses" || hasAutoScrolled.current || horizontalScrollStartY === null) {
@@ -491,6 +501,11 @@ export default function ExploreScreen() {
   const handleStyleChange = (style: "ALL" | CourseStyle) => {
     setActiveStyle(style);
   };
+
+  const handleViewModeChange = useCallback((nextViewMode: "list" | "map") => {
+    setViewMode(nextViewMode);
+    setCachedExploreViewMode(nextViewMode);
+  }, []);
 
   const handleResetFilters = () => {
     setSelectedPriceRange(0);
@@ -1447,7 +1462,7 @@ export default function ExploreScreen() {
         <View style={styles.toggleRow}>
           <Pressable
             style={[styles.toggleBtn, viewMode === "list" && styles.toggleBtnActive]}
-            onPress={() => setViewMode("list")}
+            onPress={() => handleViewModeChange("list")}
             variant="chip"
             accessibilityRole="tab"
             accessibilityState={{ selected: viewMode === "list" }}
@@ -1458,7 +1473,7 @@ export default function ExploreScreen() {
           </Pressable>
           <Pressable
             style={[styles.toggleBtn, viewMode === "map" && styles.toggleBtnActive]}
-            onPress={() => setViewMode("map")}
+            onPress={() => handleViewModeChange("map")}
             variant="chip"
             accessibilityRole="tab"
             accessibilityState={{ selected: viewMode === "map" }}
