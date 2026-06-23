@@ -214,8 +214,8 @@ export default function ExploreScreen() {
     coordinates: { latitude: number; longitude: number },
     nextLabel = "Showing courses nearest to your current location"
   ) => {
-    setUserLocation(coordinates);
-    setCachedUserLocation(coordinates);
+    setUserLocation({ ...coordinates });
+    setCachedUserLocation({ ...coordinates });
     setLocationLabel(nextLabel);
     setLocationState("ready");
     setLocationNotice({ kind: "none", title: "", body: "" });
@@ -226,8 +226,8 @@ export default function ExploreScreen() {
     hasCenteredOnUser.current = true;
     hasFocusedRouteCourseRef.current = false;
     setSelectedCourseId(null);
-    setUserLocation(coordinates);
-    setCachedUserLocation(coordinates);
+    setUserLocation({ ...coordinates });
+    setCachedUserLocation({ ...coordinates });
     setLocationState("ready");
     setLocationNotice({ kind: "none", title: "", body: "" });
     setLocationLabel("Showing courses nearest to your current location");
@@ -246,6 +246,12 @@ export default function ExploreScreen() {
   }, []);
 
   const requestUserLocation = useCallback(async () => {
+    const immediateLocation = userLocation ?? getCachedUserLocation();
+
+    if (immediateLocation) {
+      centerUserLocationImmediately(immediateLocation);
+    }
+
     if (isLocationLoadingRef.current) {
       return;
     }
@@ -255,9 +261,6 @@ export default function ExploreScreen() {
     hasFocusedRouteCourseRef.current = false;
     setSelectedCourseId(null);
     setLocationState("loading");
-    if (userLocation) {
-      centerUserLocationImmediately(userLocation);
-    }
     setLocationNotice({ kind: "none", title: "", body: "" });
     setLocationLabel("Requesting location access...");
 
