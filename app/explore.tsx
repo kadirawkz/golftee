@@ -222,6 +222,22 @@ export default function ExploreScreen() {
     centerUserLocationOnNextSyncRef.current = true;
   }, []);
 
+  const centerUserLocationImmediately = useCallback((coordinates: { latitude: number; longitude: number }) => {
+    hasCenteredOnUser.current = true;
+    hasFocusedRouteCourseRef.current = false;
+    setSelectedCourseId(null);
+    setUserLocation(coordinates);
+    setCachedUserLocation(coordinates);
+    setLocationState("ready");
+    setLocationNotice({ kind: "none", title: "", body: "" });
+    setLocationLabel("Showing courses nearest to your current location");
+    centerUserLocationOnNextSyncRef.current = false;
+
+    if ((Platform.OS === "web" || webViewRef.current) && isMapReady) {
+      injectJS(`updateUserLocation(${coordinates.latitude}, ${coordinates.longitude}, true);`);
+    }
+  }, [isMapReady]);
+
   const applyLocationFailureFallback = useCallback(() => {
     setLocationState("fallback");
     setCachedUserLocation(null);
@@ -236,7 +252,11 @@ export default function ExploreScreen() {
 
     isLocationLoadingRef.current = true;
     hasCenteredOnUser.current = false;
+    hasFocusedRouteCourseRef.current = false;
     setSelectedCourseId(null);
+    if (userLocation) {
+      centerUserLocationImmediately(userLocation);
+    }
     setLocationState("loading");
     setLocationNotice({ kind: "none", title: "", body: "" });
     setLocationLabel("Requesting location access...");
@@ -304,13 +324,11 @@ export default function ExploreScreen() {
       });
 
       if (recentPosition) {
-        applyResolvedUserLocation(
-          {
-            latitude: recentPosition.coords.latitude,
-            longitude: recentPosition.coords.longitude,
-          },
-          "Using your recent device location while we refresh it."
-        );
+        centerUserLocationImmediately({
+          latitude: recentPosition.coords.latitude,
+          longitude: recentPosition.coords.longitude,
+        });
+        setLocationLabel("Using your recent device location while we refresh it.");
       }
 
       const currentPositionResult = await Promise.race<
@@ -336,7 +354,7 @@ export default function ExploreScreen() {
       }
 
       if (currentPositionResult.type === "position") {
-        applyResolvedUserLocation({
+        centerUserLocationImmediately({
           latitude: currentPositionResult.value.coords.latitude,
           longitude: currentPositionResult.value.coords.longitude,
         });
