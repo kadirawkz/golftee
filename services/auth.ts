@@ -86,21 +86,27 @@ async function loadProfile(userId: string) {
 }
 
 let sessionRealtimeChannel: RealtimeChannel | null = null;
+let sessionRealtimeGeneration = 0;
 
-function unsubscribeSessionRealtime() {
-  if (sessionRealtimeChannel) {
-    void sessionRealtimeChannel.unsubscribe();
-    sessionRealtimeChannel = null;
+async function unsubscribeSessionRealtime() {
+  const channel = sessionRealtimeChannel;
+  sessionRealtimeChannel = null;
+  if (channel) {
+    await supabase.removeChannel(channel);
   }
 }
 
 async function subscribeSessionRealtime(userId: string) {
-  unsubscribeSessionRealtime();
+  const generation = ++sessionRealtimeGeneration;
+  await unsubscribeSessionRealtime();
 
   const deviceSessionId = await getDeviceSessionId();
+  if (generation !== sessionRealtimeGeneration) {
+    return;
+  }
 
-  sessionRealtimeChannel = supabase
-    .channel(`user_sessions_sync:${deviceSessionId}`)
+  const channel = supabase
+    .channel(`user_sessions_sync:${userId}:${deviceSessionId}`)
     .on(
       "postgres_changes",
       {
@@ -109,7 +115,7 @@ async function subscribeSessionRealtime(userId: string) {
         table: "user_sessions",
         filter: `device_session_id=eq.${deviceSessionId}`,
       },
-      async (payload) => {
+      async () => {
         console.log("Active device session was remotely logged out. Signing out...");
         try {
           await signOut();
@@ -117,8 +123,10 @@ async function subscribeSessionRealtime(userId: string) {
           console.warn("Failed to sign out after remote revocation:", err);
         }
       }
-    )
-    .subscribe();
+    );
+
+  sessionRealtimeChannel = channel;
+  channel.subscribe();
 }
 
 async function applySession(session: Session | null) {
