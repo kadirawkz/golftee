@@ -156,6 +156,8 @@ export default function ExploreScreen() {
   const [showInteractiveMap, setShowInteractiveMap] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
   const hasCenteredOnUser = useRef(false);
+  const centerUserLocationOnNextSyncRef = useRef(false);
+  const suppressSelectedCourseCenterOnNextCourseSyncRef = useRef(false);
   const showInteractiveMapRef = useRef(false);
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const parsedScrollOffset = Number(scrollOffset);
@@ -213,13 +215,8 @@ export default function ExploreScreen() {
     setLocationLabel(nextLabel);
     setLocationState("ready");
     setLocationNotice({ kind: "none", title: "", body: "" });
-    setSelectedCourseId(null);
-
-    if (showInteractiveMapRef.current && (Platform.OS === 'web' || webViewRef.current)) {
-      const js = `updateUserLocation(${coordinates.latitude}, ${coordinates.longitude}, true);`;
-      injectJS(js);
-      hasCenteredOnUser.current = true;
-    }
+    centerUserLocationOnNextSyncRef.current = true;
+    suppressSelectedCourseCenterOnNextCourseSyncRef.current = true;
   }, []);
 
   const applyLocationFailureFallback = useCallback(() => {
@@ -684,7 +681,9 @@ export default function ExploreScreen() {
   // Update user location marker in WebView when it resolves
   useEffect(() => {
     if ((Platform.OS === 'web' || webViewRef.current) && isMapReady && locationState === "ready" && userLocation) {
-      const js = `updateUserLocation(${userLocation.latitude}, ${userLocation.longitude}, false);`;
+      const shouldCenter = centerUserLocationOnNextSyncRef.current;
+      centerUserLocationOnNextSyncRef.current = false;
+      const js = `updateUserLocation(${userLocation.latitude}, ${userLocation.longitude}, ${shouldCenter});`;
       injectJS(js);
     }
   }, [userLocation, locationState, isMapReady]);
@@ -700,7 +699,9 @@ export default function ExploreScreen() {
         lng: c.coordinates.longitude,
         distanceKm: c.distanceKm,
       }));
-      const js = `updateCourses('${JSON.stringify(coursesPayload).replace(/'/g, "\\'")}', ${selectedCourseId ? `"${selectedCourseId}"` : "null"});`;
+      const shouldPreserveCenter = suppressSelectedCourseCenterOnNextCourseSyncRef.current;
+      suppressSelectedCourseCenterOnNextCourseSyncRef.current = false;
+      const js = `updateCourses('${JSON.stringify(coursesPayload).replace(/'/g, "\\'")}', ${selectedCourseId ? `"${selectedCourseId}"` : "null"}, ${shouldPreserveCenter});`;
       injectJS(js);
     }
   }, [displayedCoursesWithDistance, isMapReady, selectedCourseId]);
@@ -905,7 +906,7 @@ export default function ExploreScreen() {
       }
     }
 
-    function updateCourses(coursesJson, selectedId) {
+    function updateCourses(coursesJson, selectedId, preserveCenter) {
       selectedCourseId = selectedId;
       var newCourses = JSON.parse(coursesJson);
       
@@ -928,7 +929,7 @@ export default function ExploreScreen() {
         
         markers[course.id] = marker;
         
-        if (isSelected) {
+        if (isSelected && !preserveCenter) {
           setTimeout(function() {
             map.setView([course.lat, course.lng], 9.5);
           }, 100);
