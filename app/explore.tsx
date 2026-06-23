@@ -231,6 +231,7 @@ export default function ExploreScreen() {
 
     isLocationLoadingRef.current = true;
     hasCenteredOnUser.current = false;
+    setSelectedCourseId(null);
     setLocationState("loading");
     setLocationNotice({ kind: "none", title: "", body: "" });
     setLocationLabel("Requesting location access...");
