@@ -17,7 +17,7 @@ import {
 } from "../services/course-data";
 import { getCachedExploreViewMode, setCachedExploreViewMode } from "../services/explore-state";
 import { useCourseCatalog } from "../services/course-management";
-import { openInGoogleMaps } from "../utils/map-links";
+import { ExploreMapOverlays } from "../components/explore-map-overlays";
 import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../components/theme";
 import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
 
@@ -1093,147 +1093,18 @@ export default function ExploreScreen() {
           />
         </Pressable>
 
-        {activeLocationNotice ? (
-          <Animated.View
-            style={[
-              styles.locationNoticeCard,
-              {
-                opacity: locationNoticeAnim,
-                transform: [{
-                  translateY: locationNoticeAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [40, 0]
-                  })
-                }],
-                pointerEvents: locationNotice.kind !== "none" ? 'auto' : 'none',
-                position: "relative",
-              },
-            ]}
-          >
-            <View style={[styles.locationNoticeHeader, { paddingRight: 24 }]}>
-              <View style={styles.locationNoticeIconWrap}>
-                <Ionicons
-                  name={activeLocationNotice.kind === "permissionBlocked" ? "settings-outline" : "locate-outline"}
-                  size={16}
-                  color={colors.primary}
-                />
-              </View>
-              <View style={styles.locationNoticeCopy}>
-                <Text style={styles.locationNoticeTitle}>{activeLocationNotice.title}</Text>
-                <Text style={styles.locationNoticeBody}>{activeLocationNotice.body}</Text>
-              </View>
-            </View>
-            <Pressable style={styles.locationNoticeAction} onPress={handleLocationNoticePrimaryAction} variant="chip">
-              <Text style={styles.locationNoticeActionText}>
-                {activeLocationNotice.kind === "permissionBlocked" ? "Open Settings" : "Retry"}
-              </Text>
-            </Pressable>
-            {/* Close Button */}
-            <Pressable
-              style={styles.closeCardButton}
-              onPress={() => setLocationNotice({ kind: "none", title: "", body: "" })}
-              variant="icon"
-            >
-              <Ionicons name="close" size={18} color={colors.text} />
-            </Pressable>
-          </Animated.View>
-        ) : null}
-
-        {activeCardCourse ? (
-          <Animated.View
-            style={[
-              styles.floatingCourseCard,
-              {
-                opacity: cardAnim,
-                transform: [{
-                  translateY: cardAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [40, 0]
-                  })
-                }],
-                pointerEvents: selectedCourse ? 'auto' : 'none',
-              },
-            ]}
-          >
-            <Pressable
-              style={styles.mapCardInner}
-              onPress={centerSelectedCourse}
-              variant="card"
-            >
-              {/* Top Row: Course Info & Dismiss */}
-              <View style={styles.mapCardHeaderRow}>
-                <View style={styles.mapCardInfo}>
-                  <Text style={styles.selectedCourseLabel}>SELECTED COURSE</Text>
-                  <Text style={styles.selectedCourseTitle} numberOfLines={1}>{activeCardCourse.title}</Text>
-                  
-                  <View style={styles.mapCardMetaRow}>
-                    <View style={styles.mapCardMetaItem}>
-                      <Ionicons name="location" size={12} color={colors.textSoft} />
-                      <Text style={styles.mapCardMetaText} numberOfLines={1}>
-                        {activeCardCourse.location} ({activeCardCourse.distanceKm.toFixed(0)} km)
-                      </Text>
-                    </View>
-                    <View style={styles.mapCardMetaDivider} />
-                    <View style={styles.mapCardMetaItem}>
-                      <Ionicons name="star" size={12} color={colors.accentWarm} />
-                      <Text style={styles.mapCardMetaText}>{activeCardCourse.rating}</Text>
-                    </View>
-                  </View>
-                </View>
-
-                <View style={styles.mapCardPriceBlock}>
-                  <Text style={styles.mapCardPriceLabel}>STARTING AT</Text>
-                  <Text style={styles.mapCardPriceVal}>{activeCardCourse.price}</Text>
-                </View>
-              </View>
-
-              <Pressable
-                style={styles.mapCardCloseBtn}
-                onPress={() => setSelectedCourseId(null)}
-                variant="icon"
-              >
-                <Ionicons name="close" size={18} color={colors.text} />
-              </Pressable>
-
-              {/* Actions Row */}
-              <View style={styles.mapCardActions}>
-                <Pressable
-                  style={[styles.mapCardBtn, styles.mapCardBtnSecondary]}
-                  onPress={() => openInGoogleMaps({
-                    coordinates: activeCardCourse.coordinates,
-                    placeQuery: activeCardCourse.placeQuery,
-                    placeId: activeCardCourse.placeId,
-                  })}
-                  variant="chip"
-                >
-                  <Ionicons name="navigate-outline" size={14} color={colors.primary} />
-                  <Text style={styles.mapCardBtnSecondaryText}>Open in Google Maps</Text>
-                </Pressable>
-
-                <Pressable
-                  style={[styles.mapCardBtn, styles.mapCardBtnSecondaryAlt]}
-                  onPress={() => openCourseDetails(activeCardCourse.id)}
-                  variant="chip"
-                >
-                  <Ionicons name="information-circle-outline" size={14} color={colors.primary} />
-                  <Text style={styles.mapCardBtnSecondaryText}>Details</Text>
-                </Pressable>
-
-                <Pressable
-                  style={[styles.mapCardBtn, styles.mapCardBtnPrimary]}
-                  onPress={() => router.navigate({
-                    pathname: "/tee-time-booking",
-                    params: { id: activeCardCourse.id }
-                  })}
-                  variant="cta"
-                >
-                  <Ionicons name="calendar-outline" size={14} color={colors.surface} />
-                  <Text style={styles.mapCardBtnPrimaryText}>Book Now</Text>
-                </Pressable>
-              </View>
-            </Pressable>
-          </Animated.View>
-        ) : null}
+        <ExploreMapOverlays
+          activeLocationNotice={activeLocationNotice}
+          locationNoticeAnim={locationNoticeAnim}
+          onLocationNoticePrimaryAction={handleLocationNoticePrimaryAction}
+          onDismissLocationNotice={() => setLocationNotice({ kind: "none", title: "", body: "" })}
+          activeCardCourse={activeCardCourse}
+          cardAnim={cardAnim}
+          onCloseSelectedCourse={() => setSelectedCourseId(null)}
+          onOpenCourseDetails={openCourseDetails}
+          onBookNow={(courseId) => router.navigate({ pathname: "/tee-time-booking", params: { id: courseId } })}
+          onCenterSelectedCourse={centerSelectedCourse}
+        />
       </View>
     </View>
   );
