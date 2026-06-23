@@ -380,7 +380,7 @@ export default function CourseDetailsScreen() {
                 onPress={() => {
                   router.navigate({
                     pathname: "/explore",
-                    params: { view: "map", courseId: course.id, origin: "details" },
+                    params: { view: "map", courseId: course.id },
                   });
                 }}
                 variant="chip"
