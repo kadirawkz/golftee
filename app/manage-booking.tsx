@@ -2,10 +2,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useMemo, useState } from "react";
-import { Platform,  ActivityIndicator, ScrollView, StyleSheet, Text, View  } from "react-native";
+import { Platform, ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
+import { AppHeader } from "../components/app-header";
 import {
   cancelBooking,
   formatBookingDate,
@@ -33,7 +34,7 @@ export default function ManageBookingScreen() {
   const { colors, resolvedTheme } = useAppTheme();
   const styles = useThemedStyles(themedStyles);
   const router = useRouter();
-  const { horizontalPadding, screenBottomPadding, isTabletLike, maxContentWidth } = useResponsiveLayout();
+  const { screenBottomPadding, isTabletLike, maxContentWidth, horizontalPadding } = useResponsiveLayout();
   const { bookingId } = useLocalSearchParams<{ bookingId?: string | string[] }>();
   const resolvedBookingId = Array.isArray(bookingId) ? bookingId[0] : bookingId;
   const bookingState = useBookingState();
@@ -69,8 +70,13 @@ export default function ManageBookingScreen() {
 
   if (!bookingState.initialized || bookingState.loading) {
     return (
-      <SafeAreaView style={styles.screen} edges={["bottom"]}>
+      <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
         <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
+        <AppHeader
+          title="Manage Booking"
+          onPressLeft={() => router.back()}
+          showRightButton={false}
+        />
         <View style={styles.centerState}>
           <Text style={styles.centerStateText}>Loading booking details...</Text>
         </View>
@@ -80,8 +86,13 @@ export default function ManageBookingScreen() {
 
   if (!booking) {
     return (
-      <SafeAreaView style={styles.screen} edges={["bottom"]}>
+      <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
         <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
+        <AppHeader
+          title="Manage Booking"
+          onPressLeft={() => router.back()}
+          showRightButton={false}
+        />
         <View style={styles.centerState}>
           <Text style={styles.centerStateText}>Booking not found.</Text>
         </View>
@@ -109,33 +120,33 @@ export default function ManageBookingScreen() {
         <View style={styles.metaCard}>
           <Ionicons name="calendar-outline" size={22} color={colors.primary} />
           <Text style={styles.metaTitle}>DATE</Text>
-          <Text style={styles.metaMain}>{formatBookingDate(booking.tee_date)}</Text>
+          <Text style={styles.metaMain} numberOfLines={1} adjustsFontSizeToFit>{formatBookingDate(booking.tee_date)}</Text>
         </View>
 
         <View style={styles.metaCard}>
           <Ionicons name="time-outline" size={22} color={colors.primary} />
           <Text style={styles.metaTitle}>TEE TIME</Text>
-          <Text style={styles.metaMain}>{formatBookingTime(booking.tee_time)}</Text>
+          <Text style={styles.metaMain} numberOfLines={1} adjustsFontSizeToFit>{formatBookingTime(booking.tee_time)}</Text>
         </View>
       </View>
 
       <View style={styles.partyCard}>
         <View>
           <Text style={styles.metaTitle}>PARTY SIZE</Text>
-          <Text style={styles.metaMain}>{booking.players} Players</Text>
+          <Text style={styles.partyMain}>{booking.players} Players</Text>
         </View>
         <View style={styles.avatarRow}>
           {Array.from({ length: visiblePlayerBubbles }).map((_, index) => {
             if (index === PARTY_BUBBLE_STYLES.length && overflowPlayers > 0) {
               return (
-                <View key={`overflow-${overflowPlayers}`} style={[styles.avatarBubble, styles.avatarMore]}>
+                <View key={`overflow-${overflowPlayers}`} style={[styles.avatarBubble, styles.avatarMore, index === 0 && styles.avatarFirst]}>
                   <Text style={styles.avatarMoreText}>{`+${overflowPlayers}`}</Text>
                 </View>
               );
             }
 
             const bubbleStyle = PARTY_BUBBLE_STYLES[index] ?? PARTY_BUBBLE_STYLES[PARTY_BUBBLE_STYLES.length - 1];
-            return <View key={`player-${index + 1}`} style={[styles.avatarBubble, styles[bubbleStyle]]} />;
+            return <View key={`player-${index + 1}`} style={[styles.avatarBubble, styles[bubbleStyle], index === 0 && styles.avatarFirst]} />;
           })}
         </View>
       </View>
@@ -156,11 +167,23 @@ export default function ManageBookingScreen() {
   const renderPriceSection = () => (
     <View style={styles.priceCard}>
       <Text style={styles.priceTitle}>Booking Costs</Text>
-      <Text style={styles.priceRow}>Green Fees: ${booking.green_fee.toFixed(2)}</Text>
-      <Text style={styles.priceRow}>Service Fee: ${booking.service_fee.toFixed(2)}</Text>
-      <Text style={styles.priceRow}>Caddy Fee: ${booking.caddy_fee.toFixed(2)}</Text>
-      <Text style={styles.priceRow}>Taxes: ${booking.taxes.toFixed(2)}</Text>
-      <Text style={styles.priceTotal}>Total: ${getBookingTotal(booking).toFixed(2)}</Text>
+      <View style={styles.priceSeparator} />
+      {[
+        { label: "Green Fees", value: booking.green_fee },
+        { label: "Service Fee", value: booking.service_fee },
+        { label: "Caddy Fee", value: booking.caddy_fee },
+        { label: "Taxes", value: booking.taxes },
+      ].map(({ label, value }) => (
+        <View key={label} style={styles.priceRow}>
+          <Text style={styles.priceLabel}>{label}</Text>
+          <Text style={styles.priceValue}>${value.toFixed(2)}</Text>
+        </View>
+      ))}
+      <View style={styles.priceSeparator} />
+      <View style={styles.priceRow}>
+        <Text style={styles.priceTotalLabel}>Total</Text>
+        <Text style={styles.priceTotalValue}>${getBookingTotal(booking).toFixed(2)}</Text>
+      </View>
     </View>
   );
 
@@ -214,7 +237,7 @@ export default function ManageBookingScreen() {
         <View style={styles.detailsIconWrap}>
           <Ionicons name="information-circle" size={22} color={colors.primary} />
         </View>
-        <View>
+        <View style={styles.detailsTextBlock}>
           <Text style={styles.detailsTitle}>Course Details</Text>
           <Text style={styles.detailsSubtitle}>Directions, amenities, and course rules</Text>
         </View>
@@ -224,8 +247,14 @@ export default function ManageBookingScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.screen} edges={["bottom"]}>
+    <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
       <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
+
+      <AppHeader
+        title="Manage Booking"
+        onPressLeft={() => router.back()}
+        showRightButton={false}
+      />
 
       <ScrollView
         showsVerticalScrollIndicator={Platform.OS === "web"}
@@ -256,7 +285,7 @@ export default function ManageBookingScreen() {
               </View>
             </View>
           ) : (
-            <>
+            <View style={styles.mobileStack}>
               {renderHeroSection()}
               {renderDetailsSection()}
               {renderQrSection()}
@@ -267,7 +296,7 @@ export default function ManageBookingScreen() {
               ) : null}
               {renderActionsSection()}
               {renderCourseDetailsLink()}
-            </>
+            </View>
           )}
         </View>
       </ScrollView>
@@ -281,10 +310,8 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     backgroundColor: colors.background,
   },
   scrollContent: {
-    paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 160,
-    gap: 12,
+    paddingBottom: 40,
   },
   centerState: {
     flex: 1,
@@ -298,6 +325,11 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     color: colors.textSoft,
     fontWeight: "600",
     textAlign: "center",
+  },
+  // Mobile: a View with gap so all sections are evenly spaced
+  mobileStack: {
+    width: "100%",
+    gap: 12,
   },
   heroCard: {
     height: 204,
@@ -359,7 +391,8 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     borderColor: colors.border,
     paddingHorizontal: 12,
     paddingVertical: 13,
-    gap: 5,
+    gap: 4,
+    minWidth: 0,
   },
   metaTitle: {
     fontSize: theme.typography.caption.fontSize,
@@ -369,25 +402,33 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     fontWeight: "700",
   },
   metaMain: {
-    fontSize: theme.typography.h3.fontSize,
-    lineHeight: theme.typography.h3.lineHeight,
+    fontSize: theme.typography.subtitle.fontSize,
+    lineHeight: theme.typography.subtitle.lineHeight,
     color: colors.text,
     fontWeight: "700",
+    flexShrink: 1,
   },
   partyCard: {
     borderRadius: 14,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 13,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 12,
+  },
+  partyMain: {
+    fontSize: theme.typography.subtitle.fontSize,
+    lineHeight: theme.typography.subtitle.lineHeight,
+    color: colors.text,
+    fontWeight: "700",
+    marginTop: 2,
   },
   avatarRow: {
     flexDirection: "row",
-    marginLeft: 8,
   },
   avatarBubble: {
     width: 34,
@@ -396,6 +437,10 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     borderWidth: 2,
     borderColor: colors.surface,
     marginLeft: -9,
+  },
+  // First bubble gets no negative margin
+  avatarFirst: {
+    marginLeft: 0,
   },
   avatarBubbleMuted: {
     backgroundColor: colors.muted,
@@ -421,35 +466,35 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     borderRadius: 18,
     backgroundColor: colors.primary,
     paddingHorizontal: 16,
-    paddingVertical: 18,
+    paddingVertical: 20,
     alignItems: "center",
-    gap: 7,
+    gap: 6,
   },
   qrTitle: {
     color: colors.surface,
-    fontSize: theme.typography.h2.fontSize,
-    lineHeight: theme.typography.h2.lineHeight,
+    fontSize: theme.typography.title.fontSize,
+    lineHeight: theme.typography.title.lineHeight,
     fontWeight: "700",
   },
   qrSubtitle: {
     color: colors.textOnPrimarySoft,
-    fontSize: theme.typography.subtitle.fontSize,
-    lineHeight: theme.typography.subtitle.lineHeight,
+    fontSize: theme.typography.bodySm.fontSize,
+    lineHeight: theme.typography.bodySm.lineHeight,
     textAlign: "center",
-    marginBottom: 6,
+    marginBottom: 4,
   },
   qrImageWrap: {
     width: 208,
-    height: 238,
+    height: 208,
     borderRadius: 12,
     backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 6,
+    marginBottom: 4,
   },
   qrImage: {
-    width: 200,
-    height: 200,
+    width: 196,
+    height: 196,
   },
   qrId: {
     color: colors.textOnPrimaryDim,
@@ -458,29 +503,51 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     letterSpacing: 1,
     fontWeight: "600",
   },
+  // Price card with proper row layout
   priceCard: {
     borderRadius: 14,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: 14,
-    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    gap: 8,
   },
   priceTitle: {
     fontSize: theme.typography.title.fontSize,
     lineHeight: theme.typography.title.lineHeight,
     color: colors.primary,
     fontWeight: "800",
-    marginBottom: 4,
+  },
+  priceSeparator: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: 2,
   },
   priceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  priceLabel: {
     fontSize: theme.typography.body.fontSize,
     lineHeight: theme.typography.body.lineHeight,
     color: colors.textSoft,
+    fontWeight: "500",
+  },
+  priceValue: {
+    fontSize: theme.typography.body.fontSize,
+    lineHeight: theme.typography.body.lineHeight,
+    color: colors.text,
     fontWeight: "600",
   },
-  priceTotal: {
-    marginTop: 4,
+  priceTotalLabel: {
+    fontSize: theme.typography.subtitle.fontSize,
+    lineHeight: theme.typography.subtitle.lineHeight,
+    color: colors.primary,
+    fontWeight: "800",
+  },
+  priceTotalValue: {
     fontSize: theme.typography.subtitle.fontSize,
     lineHeight: theme.typography.subtitle.lineHeight,
     color: colors.primary,
@@ -491,6 +558,8 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     lineHeight: theme.typography.bodySm.lineHeight,
     color: colors.textSoft,
     fontWeight: "600",
+    paddingHorizontal: 4,
+    paddingVertical: 2,
   },
   actionList: {
     gap: 10,
@@ -552,12 +621,14 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     justifyContent: "space-between",
     borderWidth: 1,
     borderColor: colors.border,
+    gap: 8,
   },
   detailsLeft: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
     flex: 1,
+    minWidth: 0,
   },
   detailsIconWrap: {
     width: 44,
@@ -566,6 +637,11 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
+    flexShrink: 0,
+  },
+  detailsTextBlock: {
+    flex: 1,
+    minWidth: 0,
   },
   detailsTitle: {
     color: colors.text,
@@ -575,13 +651,13 @@ const themedStyles = createThemedStyleSheet((colors) => ({
   },
   detailsSubtitle: {
     color: colors.textSoft,
-    fontSize: theme.typography.body.fontSize,
-    lineHeight: theme.typography.body.lineHeight,
+    fontSize: theme.typography.bodySm.fontSize,
+    lineHeight: theme.typography.bodySm.lineHeight,
     marginTop: 1,
   },
   contentBlock: {
     width: "100%",
-    alignItems: "center",
+    alignSelf: "center",
   },
   desktopLayoutRow: {
     flexDirection: "row",

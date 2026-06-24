@@ -852,7 +852,7 @@ grant select, insert, update, delete on table public.profiles to service_role;
 grant select, insert, delete on table public.favorite_courses to authenticated;
 grant select, insert, update, delete on table public.favorite_courses to service_role;
 
-grant select on table public.tee_time_bookings to authenticated;
+grant select, insert, update, delete on table public.tee_time_bookings to authenticated;
 grant select, insert, update, delete on table public.tee_time_bookings to service_role;
 
 -- Create Notifications Table

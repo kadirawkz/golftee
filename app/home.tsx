@@ -727,7 +727,14 @@ export default function HomeScreen() {
                   styleLabel={course.style}
                   tone={course.style === "COASTAL" ? "green" : "gold"}
                   cardStyle={[styles.trendingCard, isTabletLike && styles.trendingCardTablet]}
-                  onPress={() => openCourseDetails(course.id)}
+                  compactActionLabel="View Details"
+                  onPressCompactAction={() => openCourseDetails(course.id)}
+                  onPress={() =>
+                    router.navigate({
+                      pathname: "/explore",
+                      params: { view: "map", courseId: course.id },
+                    })
+                  }
                 />
               ))}
             </ScrollView>
