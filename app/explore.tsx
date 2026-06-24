@@ -163,6 +163,7 @@ export default function ExploreScreen() {
   const centerUserLocationOnNextSyncRef = useRef(false);
   const showInteractiveMapRef = useRef(false);
   const hasFocusedRouteCourseRef = useRef(false);
+  const prevSelectedCourseIdRef = useRef<string | null>(null);
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const parsedScrollOffset = Number(scrollOffset);
   const resolvedScrollOffset = Number.isFinite(parsedScrollOffset) && parsedScrollOffset > 0
@@ -230,7 +231,8 @@ export default function ExploreScreen() {
     setLocationLabel("Showing courses nearest to your current location");
 
     if ((Platform.OS === "web" || webViewRef.current) && isMapReady) {
-      injectJS(`updateUserLocation(${coordinates.latitude}, ${coordinates.longitude}, true);`);
+      // Stop any in-progress flyTo (e.g. from a selected course) before centering on user
+      injectJS(`map.stop(); updateUserLocation(${coordinates.latitude}, ${coordinates.longitude}, true);`);
     } else {
       centerUserLocationOnNextSyncRef.current = true;
     }
@@ -701,11 +703,19 @@ export default function ExploreScreen() {
   // Update selected marker in WebView when selectedCourseId changes from list interaction
   useEffect(() => {
     if ((Platform.OS === 'web' || webViewRef.current) && isMapReady) {
+      const selectionChanged = selectedCourseId !== prevSelectedCourseIdRef.current;
+      prevSelectedCourseIdRef.current = selectedCourseId;
+
       if (selectedCourseId) {
         const course = displayedCoursesById.get(selectedCourseId);
         if (course) {
-          const js = `selectMarker("${course.id}", ${course.coordinates.latitude}, ${course.coordinates.longitude});`;
-          injectJS(js);
+          if (selectionChanged) {
+            // New selection: fly to the course
+            injectJS(`selectMarker("${course.id}", ${course.coordinates.latitude}, ${course.coordinates.longitude});`);
+          } else {
+            // Same course, data just re-sorted (e.g. user location updated): update icon only
+            injectJS(`highlightMarker("${course.id}");`);
+          }
         }
       } else {
         injectJS('deselectMarker();');
@@ -923,6 +933,18 @@ export default function ExploreScreen() {
         markers[id].setIcon(makeDivIcon('#C79A4B', '#8B6512', '#fff', true));
       }
       animateMapTo(lat, lng, 9.5);
+    }
+
+    // Like selectMarker but skips the flyTo — used when the course list re-sorts
+    // without the selection actually changing, to avoid fighting other animations
+    function highlightMarker(id) {
+      selectedCourseId = id;
+      for (var key in markers) {
+        markers[key].setIcon(makeDivIcon('#2D7D4E', '#12392D', '#fff', false));
+      }
+      if (markers[id]) {
+        markers[id].setIcon(makeDivIcon('#C79A4B', '#8B6512', '#fff', true));
+      }
     }
 
     function deselectMarker() {
