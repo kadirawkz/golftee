@@ -139,7 +139,7 @@ export default function ManageBookingScreen() {
           {Array.from({ length: visiblePlayerBubbles }).map((_, index) => {
             if (index === PARTY_BUBBLE_STYLES.length && overflowPlayers > 0) {
               return (
-                <View key={`overflow-${overflowPlayers}`} style={[styles.avatarBubble, styles.avatarMore, index === 0 && styles.avatarFirst]}>
+                <View key={`overflow-${overflowPlayers}`} style={[styles.avatarBubble, styles.avatarMore]}>
                   <Text style={styles.avatarMoreText}>{`+${overflowPlayers}`}</Text>
                 </View>
               );
