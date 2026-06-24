@@ -3,7 +3,7 @@ import * as Location from "expo-location";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, InteractionManager, Linking, Platform, ScrollView, Text, TextInput, View, TouchableWithoutFeedback, Animated, BackHandler } from "react-native";
+import { FlatList, InteractionManager, Linking, Platform, ScrollView, Text, TextInput, View, TouchableWithoutFeedback, Animated, BackHandler, LayoutAnimation } from "react-native";
 import { WebView } from "react-native-webview";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
@@ -589,6 +589,7 @@ export default function ExploreScreen() {
   // Animate the bottom course card in/out
   useEffect(() => {
     if (selectedCourse) {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       setActiveCardCourse(selectedCourse);
       Animated.spring(cardAnim, {
         toValue: 1,
@@ -597,22 +598,21 @@ export default function ExploreScreen() {
         bounciness: 7,
       }).start();
     } else {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setActiveCardCourse(null);
       Animated.spring(cardAnim, {
         toValue: 0,
         useNativeDriver: true,
         speed: 16,
         bounciness: 7,
-      }).start(({ finished }) => {
-        if (finished) {
-          setActiveCardCourse(null);
-        }
-      });
+      }).start();
     }
   }, [selectedCourse, cardAnim]);
 
   // Animate the location notice card in/out
   useEffect(() => {
     if (locationNotice.kind !== "none") {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       setActiveLocationNotice(locationNotice);
       Animated.spring(locationNoticeAnim, {
         toValue: 1,
@@ -621,16 +621,14 @@ export default function ExploreScreen() {
         bounciness: 7,
       }).start();
     } else {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setActiveLocationNotice(null);
       Animated.spring(locationNoticeAnim, {
         toValue: 0,
         useNativeDriver: true,
         speed: 16,
         bounciness: 7,
-      }).start(({ finished }) => {
-        if (finished) {
-          setActiveLocationNotice(null);
-        }
-      });
+      }).start();
     }
   }, [locationNotice, locationNoticeAnim]);
 

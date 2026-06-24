@@ -63,12 +63,6 @@ export function ExploreMapOverlays({
             styles.locationNoticeCard,
             {
               opacity: locationNoticeAnim,
-              transform: [{
-                translateY: locationNoticeAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [40, 0],
-                }),
-              }],
               pointerEvents: activeLocationNotice.kind !== "none" ? "auto" : "none",
               position: "relative",
             },
@@ -108,12 +102,6 @@ export function ExploreMapOverlays({
             styles.floatingCourseCard,
             {
               opacity: cardAnim,
-              transform: [{
-                translateY: cardAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [40, 0],
-                }),
-              }],
               pointerEvents: "auto",
             },
           ]}

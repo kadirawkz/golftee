@@ -16,10 +16,10 @@ import * as ImagePicker from "expo-image-picker";
 
 
 const PRESET_AVATARS = [
-  { name: "Classic Golfer", url: "https://images.unsplash.com/photo-1535131749006-b7f58c99034b?auto=format&fit=crop&w=150&h=150&q=80" },
-  { name: "Club House", url: "https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?auto=format&fit=crop&w=150&h=150&q=80" },
-  { name: "Fairway", url: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=150&h=150&q=80" },
-  { name: "Tee Shot", url: "https://images.unsplash.com/photo-1593111774240-d529f12cf4bb?auto=format&fit=crop&w=150&h=150&q=80" },
+  { name: "Classic Golfer", url: "preset:classic_golfer" },
+  { name: "Club House", url: "preset:club_house" },
+  { name: "Fairway", url: "preset:fairway" },
+  { name: "Tee Shot", url: "preset:tee_shot" },
 ];
 
 const COUNTRY_CODES = [

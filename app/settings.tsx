@@ -47,6 +47,7 @@ function SessionRowItem({
   onPressRevoke,
   isRevoking,
   onAnimationComplete,
+  currentSessionAgeMs,
 }: {
   item: any;
   isCurrent: boolean;
@@ -55,6 +56,7 @@ function SessionRowItem({
   onPressRevoke: () => void;
   isRevoking: boolean;
   onAnimationComplete: () => void;
+  currentSessionAgeMs?: number;
 }) {
   const [fadeAnim] = useState(() => new Animated.Value(1));
   const [heightAnim] = useState(() => new Animated.Value(1));
@@ -102,9 +104,14 @@ function SessionRowItem({
     }),
   };
 
-  const sessionAgeMs = new Date().getTime() - new Date(item.created_at || item.last_active_at).getTime();
-  const isTooNewToLogOut = !isCurrent && sessionAgeMs < 24 * 60 * 60 * 1000;
-  const hoursLeft = Math.ceil((24 * 60 * 60 * 1000 - sessionAgeMs) / (1000 * 60 * 60));
+  const itemAgeMs = new Date().getTime() - new Date(item.created_at || item.last_active_at).getTime();
+  const safeCurrentSessionAgeMs = currentSessionAgeMs !== undefined ? currentSessionAgeMs : 24 * 60 * 60 * 1000;
+  
+  const isCurrentSessionNew = safeCurrentSessionAgeMs < 24 * 60 * 60 * 1000;
+  const isTargetOlder = itemAgeMs > safeCurrentSessionAgeMs;
+  
+  const isTooNewToLogOut = !isCurrent && isCurrentSessionNew && isTargetOlder;
+  const hoursLeft = isTooNewToLogOut ? Math.ceil((24 * 60 * 60 * 1000 - safeCurrentSessionAgeMs) / (1000 * 60 * 60)) : 0;
 
   return (
     <Animated.View style={[styles.sessionRow, animatedStyle, { overflow: "hidden" }]}>
@@ -310,6 +317,11 @@ export default function SettingsScreen() {
           ) : (
             sessions.map((item) => {
               const isCurrent = item.device_session_id === currentDeviceId;
+              const currentSession = sessions.find((s) => s.device_session_id === currentDeviceId);
+              const currentSessionAgeMs = currentSession 
+                ? new Date().getTime() - new Date(currentSession.created_at || currentSession.last_active_at).getTime() 
+                : 24 * 60 * 60 * 1000;
+
               return (
                 <SessionRowItem
                   key={item.id}
@@ -320,6 +332,7 @@ export default function SettingsScreen() {
                   onPressRevoke={() => handleRevokeSession(item.id)}
                   isRevoking={animatingRevokeId === item.id}
                   onAnimationComplete={() => void handleFinalRevoke(item.id)}
+                  currentSessionAgeMs={currentSessionAgeMs}
                 />
               );
             })
