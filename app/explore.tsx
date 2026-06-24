@@ -711,7 +711,7 @@ export default function ExploreScreen() {
         injectJS('deselectMarker();');
       }
     }
-  }, [selectedCourseId, isMapReady]);
+  }, [selectedCourseId, isMapReady, displayedCoursesById]);
 
   // Update user location marker in WebView when it resolves
   useEffect(() => {
