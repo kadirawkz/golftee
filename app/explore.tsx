@@ -221,18 +221,6 @@ export default function ExploreScreen() {
     hasFocusedRouteCourseRef.current = false;
   }, [courseId]);
 
-  const applyResolvedUserLocation = useCallback((
-    coordinates: { latitude: number; longitude: number },
-    nextLabel = "Showing courses nearest to your current location"
-  ) => {
-    setUserLocation({ ...coordinates });
-    setCachedUserLocation({ ...coordinates });
-    setLocationLabel(nextLabel);
-    setLocationState("ready");
-    setLocationNotice({ kind: "none", title: "", body: "" });
-    centerUserLocationOnNextSyncRef.current = true;
-  }, []);
-
   const centerUserLocationImmediately = useCallback((coordinates: { latitude: number; longitude: number }) => {
     hasCenteredOnUser.current = true;
     setUserLocation({ ...coordinates });
@@ -240,10 +228,11 @@ export default function ExploreScreen() {
     setLocationState("ready");
     setLocationNotice({ kind: "none", title: "", body: "" });
     setLocationLabel("Showing courses nearest to your current location");
-    centerUserLocationOnNextSyncRef.current = true;
 
     if ((Platform.OS === "web" || webViewRef.current) && isMapReady) {
       injectJS(`updateUserLocation(${coordinates.latitude}, ${coordinates.longitude}, true);`);
+    } else {
+      centerUserLocationOnNextSyncRef.current = true;
     }
   }, [isMapReady]);
 
