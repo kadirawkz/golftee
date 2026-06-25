@@ -164,6 +164,10 @@ export default function ExploreScreen() {
   const showInteractiveMapRef = useRef(false);
   const hasFocusedRouteCourseRef = useRef(false);
   const prevSelectedCourseIdRef = useRef<string | null>(null);
+  // True while a user-initiated location request is in-flight and the result
+  // should fly to the user's position. Cleared the moment the user selects a
+  // course so that the async result does NOT override an intentional course pan.
+  const pendingUserCenterRef = useRef(false);
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const parsedScrollOffset = Number(scrollOffset);
   const resolvedScrollOffset = Number.isFinite(parsedScrollOffset) && parsedScrollOffset > 0
@@ -230,13 +234,24 @@ export default function ExploreScreen() {
     setLocationNotice({ kind: "none", title: "", body: "" });
     setLocationLabel("Showing courses nearest to your current location");
 
+    // Only fly to user if they haven't navigated to a course since tapping the button,
+    // and there is no active course selection.
+    const shouldFly = pendingUserCenterRef.current && !selectedCourseId;
+    pendingUserCenterRef.current = false;
+    centerUserLocationOnNextSyncRef.current = false;
+
     if ((Platform.OS === "web" || webViewRef.current) && isMapReady) {
-      // Stop any in-progress flyTo (e.g. from a selected course) before centering on user
-      injectJS(`map.stop(); updateUserLocation(${coordinates.latitude}, ${coordinates.longitude}, true);`);
+      if (shouldFly) {
+        // Stop any in-progress flyTo before centering on user
+        injectJS(`map.stop(); updateUserLocation(${coordinates.latitude}, ${coordinates.longitude}, true);`);
+      } else {
+        // Just update the dot position without interrupting the current map view
+        injectJS(`updateUserLocation(${coordinates.latitude}, ${coordinates.longitude}, false);`);
+      }
     } else {
-      centerUserLocationOnNextSyncRef.current = true;
+      centerUserLocationOnNextSyncRef.current = shouldFly;
     }
-  }, [isMapReady]);
+  }, [isMapReady, selectedCourseId]);
 
   const applyLocationFailureFallback = useCallback(() => {
     setLocationState("fallback");
@@ -262,6 +277,10 @@ export default function ExploreScreen() {
 
   const requestUserLocation = useCallback(async () => {
     const immediateLocation = userLocation ?? getCachedUserLocation();
+
+    // Mark that we want the async result to fly to the user's location.
+    // This can be cancelled if the user taps a course before the result arrives.
+    pendingUserCenterRef.current = true;
 
     if (immediateLocation) {
       centerUserLocationImmediately(immediateLocation);
@@ -625,6 +644,8 @@ export default function ExploreScreen() {
 
   const centerSelectedCourse = useCallback(() => {
     if (selectedCourse && (Platform.OS === 'web' || webViewRef.current)) {
+      // User intentionally navigated to a course — cancel any pending user-location fly-to
+      pendingUserCenterRef.current = false;
       injectJS(`selectMarker("${selectedCourse.id}", ${selectedCourse.coordinates.latitude}, ${selectedCourse.coordinates.longitude});`);
     }
   }, [selectedCourse]);
@@ -635,6 +656,8 @@ export default function ExploreScreen() {
       return;
     }
 
+    // User intentionally navigated to a course — cancel any pending user-location fly-to
+    pendingUserCenterRef.current = false;
     setViewMode("map");
     setSelectedCourseId(course.id);
 
