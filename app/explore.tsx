@@ -234,9 +234,9 @@ export default function ExploreScreen() {
     setLocationNotice({ kind: "none", title: "", body: "" });
     setLocationLabel("Showing courses nearest to your current location");
 
-    // Only fly to user if they haven't navigated to a course since tapping the button,
-    // and there is no active course selection.
-    const shouldFly = pendingUserCenterRef.current && !selectedCourseId;
+    // Only fly to user if this was a user-initiated location request.
+    // Keep the currently selected course highlighted, but do not block recentering.
+    const shouldFly = pendingUserCenterRef.current;
     pendingUserCenterRef.current = false;
     centerUserLocationOnNextSyncRef.current = false;
 
@@ -251,7 +251,7 @@ export default function ExploreScreen() {
     } else {
       centerUserLocationOnNextSyncRef.current = shouldFly;
     }
-  }, [isMapReady, selectedCourseId]);
+  }, [isMapReady]);
 
   const applyLocationFailureFallback = useCallback(() => {
     setLocationState("fallback");
@@ -2328,3 +2328,4 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     height: "100%",
   },
 }));
+
