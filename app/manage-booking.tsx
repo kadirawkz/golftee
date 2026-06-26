@@ -6,7 +6,6 @@ import { Platform, ActivityIndicator, ScrollView, StyleSheet, Text, View } from 
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
-import { AppHeader } from "../components/app-header";
 import {
   cancelBooking,
   formatBookingDate,
@@ -72,11 +71,6 @@ export default function ManageBookingScreen() {
     return (
       <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
         <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
-        <AppHeader
-          title="Manage Booking"
-          onPressLeft={() => router.back()}
-          showRightButton={false}
-        />
         <View style={styles.centerState}>
           <Text style={styles.centerStateText}>Loading booking details...</Text>
         </View>
@@ -88,11 +82,6 @@ export default function ManageBookingScreen() {
     return (
       <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
         <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
-        <AppHeader
-          title="Manage Booking"
-          onPressLeft={() => router.back()}
-          showRightButton={false}
-        />
         <View style={styles.centerState}>
           <Text style={styles.centerStateText}>Booking not found.</Text>
         </View>
@@ -140,13 +129,18 @@ export default function ManageBookingScreen() {
             if (index === PARTY_BUBBLE_STYLES.length && overflowPlayers > 0) {
               return (
                 <View key={`overflow-${overflowPlayers}`} style={[styles.avatarBubble, styles.avatarMore]}>
+                  <Ionicons name="person" size={16} color={colors.surface} />
                   <Text style={styles.avatarMoreText}>{`+${overflowPlayers}`}</Text>
                 </View>
               );
             }
 
             const bubbleStyle = PARTY_BUBBLE_STYLES[index] ?? PARTY_BUBBLE_STYLES[PARTY_BUBBLE_STYLES.length - 1];
-            return <View key={`player-${index + 1}`} style={[styles.avatarBubble, styles[bubbleStyle], index === 0 && styles.avatarFirst]} />;
+            return (
+              <View key={`player-${index + 1}`} style={[styles.avatarBubble, styles[bubbleStyle], index === 0 && styles.avatarFirst]}>
+                <Ionicons name="person" size={16} color={colors.surface} />
+              </View>
+            );
           })}
         </View>
       </View>
@@ -249,13 +243,6 @@ export default function ManageBookingScreen() {
   return (
     <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
       <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
-
-      <AppHeader
-        title="Manage Booking"
-        onPressLeft={() => router.back()}
-        showRightButton={false}
-      />
-
       <ScrollView
         showsVerticalScrollIndicator={Platform.OS === "web"}
         contentContainerStyle={[
@@ -437,6 +424,8 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     borderWidth: 2,
     borderColor: colors.surface,
     marginLeft: -9,
+    alignItems: "center",
+    justifyContent: "center",
   },
   // First bubble gets no negative margin
   avatarFirst: {
@@ -452,9 +441,12 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     backgroundColor: colors.accent,
   },
   avatarMore: {
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 2,
     backgroundColor: colors.muted,
+    paddingHorizontal: 7,
   },
   avatarMoreText: {
     color: colors.surface,
@@ -676,3 +668,11 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     width: "100%",
   },
 }));
+
+
+
+
+
+
+
+
