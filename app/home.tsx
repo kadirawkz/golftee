@@ -36,9 +36,9 @@ import {
   refreshBookings,
 } from "../services/bookings";
 
-const HERO_NEWS_IMAGE = require("../assets/images/home-hero-news.webp");
-const HERO_OFFER_IMAGE = require("../assets/images/home-hero-offer.webp");
-const HERO_MEMBER_IMAGE = require("../assets/images/home-hero-member.webp");
+const HERO_NEWS_IMAGE = require("../assets/images/ui/home-hero-news.webp");
+const HERO_OFFER_IMAGE = require("../assets/images/ui/home-hero-offer.webp");
+const HERO_MEMBER_IMAGE = require("../assets/images/ui/home-hero-member.webp");
 
 const HERO_SLIDES = [
   {

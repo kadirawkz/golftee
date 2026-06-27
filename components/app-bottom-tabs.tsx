@@ -455,7 +455,7 @@ export function AppBottomTabs({ children }: AppBottomTabsProps) {
           <View style={styles.sidebar}>
             {/* Branding Logo */}
             <View style={styles.sidebarBranding}>
-              <Image source={require("../assets/images/icon.png")} style={styles.logoImage} />
+              <Image source={require("../assets/images/logos/icon.png")} style={styles.logoImage} />
               <Text style={styles.brandingText}>GolfTee</Text>
             </View>
 

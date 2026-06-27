@@ -525,7 +525,7 @@ export default function SignupScreen() {
         <View style={styles.desktopContainer}>
           <View style={styles.desktopHeroCol}>
             <View style={styles.logoCircleLarge}>
-              <Image source={require("../assets/images/icon.png")} style={styles.logoImageLarge} />
+              <Image source={require("../assets/images/logos/icon.png")} style={styles.logoImageLarge} />
             </View>
             <Text style={styles.desktopBrandingTitle}>GolfTee</Text>
             <Text style={styles.desktopBrandingDesc}>

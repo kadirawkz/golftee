@@ -101,7 +101,7 @@ export default function Index() {
       <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
 
       <View style={styles.background}>
-        <AppImage source={require("../assets/images/get-started-background.webp")} style={styles.backgroundImage} />
+        <AppImage source={require("../assets/images/ui/get-started-background.webp")} style={styles.backgroundImage} />
         <View style={[
           styles.dimLayer,
           { backgroundColor: resolvedTheme === "dark" ? "rgba(7, 32, 24, 0.78)" : "rgba(244, 248, 246, 0.78)" }
@@ -128,7 +128,7 @@ export default function Index() {
 
           {/* Logo & Title branding */}
           <Animated.View style={[styles.brandBlock, { transform: [{ translateY: logoTranslateY }] }]}>
-            <Image source={require("../assets/images/splash-icon.png")} style={styles.logoImage} />
+            <Image source={require("../assets/images/logos/splash-icon.png")} style={styles.logoImage} />
 
             <Text
               style={[

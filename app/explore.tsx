@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { useIsFocused } from "@react-navigation/native";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, InteractionManager, Linking, Platform, ScrollView, Text, TextInput, View, TouchableWithoutFeedback, Animated, BackHandler, LayoutAnimation } from "react-native";
 import { WebView } from "react-native-webview";
@@ -79,6 +80,7 @@ export default function ExploreScreen() {
   }>();
   const scrollRef = useRef<FlatList<DisplayedCourse>>(null);
   const webViewRef = useRef<WebView>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const hasAutoScrolled = useRef(false);
   const locationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "map">(
@@ -94,7 +96,7 @@ export default function ExploreScreen() {
 
   const injectJS = (js: string) => {
     if (Platform.OS === 'web') {
-      const iframe = document.getElementById('map-iframe') as HTMLIFrameElement | null;
+      const iframe = iframeRef.current;
       if (iframe?.contentWindow) {
         iframe.contentWindow.postMessage({ type: 'injectJavaScript', code: js }, '*');
       }
@@ -159,6 +161,14 @@ export default function ExploreScreen() {
   const [activeLocationNotice, setActiveLocationNotice] = useState<typeof locationNotice | null>(null);
   const [showInteractiveMap, setShowInteractiveMap] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
+  const [mapSyncTrigger, setMapSyncTrigger] = useState(0);
+  const isFocused = useIsFocused();
+
+  useEffect(() => {
+    if (isFocused && isMapReady) {
+      setMapSyncTrigger((prev) => prev + 1);
+    }
+  }, [isFocused, isMapReady]);
   const hasCenteredOnUser = useRef(false);
   const centerUserLocationOnNextSyncRef = useRef(false);
   const showInteractiveMapRef = useRef(false);
@@ -744,7 +754,7 @@ export default function ExploreScreen() {
         injectJS('deselectMarker();');
       }
     }
-  }, [selectedCourseId, isMapReady, displayedCoursesById]);
+  }, [selectedCourseId, isMapReady, displayedCoursesById, mapSyncTrigger]);
 
   // Update user location marker in WebView when it resolves
   useEffect(() => {
@@ -754,7 +764,7 @@ export default function ExploreScreen() {
       const js = `updateUserLocation(${userLocation.latitude}, ${userLocation.longitude}, ${shouldCenter});`;
       injectJS(js);
     }
-  }, [userLocation, locationState, isMapReady]);
+  }, [userLocation, locationState, isMapReady, mapSyncTrigger]);
 
   // Update courses list in WebView when courses list or map readiness changes
   useEffect(() => {
@@ -770,13 +780,14 @@ export default function ExploreScreen() {
       const js = `updateCourses('${JSON.stringify(coursesPayload).replace(/'/g, "\\'")}', ${selectedCourseId ? `"${selectedCourseId}"` : "null"});`;
       injectJS(js);
     }
-  }, [displayedCoursesWithDistance, isMapReady, selectedCourseId]);
+  }, [displayedCoursesWithDistance, isMapReady, selectedCourseId, mapSyncTrigger]);
 
   const handleWebViewMessage = useCallback((event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
       if (data.type === 'MAP_READY') {
         setIsMapReady(true);
+        setMapSyncTrigger((prev) => prev + 1);
       } else if (data.type === 'SELECT_COURSE') {
         setSelectedCourseId(data.courseId);
       } else if (data.type === 'VIEW_DETAILS') {
@@ -955,7 +966,7 @@ export default function ExploreScreen() {
       if (markers[id]) {
         markers[id].setIcon(makeDivIcon('#C79A4B', '#8B6512', '#fff', true));
       }
-      animateMapTo(lat, lng, 9.5);
+      animateMapTo(lat, lng, 10);
     }
 
     // Like selectMarker but skips the flyTo — used when the course list re-sorts
@@ -984,7 +995,7 @@ export default function ExploreScreen() {
         userMarker = L.marker([lat, lng], { icon: blueIcon }).addTo(map);
       }
       if (shouldCenter) {
-        animateMapTo(lat, lng, 8.5);
+        animateMapTo(lat, lng, 10);
       }
     }
 
@@ -1055,6 +1066,7 @@ export default function ExploreScreen() {
                 }
               `}} />
               <iframe
+                ref={iframeRef}
                 id="map-iframe"
                 title="Interactive Course Map"
                 srcDoc={leafletHtml}
