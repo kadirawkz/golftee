@@ -573,12 +573,7 @@ export default function ExploreScreen() {
         ...course,
         distanceKm: userLocation ? calculateDistanceKm(userLocation, course.coordinates) : 0,
       }))
-      .sort((a, b) => {
-        if (!userLocation) {
-          return a.title.localeCompare(b.title);
-        }
-        return a.distanceKm - b.distanceKm;
-      });
+      .sort((a, b) => a.title.localeCompare(b.title));
   }, [displayedCourses, userLocation]);
 
   const nearbyCourses = useMemo(
