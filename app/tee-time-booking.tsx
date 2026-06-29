@@ -11,7 +11,7 @@ import { AnimatedPressable as Pressable } from "../components/animated-pressable
 import { AppImage } from "../components/app-image";
 import { isEditableBooking, useBookingState } from "../services/bookings";
 import { getColomboDateKey, parseDateKeyToDate } from "../utils/colombo-time";
-import { getAvailableTeeSlots, getManagedCourseById, getNextBookableTeeSlot, type TeeSlot } from "../services/course-management";
+import { getAvailableTeeSlots, getManagedCourseById, getNextBookableTeeSlot, type TeeSlot, useCourseCatalog } from "../services/course-management";
 import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
 import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../components/theme";
 import { DailyWeatherForecast, getFourteenDayForecast, getWeatherCodeIconName } from "../services/weather";
@@ -76,6 +76,7 @@ export default function TeeTimeBookingScreen() {
   const rawCourseId = id || paramCourseId;
   const courseId = Array.isArray(rawCourseId) ? rawCourseId[0] : rawCourseId;
   const resolvedBookingId = Array.isArray(bookingId) ? bookingId[0] : bookingId;
+  useCourseCatalog();
   const course = getManagedCourseById(courseId);
   const bookingState = useBookingState();
   const existingBooking = bookingState.bookings.find((item) => item.id === resolvedBookingId) ?? null;

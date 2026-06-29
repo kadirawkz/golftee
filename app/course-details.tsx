@@ -7,7 +7,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
 import { getColomboDateKey } from "../utils/colombo-time";
-import { getManagedCourseById, getNextBookableTeeSlot, useCourseDetails, addCourseReview } from "../services/course-management";
+import { getManagedCourseById, getNextBookableTeeSlot, useCourseDetails, addCourseReview, useCourseCatalog } from "../services/course-management";
 import { toggleFavoriteCourse, useIsFavoriteCourse } from "../services/favorites";
 import { openInGoogleMaps } from "../utils/map-links";
 import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../components/theme";
@@ -118,6 +118,7 @@ export default function CourseDetailsScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
   const courseId = Array.isArray(id) ? id[0] : id;
+  useCourseCatalog();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [weather, setWeather] = useState<DailyWeatherForecast[]>([]);

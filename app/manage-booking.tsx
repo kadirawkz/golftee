@@ -15,7 +15,7 @@ import {
   isEditableBooking,
   useBookingState,
 } from "../services/bookings";
-import { getManagedCourseById } from "../services/course-management";
+import { getManagedCourseById, useCourseCatalog } from "../services/course-management";
 import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
 import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../components/theme";
 import { getCourseImage } from "../lib/image-mapping";
@@ -35,6 +35,7 @@ export default function ManageBookingScreen() {
   const router = useRouter();
   const { screenBottomPadding, isTabletLike, maxContentWidth, horizontalPadding } = useResponsiveLayout();
   const { bookingId } = useLocalSearchParams<{ bookingId?: string | string[] }>();
+  useCourseCatalog();
   const resolvedBookingId = Array.isArray(bookingId) ? bookingId[0] : bookingId;
   const bookingState = useBookingState();
   const booking = useMemo(

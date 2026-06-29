@@ -8,7 +8,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
 import { createBooking, updateBooking } from "../services/bookings";
-import { getManagedCourseById } from "../services/course-management";
+import { getManagedCourseById, useCourseCatalog } from "../services/course-management";
 import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
 import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../components/theme";
 import { getCourseImage } from "../lib/image-mapping";
@@ -60,6 +60,7 @@ export default function BookingCheckoutScreen() {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { scaleFont, scaleLineHeight } = useResponsiveLayout();
+  useCourseCatalog();
   const params = useLocalSearchParams<{
     id?: string | string[];
     players?: string | string[];

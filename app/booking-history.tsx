@@ -6,7 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { AnimatedPressable as Pressable } from "../components/animated-pressable";
 import { AppImage } from "../components/app-image";
 import { formatBookingDate, getBookingTotal, isHistoricalBooking, useBookingState } from "../services/bookings";
-import { getManagedCourseById } from "../services/course-management";
+import { getManagedCourseById, useCourseCatalog } from "../services/course-management";
 import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
 import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../components/theme";
 import { getCourseImage } from "../lib/image-mapping";
@@ -17,6 +17,7 @@ export default function BookingHistoryScreen() {
   const router = useRouter();
   const { horizontalPadding, screenBottomPadding } = useResponsiveLayout();
   const bookingState = useBookingState();
+  useCourseCatalog();
   const historyBookings = bookingState.bookings.filter(isHistoricalBooking).reverse();
   const completedBookings = historyBookings.filter((booking) => booking.status === "completed");
   const averageSpend = historyBookings.length

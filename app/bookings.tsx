@@ -26,7 +26,7 @@ import {
   useBookingState,
   refreshBookings,
 } from "../services/bookings";
-import { getManagedCourseById } from "../services/course-management";
+import { getManagedCourseById, useCourseCatalog } from "../services/course-management";
 import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
 import { createThemedStyleSheet, useThemedStyles, useAppTheme, theme } from "../components/theme";
 import { getCourseImage } from "../lib/image-mapping";
@@ -288,6 +288,7 @@ export default function BookingsScreen() {
   const router = useRouter();
   const { horizontalPadding, screenBottomPadding, isTabletLike } = useResponsiveLayout();
   const bookingState = useBookingState();
+  useCourseCatalog();
   const [refreshing, setRefreshing] = useState(false);
 
   const handleRefresh = useCallback(async () => {
