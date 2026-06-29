@@ -256,14 +256,14 @@ function BookingCard({
             </Pressable>
           </View>
         ) : (
-          <View style={styles.actionRow}>
+          <View style={[styles.actionRow, { justifyContent: "space-between" }]}>
             <View>
               <Text style={styles.metaLabel}>TOTAL PAID</Text>
               <Text style={styles.historyPrice}>${getBookingTotal(booking).toFixed(2)}</Text>
             </View>
 
             <Pressable
-              style={[styles.actionBtn, styles.primaryBtn, { flex: 0, paddingHorizontal: 20 }]}
+              style={styles.bookAgainBtn}
               onPress={() =>
                 router.navigate({
                   pathname: "/tee-time-booking",
@@ -545,28 +545,14 @@ export default function BookingsScreen() {
         {activeTab === "upcoming" && !bookingState.loading && (
           <View style={styles.sectionWrap}>
             {filteredUpcoming.length > 0 ? (
-              isTabletLike ? (
-                <View style={styles.desktopGrid}>
-                  {filteredUpcoming.map((booking) => (
-                    <View key={booking.id} style={styles.desktopCardWrapper}>
-                      <BookingCard
-                        booking={booking}
-                        onPressManage={handleManageBooking}
-                        showToast={showToast}
-                      />
-                    </View>
-                  ))}
-                </View>
-              ) : (
-                filteredUpcoming.map((booking) => (
-                  <BookingCard
-                    key={booking.id}
-                    booking={booking}
-                    onPressManage={handleManageBooking}
-                    showToast={showToast}
-                  />
-                ))
-              )
+              filteredUpcoming.map((booking) => (
+                <BookingCard
+                  key={booking.id}
+                  booking={booking}
+                  onPressManage={handleManageBooking}
+                  showToast={showToast}
+                />
+              ))
             ) : (
               <View style={styles.emptyContainer}>
                 <Ionicons name="calendar-outline" size={48} color={colors.muted} />
@@ -588,28 +574,14 @@ export default function BookingsScreen() {
         {activeTab === "history" && !bookingState.loading && (
           <View style={styles.sectionWrap}>
             {filteredHistory.length > 0 ? (
-              isTabletLike ? (
-                <View style={styles.desktopGrid}>
-                  {filteredHistory.map((booking) => (
-                    <View key={booking.id} style={styles.desktopCardWrapper}>
-                      <BookingCard
-                        booking={booking}
-                        onPressManage={handleManageBooking}
-                        showToast={showToast}
-                      />
-                    </View>
-                  ))}
-                </View>
-              ) : (
-                filteredHistory.map((booking) => (
-                  <BookingCard
-                    key={booking.id}
-                    booking={booking}
-                    onPressManage={handleManageBooking}
-                    showToast={showToast}
-                  />
-                ))
-              )
+              filteredHistory.map((booking) => (
+                <BookingCard
+                  key={booking.id}
+                  booking={booking}
+                  onPressManage={handleManageBooking}
+                  showToast={showToast}
+                />
+              ))
             ) : (
               <View style={styles.emptyContainer}>
                 <Ionicons name="journal-outline" size={48} color={colors.muted} />
@@ -975,6 +947,16 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     backgroundColor: "transparent",
   },
   primaryBtn: {
+    backgroundColor: colors.primary,
+  },
+  bookAgainBtn: {
+    height: 40,
+    borderRadius: theme.radius.pill,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 20,
     backgroundColor: colors.primary,
   },
   actionBtnText: {

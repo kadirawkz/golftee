@@ -605,7 +605,9 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     backgroundColor: colors.surfaceSoft,
   },
   appleIcon: {
-    backgroundColor: colors.inverse,
+    backgroundColor: "#000000",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.15)",
   },
   appleBadgeText: {
     color: colors.surface,
@@ -683,6 +685,7 @@ const themedStyles = createThemedStyleSheet((colors) => ({
   },
   modalContent: {
     width: "100%",
+    maxWidth: 500,
     backgroundColor: colors.surface,
     borderRadius: 24,
     padding: 24,

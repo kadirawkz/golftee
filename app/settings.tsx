@@ -1111,6 +1111,7 @@ const themedStyles = createThemedStyleSheet((colors) => ({
   },
   modalContent: {
     width: "100%",
+    maxWidth: 500,
     backgroundColor: colors.surface,
     borderRadius: 24,
     padding: 24,
@@ -1258,6 +1259,9 @@ const themedStyles = createThemedStyleSheet((colors) => ({
   },
   faqContainer: {
     height: "80%",
+    width: "100%",
+    maxWidth: 800,
+    alignSelf: "center",
     backgroundColor: colors.page,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,

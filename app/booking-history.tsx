@@ -15,7 +15,7 @@ export default function BookingHistoryScreen() {
   const { colors, resolvedTheme } = useAppTheme();
   const styles = useThemedStyles(themedStyles);
   const router = useRouter();
-  const { horizontalPadding, screenBottomPadding, isTabletLike } = useResponsiveLayout();
+  const { horizontalPadding, screenBottomPadding } = useResponsiveLayout();
   const bookingState = useBookingState();
   const historyBookings = bookingState.bookings.filter(isHistoricalBooking).reverse();
   const completedBookings = historyBookings.filter((booking) => booking.status === "completed");
@@ -58,16 +58,16 @@ export default function BookingHistoryScreen() {
           </Text>
         ) : null}
 
-        <View style={isTabletLike ? styles.desktopList : styles.list}>
+        <View style={styles.list}>
           {historyBookings.map((booking) => {
             const course = getManagedCourseById(booking.course_id);
             const badgeText =
               booking.status === "cancelled" ? "CANCELLED" : booking.status === "completed" ? "COMPLETED" : "PAST";
 
-            const cardContent = (
+            return (
               <Pressable
                 key={booking.id}
-                style={[styles.historyCard, isTabletLike && styles.desktopCard]}
+                style={styles.historyCard}
                 onPress={() => router.navigate({ pathname: "/manage-booking", params: { bookingId: booking.id } })}
                 variant="card"
               >
@@ -116,15 +116,6 @@ export default function BookingHistoryScreen() {
                 </View>
               </Pressable>
             );
-
-            if (isTabletLike) {
-              return (
-                <View key={booking.id} style={styles.desktopCardWrapper}>
-                  {cardContent}
-                </View>
-              );
-            }
-            return cardContent;
           })}
         </View>
       </ScrollView>

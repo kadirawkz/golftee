@@ -1234,6 +1234,7 @@ const themedStyles = createThemedStyleSheet((colors) => ({
   },
   modalContent: {
     width: "100%",
+    maxWidth: 500,
     backgroundColor: colors.surface,
     borderRadius: 20,
     padding: 20,
@@ -1374,6 +1375,9 @@ const themedStyles = createThemedStyleSheet((colors) => ({
   },
   billingModalContainer: {
     height: "80%",
+    width: "100%",
+    maxWidth: 800,
+    alignSelf: "center",
     backgroundColor: colors.page,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,

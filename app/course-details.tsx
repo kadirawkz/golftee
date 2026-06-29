@@ -1132,6 +1132,9 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     borderTopRightRadius: theme.radius.xl,
     maxHeight: "85%",
     paddingBottom: 24,
+    width: "100%",
+    maxWidth: 800,
+    alignSelf: "center",
   },
   modalHeader: {
     flexDirection: "row",
