@@ -216,6 +216,16 @@ export function AppBottomTabs({ children }: AppBottomTabsProps) {
       router.replace("/splash");
       return;
     }
+    if (Platform.OS === "web") {
+      if (navigation.canGoBack()) {
+        router.back();
+      } else if (typeof window !== "undefined" && window.history && window.history.length > 1) {
+        window.history.back();
+      } else {
+        router.replace("/home");
+      }
+      return;
+    }
     router.back();
   };
 

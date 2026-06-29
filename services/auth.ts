@@ -653,14 +653,21 @@ export async function updateProfile(profileUpdate: ProfileUpdate) {
 
   // Dispatch Profile update notification
   try {
-    const updatedFields = Object.keys(profileUpdate);
+    const oldHandicap = snapshot.profile?.handicap;
+    const newHandicap = profileUpdate.handicap;
+    const isHandicapChanged =
+      newHandicap !== undefined &&
+      (oldHandicap === undefined || oldHandicap === null
+        ? newHandicap !== null
+        : oldHandicap !== newHandicap);
+
     let title = "Profile Updated";
     let message = "Your profile information has been successfully updated.";
     let icon = "person";
 
-    if (updatedFields.includes("handicap")) {
+    if (isHandicapChanged) {
       title = "Handicap Updated";
-      message = `Your handicap has been updated to ${profileUpdate.handicap ?? "N/A"}.`;
+      message = `Your handicap has been updated to ${newHandicap ?? "N/A"}.`;
       icon = "golf";
     }
 
