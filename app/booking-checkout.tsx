@@ -234,7 +234,7 @@ export default function BookingCheckoutScreen() {
                     <Ionicons
                       name={method.brand === "Apple Pay" ? "logo-apple" : "logo-google"}
                       size={20}
-                      color={method.brand === "Apple Pay" ? "#FFFFFF" : colors.primary}
+                      color={method.brand === "Apple Pay" ? "#000000" : colors.primary}
                     />
                   ) : (
                     <Ionicons name="card" size={22} color={colors.primary} />
@@ -613,7 +613,7 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     backgroundColor: colors.surfaceTint,
   },
   appleIcon: {
-    backgroundColor: colors.inverse,
+    backgroundColor: "#FFFFFF",
   },
   appleText: {
     color: colors.surface,

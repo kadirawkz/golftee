@@ -121,33 +121,42 @@ export default function PaymentMethodsScreen() {
   };
 
   const handleDelete = (id: string) => {
-    Alert.alert(
-      "Remove Payment Method",
-      "Are you sure you want to remove this payment method?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Remove",
-          style: "destructive",
-          onPress: async () => {
-            const updated = methods.filter((m) => m.id !== id);
-            setMethods(updated);
-            await saveMethodsToStorage(updated);
+    const confirmDelete = async () => {
+      const updated = methods.filter((m) => m.id !== id);
+      setMethods(updated);
+      await saveMethodsToStorage(updated);
 
-            if (defaultMethodId === id && updated.length > 0) {
-              const newDefaultId = updated[0].id;
-              setDefaultMethodId(newDefaultId);
-              await AsyncStorage.setItem("golftee:settings:default_payment_id", newDefaultId);
-              await AsyncStorage.setItem("golftee:settings:default_payment", updated[0].type);
-            } else if (updated.length === 0) {
-              setDefaultMethodId("");
-              await AsyncStorage.removeItem("golftee:settings:default_payment_id");
-              await AsyncStorage.removeItem("golftee:settings:default_payment");
-            }
+      if (defaultMethodId === id && updated.length > 0) {
+        const newDefaultId = updated[0].id;
+        setDefaultMethodId(newDefaultId);
+        await AsyncStorage.setItem("golftee:settings:default_payment_id", newDefaultId);
+        await AsyncStorage.setItem("golftee:settings:default_payment", updated[0].type);
+      } else if (updated.length === 0) {
+        setDefaultMethodId("");
+        await AsyncStorage.removeItem("golftee:settings:default_payment_id");
+        await AsyncStorage.removeItem("golftee:settings:default_payment");
+      }
+    };
+
+    if (Platform.OS === "web") {
+      const confirmed = window.confirm("Are you sure you want to remove this payment method?");
+      if (confirmed) {
+        confirmDelete();
+      }
+    } else {
+      Alert.alert(
+        "Remove Payment Method",
+        "Are you sure you want to remove this payment method?",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Remove",
+            style: "destructive",
+            onPress: confirmDelete,
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
   };
 
   // Card formatting
@@ -308,7 +317,7 @@ export default function PaymentMethodsScreen() {
                           <Ionicons
                             name={method.brand === "Apple Pay" ? "logo-apple" : "logo-google"}
                             size={20}
-                            color={method.brand === "Apple Pay" ? "#FFFFFF" : colors.primary}
+                            color={method.brand === "Apple Pay" ? "#000000" : colors.primary}
                           />
                         ) : (
                           <Ionicons name="card" size={22} color={colors.primary} />
@@ -605,7 +614,7 @@ const themedStyles = createThemedStyleSheet((colors) => ({
     backgroundColor: colors.surfaceSoft,
   },
   appleIcon: {
-    backgroundColor: "#000000",
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.15)",
   },
